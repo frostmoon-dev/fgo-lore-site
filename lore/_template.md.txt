@@ -1,0 +1,8 @@
+---
+title: Entry title
+category: Servants | Places | Singularities | Lostbelts | Organizations | Concepts
+keywords: [main name, nickname, other trigger word]
+priority: 0
+constant: false    # true = always included, ignoring keywords
+---
+Two to six short lines. Facts the bot needs. No long history dumps.

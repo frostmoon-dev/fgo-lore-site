@@ -1,0 +1,191 @@
+# Shiru’s Garden
+
+A roleplay chat site for your own characters. Write bots, give them pictures, set up a
+world of lore, choose who you are, and talk to them through any OpenAI-compatible API
+or reverse proxy.
+
+Everything you create lives in your browser (IndexedDB). No accounts, no database, no
+server-side storage of your key.
+
+## What it does
+
+- **Bots** with picture, tagline, tags, definition, scenario, first message, alternate
+  first messages, example dialogue, and per-bot overrides for the system prompt,
+  post-history instructions, model, temperature and reply length.
+- **Pictures you crop yourself**: drag to move, wheel, pinch or the slider to zoom, for
+  both bot pictures and personas. Backgrounds crop to 16:9.
+- **Chat backgrounds**: one per bot, or a default for every chat, dimmed by an amount you
+  choose so the words always sit on a plain surface.
+- **Import and export character cards** in the format other roleplay sites use
+  (Character Card V2: PNG with the card embedded, or JSON). Lorebooks inside a card
+  are imported too.
+- **Personas**: who you are in a chat, with a picture and description. Set a default
+  and switch per chat.
+- **Prompt page**: the main prompt, post-history instructions, what to include,
+  generation settings, and a preview of the exact prompt a bot will receive.
+  Save several presets.
+- **Lorebooks**: lore entries live in books. A book can be used by every bot, or linked
+  to the bots you choose, so a Fate bot and a sci-fi bot never see each other's world.
+  Entries still enter the prompt only when their keywords appear in recent messages.
+- **Bond meter**: an optional relationship score per chat, shown in the chat header and
+  told to the bot, so a conversation that goes badly makes the character colder.
+- **Chat**: streaming replies, stop, regenerate with swipes between versions, edit any
+  message, delete with undo, several chats per bot, export a chat as text, Markdown or
+  JSON, and a per-message view of which lore was used and how many tokens were spent.
+- **Connection**: as many API profiles as you like, a model list fetched from the
+  provider, a test button, and custom headers for fussy proxies.
+- Light and dark theme, keyboard shortcuts, and a full backup/restore of your data.
+
+## Running it locally
+
+Requires Node 22.9 or newer.
+
+```bash
+npm install
+npm start          # http://localhost:3000
+```
+
+`npm start` compiles `bots/*.md` and `lore/*.md` into `public/library.json`, then serves
+`public/` and the `api/` functions. The server only listens on 127.0.0.1, so nobody else
+on your network can open it.
+
+## Deploying to Vercel
+
+1. Push this folder to a Git repository.
+2. In Vercel, **Add New → Project**, import the repository, and deploy. No settings to
+   change: `vercel.json` already sets the build command and output directory.
+3. Open the site, go to **Connection**, and add your API base URL, key and model.
+
+Or from this folder:
+
+```bash
+npx vercel
+```
+
+Environment variables are optional (see below). The site works with none set: each
+visitor brings their own key, and it is kept in their own browser.
+
+## How requests reach your API
+
+Set this per connection, on the Connection page.
+
+| Mode | Path | Use when |
+| --- | --- | --- |
+| **Relay** (default) | Browser → this site's `/api/chat` → your proxy | Almost always. Avoids CORS errors that stop proxies working from a browser. Your key is sent with each request, used once, and never stored or logged. |
+| **Direct** | Browser → your proxy | Your provider allows browser requests, or you run a local server such as Ollama. The key never touches this site. |
+| **This site's key** | Browser → `/api/chat` → the key in the site's environment | You run the site and want to supply the key yourself. |
+
+The relay refuses non-HTTPS URLs and private or local addresses when deployed, so a
+public deployment can't be used to reach machines inside a network. Locally those
+restrictions are off, so `http://localhost:11434/v1` works through the relay too.
+
+## Environment variables (optional)
+
+Copy `.env.example` to `.env` for local use, or set them in Vercel's project settings.
+
+| Variable | Meaning |
+| --- | --- |
+| `API_BASE_URL` | Base URL used by the "This site's key" mode. |
+| `API_KEY` | The key for that mode. |
+| `DEFAULT_MODEL` | Model used when a request doesn't name one. |
+| `ACCESS_CODE` | Required to allow "This site's key" on a deployed site. Without it, that mode works only when you run the site locally, so strangers can't spend your credit. Visitors type the code once on the Connection page. |
+| `PORT` | Local server port. Default 3000. |
+
+## The bond meter
+
+When bond tracking is on, two things happen. The bot is told where it stands, for
+example `Bond is 34 out of 100 (Civil)`, so the number colours how it behaves. And it is
+asked to end each reply with a hidden tag such as `<bond:+2>`, from -5 to +5, which the
+site strips out before showing the message.
+
+The meter is worked out from the replies currently on screen, not from a running total,
+so swiping to another version of a reply, editing it or deleting it moves the bond back
+in step. The header shows a tier: Hostile, Wary, Civil, Warm, Close, Devoted.
+
+Click the meter to set where *this* chat starts, so a stranger can begin at Hostile and
+an old friend at Close. Anything the conversation has already earned stays on top of the
+new figure, and other chats keep their own starting point. **Settings** holds the figure
+new chats begin at.
+
+Turn it off for one bot in that bot's **Scene** section, or everywhere in **Settings**.
+Some small models ignore the tag; the bond then simply stays where it is.
+
+## Lorebooks
+
+Every entry belongs to a book, managed on the **Lore** page.
+
+- A book marked **use with every bot** behaves like plain shared world lore.
+- Any other book reaches a bot only when that bot ticks it in its **Scene** section.
+- Importing a character card that carries a lorebook creates a book for it and links it
+  to the imported bot.
+- **Export** writes the book you are looking at; **Import** reads a book exported here, a
+  plain array of entries, or a SillyTavern world-info file into the current book.
+
+## Adding built-in bots and lore
+
+Files in `bots/` and `lore/` are compiled at build time and copied into each visitor's
+browser the first time they open the site. After that the copy belongs to them: editing
+or deleting it does not come back on reload, and changing the `.md` file does not
+overwrite their version.
+
+A bot file:
+
+```markdown
+---
+title: Morgan
+tagline: Queen of Fairy Britain. Cold, exact, and slow to trust.
+tags: [fate, royalty]
+avatar: avatars/morgan.webp     # a file you put in public/
+greeting: Speak.
+alternate_greetings:
+  - You again. Say what you came to say.
+scenario: The throne room of Camelot, late in the night.
+temperature: 0.85
+max_tokens: 600
+---
+
+You are Morgan le Fay… (the definition: who they are, how they speak, their rules)
+```
+
+A lore file:
+
+```markdown
+---
+title: Chaldea Security Organization
+category: Organizations
+keywords: [chaldea, security organization]
+priority: 10
+constant: false     # true = always in the prompt, ignoring keywords
+---
+
+Two to six short lines. Only what a bot needs in order to behave correctly.
+```
+
+Use `{{char}}` for the bot's name and `{{user}}` for your persona's name in any of these.
+
+## Project layout
+
+```
+api/            Vercel functions: chat.js, models.js, config.js (thin wrappers)
+lib/relay.js    Forwards requests to your API; blocks private addresses when deployed
+lib/entries.js  Reads the .md files
+scripts/build.js  bots/ + lore/  ->  public/library.json
+dev.js          Local server; runs the same api/ handlers Vercel does
+public/         The whole site: plain ES modules, no build step, no framework
+  js/store.js     IndexedDB data layer
+  js/prompt.js    Builds the messages sent to the model
+  js/api.js       Talks to the API, parses streams
+  js/card.js      Character card V2 import/export, including PNG
+  js/ui.js        Shared widgets: crop dialog, pickers, dialogs, toasts
+  js/views/       One file per page
+```
+
+There is no bundler and no dependency in the browser. `gray-matter` is used only by the
+build script.
+
+## Your data
+
+Bots, chats, personas, lorebooks, presets, pictures and API keys are stored by your
+browser, for this site only. Clearing site data deletes them. **Settings → Download backup** writes a JSON
+file with everything (API keys are left out unless you tick the box), and **Restore**
+reads it back.

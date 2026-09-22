@@ -1,0 +1,19 @@
+---
+title: Character name
+tagline: One line shown on the bot's card.
+tags: [fandom, trait]
+avatar: avatars/name.webp        # optional: a file you put in public/
+greeting: What they say first.
+alternate_greetings:
+  - A second way to open the scene.
+scenario: Where the chat starts and the situation between you.
+personality: Short trait list. Optional.
+temperature: 0.85                # optional per-bot overrides
+max_tokens: 600
+model: ""                        # optional: force a model for this bot
+---
+
+Who they are, how they think, how they speak, and their rules.
+Write it as instructions to the model. Use {{char}} and {{user}}.
+
+Keep it tight: every line here is sent with every message.

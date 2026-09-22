@@ -1,0 +1,16 @@
+{
+  "name": "shirus-garden",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.js",
+    "start": "node scripts/build.js && node --env-file-if-exists=.env dev.js"
+  },
+  "engines": {
+    "node": ">=22.9"
+  },
+  "dependencies": {
+    "gray-matter": "^4.0.3"
+  }
+}
