@@ -571,7 +571,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
   const direction = () => (directBar.hidden ? "" : directInput.value.trim());
   // With a direction waiting, an empty send lets the bot go ahead with it.
   const placeholderText = () => (!directBar.hidden
-    ? `Send now to let ${group() ? "the scene" : bot.name} react, or write your own message first`
+    ? `Press send to let ${group() ? "the scene" : bot.name} react`
     : group() ? "Message the scene…" : `Message ${bot.name}…`);
   function setDirecting(open, { surprise = false } = {}) {
     directBar.hidden = !open;
@@ -988,7 +988,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
     if (!el) return;
     const items = [...new Set(activity.values())];
     el.hidden = !items.length;
-    el.innerHTML = items.length ? `<span class="spin" aria-hidden="true"></span>${esc(items.join(" · "))}` : "";
+    el.innerHTML = items.length ? `<span class="moon-phase" aria-hidden="true"></span>${esc(items.join(" · "))}` : "";
     $("#composer-hint", main).hidden = items.length > 0;
   }
 

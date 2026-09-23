@@ -56,6 +56,11 @@ export async function render(main) {
             ${segmentedHTML("theme", [["system", "System"], ["light", "Light"], ["dark", "Dark"]], themePref)}
           </fieldset>
           <fieldset class="field">
+            <legend class="field-label">Colours</legend>
+            ${segmentedHTML("palette", [["moon", "Moon Cell"], ["paper", "Paper"]], readPref("palette", "moon"))}
+            <p class="hint">Moon Cell is violet and rose, after BB. Paper is warm cream and clay.</p>
+          </fieldset>
+          <fieldset class="field">
             <legend class="field-label">Text size</legend>
             ${segmentedHTML("text-size", SIZES, textPref)}
             <p class="hint">Menus, forms and headings across the site.</p>
@@ -240,6 +245,11 @@ export async function render(main) {
     const dark = pref === "system" ? matchMedia("(prefers-color-scheme: dark)").matches : pref === "dark";
     document.documentElement.dataset.theme = dark ? "dark" : "light";
     $("#theme-toggle").setAttribute("aria-label", dark ? "Switch to light theme" : "Switch to dark theme");
+  }));
+  $$('input[name="palette"]', main).forEach((r) => r.addEventListener("change", () => {
+    try { r.value === "moon" ? localStorage.removeItem("palette") : localStorage.setItem("palette", r.value); } catch {}
+    if (r.value === "paper") delete document.documentElement.dataset.palette;
+    else document.documentElement.dataset.palette = r.value;
   }));
   // Text sizes live in localStorage so theme-init.js can apply them before paint.
   const sizePref = (name, storageKey, dataKey) => $$(`input[name="${name}"]`, main).forEach((r) => r.addEventListener("change", () => {

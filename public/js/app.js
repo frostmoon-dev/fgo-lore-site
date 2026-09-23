@@ -111,8 +111,12 @@ const themeBtn = $("#theme-toggle");
 function paintThemeButton() {
   const dark = document.documentElement.dataset.theme === "dark";
   themeBtn.setAttribute("aria-label", dark ? "Switch to light theme" : "Switch to dark theme");
-  $$('meta[name="theme-color"]').forEach((m) => m.setAttribute("content", dark ? "#161412" : "#f3efe8"));
+  // The browser bar matches the page, whichever theme and colours are on.
+  const bg = getComputedStyle(document.documentElement).getPropertyValue("--bg").trim();
+  $$('meta[name="theme-color"]').forEach((m) => { m.setAttribute("content", bg); m.removeAttribute("media"); });
 }
+// Settings changes the theme and colours too; follow them from one place.
+new MutationObserver(paintThemeButton).observe(document.documentElement, { attributeFilter: ["data-theme", "data-palette"] });
 themeBtn.addEventListener("click", () => {
   const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
   document.documentElement.dataset.theme = next;
@@ -134,7 +138,9 @@ async function paintStatus() {
   dot.className = "status-dot";
   if (!conn) {
     dot.classList.add("off");
-    label.textContent = "Set up a connection";
+    label.textContent = "Connect API";
+    el.setAttribute("aria-label", "No connection yet. Set one up.");
+    el.title = "No connection yet. Set one up.";
     return;
   }
   if (lastResult === true) dot.classList.add("on");
@@ -142,6 +148,7 @@ async function paintStatus() {
   const model = conn.mode === "server" ? (conn.model || "server default") : (conn.model || "no model chosen");
   label.textContent = model;
   el.setAttribute("aria-label", `Connection ${conn.name}, model ${model}${lastResult === false ? ", last request failed" : ""}. Open connection settings.`);
+  el.title = `${conn.name} · ${model}${lastResult === false ? " · last request failed" : ""}`;
 }
 
 
