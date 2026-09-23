@@ -209,7 +209,9 @@ small { font-size: var(--t-sm); }
 }
 .nav-pair .icon-btn { width: 36px; height: 36px; color: var(--ink); }
 .nav-pair .icon-btn:hover { background: var(--raised); }
-.nav-pair-sep { width: 1px; height: 16px; background: var(--line-strong); opacity: .5; }
+.nav-pair-sep { width: 1px; height: 16px; margin: 0 var(--s1); background: var(--line-strong); opacity: .5; transition: opacity var(--dur) var(--ease); }
+/* A highlighted button is its own divider; the line would cut into it. */
+.nav-pair:has(.icon-btn:hover:not(:disabled), .icon-btn[aria-current="page"], .icon-btn:focus-visible) .nav-pair-sep { opacity: 0; }
 
 .main-nav { flex: 1; min-width: 0; }
 .main-nav ul { list-style: none; display: flex; gap: var(--s1); overflow-x: auto; scrollbar-width: none; }
@@ -230,8 +232,10 @@ small { font-size: var(--t-sm); }
 .header-status .label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* On wide screens the status gives up space before the menu does. */
 @media (min-width: 1000px) {
-  .main-nav { flex: 1 0 auto; }
-  .header-status { flex: 0 1 auto; min-width: 0; }
+  /* The menu keeps its size; the status takes the free space and shrinks first. */
+  .header-inner { gap: var(--s3); }
+  .main-nav { flex: 0 0 auto; }
+  .header-status { flex: 0 1 auto; min-width: 0; margin-left: auto; }
 }
 /* Mid-width: the dot alone; the words stay for screen readers and the tooltip. */
 @media (min-width: 1000px) and (max-width: 1199px) {
@@ -1114,8 +1118,10 @@ input[type="search"]::-webkit-search-cancel-button {
 .palette-btn { width: auto; padding: 0 var(--s2); gap: var(--s2); }
 .palette-hint { display: none; }
 @media (min-width: 1000px) {
-  .palette-btn { padding: 0 var(--s2) 0 var(--s3); border: 1px solid var(--line); }
+  .palette-btn { padding: 0 7px 0 var(--s3); border: 1px solid var(--line); }
   .palette-hint { display: inline-flex; }
+  /* Inside the pill the key is a pill too, the same distance from every edge. */
+  .palette-hint kbd { height: 20px; padding: 0 var(--s2); border-radius: var(--r-pill); border-bottom: 0; }
 }
 kbd {
   display: inline-flex; align-items: center; min-width: 20px; height: 20px; padding: 0 var(--s1); justify-content: center;
@@ -1147,7 +1153,7 @@ dialog.palette-dialog { width: min(600px, calc(100vw - 32px)); margin-top: 12vh;
 @media (hover: none) { .pal-foot { display: none; } }
 
 /* ---------- Tour and what's new ---------- */
-.tour { text-align: center; justify-items: center; max-width: 440px; }
+.tour { text-align: center; justify-items: center; }
 .tour-art {
   width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center;
   background: var(--accent-soft); color: var(--accent);
@@ -1156,7 +1162,7 @@ dialog.palette-dialog { width: min(600px, calc(100vw - 32px)); margin-top: 12vh;
 .tour p { max-width: 38ch; color: var(--muted); }
 #tour-action:empty { display: none; }
 .tour-dots { display: flex; gap: var(--s2); }
-.tour-dots span { width: 8px; height: 8px; border-radius: 50%; background: var(--line); transition: background var(--dur) var(--ease), width var(--dur) var(--ease); }
+.tour-dots span { width: 8px; height: 8px; border-radius: 50%; background: var(--line-strong); transition: background var(--dur) var(--ease), width var(--dur) var(--ease); }
 .tour-dots span.on { width: 24px; border-radius: var(--r-pill); background: var(--accent); }
 .tour .dialog-actions { width: 100%; }
 .news-list { list-style: none; display: grid; gap: var(--s4); }
