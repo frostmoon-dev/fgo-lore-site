@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
   <defs><mask id="bite"><rect width="64" height="64" fill="#fff"/><circle cx="41" cy="25" r="14" fill="#000"/></mask></defs>
-  <rect width="64" height="64" rx="16" fill="#1c1a17"/>
+  <rect width="64" height="64" rx="16" fill="#1e1828"/>
   <g transform="translate(32 32) scale(1) translate(-32 -32)">
-    <circle cx="30" cy="34" r="18" fill="#f3efe8" mask="url(#bite)"/>
-    <path d="M46 13.5Q47 18.5 52 19.5Q47 20.5 46 25.5Q45 20.5 40 19.5Q45 18.5 46 13.5Z" fill="#ef8a5a"/>
+    <circle cx="30" cy="34" r="18" fill="#f1edf5" mask="url(#bite)"/>
+    <path d="M46 13.5Q47 18.5 52 19.5Q47 20.5 46 25.5Q45 20.5 40 19.5Q45 18.5 46 13.5Z" fill="#f07ea2"/>
   </g>
 </svg>

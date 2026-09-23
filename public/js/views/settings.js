@@ -57,8 +57,8 @@ export async function render(main) {
           </fieldset>
           <fieldset class="field">
             <legend class="field-label">Colours</legend>
-            ${segmentedHTML("palette", [["paper", "Paper"], ["moon", "Moon Cell"]], readPref("palette", "paper"))}
-            <p class="hint">Paper is warm cream and clay. Moon Cell is violet and rose, after BB.</p>
+            ${segmentedHTML("palette", [["moon", "Moon Cell"], ["paper", "Paper"]], readPref("palette", "moon"))}
+            <p class="hint">Moon Cell is violet and rose, after BB. Paper is warm cream and clay.</p>
           </fieldset>
           <fieldset class="field">
             <legend class="field-label">Text size</legend>
@@ -247,7 +247,7 @@ export async function render(main) {
     $("#theme-toggle").setAttribute("aria-label", dark ? "Switch to light theme" : "Switch to dark theme");
   }));
   $$('input[name="palette"]', main).forEach((r) => r.addEventListener("change", () => {
-    try { r.value === "paper" ? localStorage.removeItem("palette") : localStorage.setItem("palette", r.value); } catch {}
+    try { r.value === "moon" ? localStorage.removeItem("palette") : localStorage.setItem("palette", r.value); } catch {}
     if (r.value === "paper") delete document.documentElement.dataset.palette;
     else document.documentElement.dataset.palette = r.value;
   }));

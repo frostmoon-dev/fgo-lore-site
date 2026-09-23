@@ -11,7 +11,7 @@ export const NEWS = [
   {
     version: "2026.09.23.3",
     items: [
-      ["Moon Cell colours", "Violet and rose, after BB. Turn them on in Settings → Appearance → Colours, or type \"moon\" in the search box."],
+      ["Moon Cell colours", "The site is now violet and rose, after BB. The old cream and clay look is still there: Settings → Appearance → Colours → Paper, or type \"paper\" in the search box."],
       ["Moon phases", "While something works in a chat, the line under the message box shows a small moon going through its phases."],
     ],
   },

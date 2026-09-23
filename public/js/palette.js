@@ -21,7 +21,7 @@ export function goToSettings(section) {
 
 const go = (hash) => () => { location.hash = hash; };
 function setPalette(value) {
-  try { value === "paper" ? localStorage.removeItem("palette") : localStorage.setItem("palette", value); } catch { /* private mode */ }
+  try { value === "moon" ? localStorage.removeItem("palette") : localStorage.setItem("palette", value); } catch { /* private mode */ }
   if (value === "paper") delete document.documentElement.dataset.palette;
   else document.documentElement.dataset.palette = value;
   const radio = document.querySelector(`input[name="palette"][value="${value}"]`);
