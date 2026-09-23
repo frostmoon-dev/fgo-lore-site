@@ -228,6 +228,16 @@ small { font-size: var(--t-sm); }
 }
 .header-status:hover { background: var(--fill); color: var(--ink); }
 .header-status .label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* On wide screens the status gives up space before the menu does. */
+@media (min-width: 1000px) {
+  .main-nav { flex: 1 0 auto; }
+  .header-status { flex: 0 1 auto; min-width: 0; }
+}
+/* Mid-width: the dot alone; the words stay for screen readers and the tooltip. */
+@media (min-width: 1000px) and (max-width: 1199px) {
+  .header-status { padding: 0 var(--s3); }
+  .header-status .label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+}
 .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--line-strong); flex: none; }
 .status-dot.on { background: var(--ok); }
 .status-dot.off { background: var(--danger); }
@@ -242,7 +252,7 @@ small { font-size: var(--t-sm); }
 .theme-toggle .icon-sun, :root[data-theme="dark"] .theme-toggle .icon-moon { display: none; }
 :root[data-theme="dark"] .theme-toggle .icon-sun { display: block; }
 
-@media (max-width: 860px) { .header-status { display: none; } }
+@media (max-width: 999px) { .header-status { display: none; } }
 @media (max-width: 700px) {
   .header-inner { flex-wrap: wrap; gap: var(--s2) var(--s3); padding-top: var(--s2); min-height: 0; }
   .brand { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
@@ -732,6 +742,9 @@ body.in-chat .site-footer { display: none; }
 @media (max-width: 600px) {
   #composer-hint { display: none; }
   .chat-topbar .hide-narrow { display: none; }
+  /* The bot's face is in every message and the sidebar; the name needs the room. */
+  .chat-topbar > .avatar, .chat-topbar > .avatar-link { display: none; }
+  .chat-topbar { min-height: 56px; padding: var(--s1) var(--s2); gap: var(--s1); }
 }
 
 /* ---------- Text size preview (Settings) ---------- */
@@ -794,7 +807,12 @@ body.in-chat .site-footer { display: none; }
 .bond-chip { color: var(--muted); }
 .bond-chip.up { color: var(--ok); }
 .bond-chip.down { color: var(--danger); }
-@media (max-width: 600px) { .bond-bar { width: 48px; } .bond-label { display: none; } }
+/* On a phone the label sits small above the bar, so the bar still says something. */
+@media (max-width: 600px) {
+  .chat-topbar .bond { flex-direction: column; align-items: stretch; justify-content: center; gap: var(--s1); height: 40px; padding: 0 var(--s2); }
+  .chat-topbar .bond-label { max-width: 72px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--t-xs); line-height: 1; text-align: center; }
+  .bond-bar { width: 56px; }
+}
 
 /* ---------- Lorebook bar ---------- */
 .book-bar { margin-bottom: var(--s5); display: grid; gap: var(--s3); }

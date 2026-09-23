@@ -138,7 +138,9 @@ async function paintStatus() {
   dot.className = "status-dot";
   if (!conn) {
     dot.classList.add("off");
-    label.textContent = "Set up a connection";
+    label.textContent = "Connect API";
+    el.setAttribute("aria-label", "No connection yet. Set one up.");
+    el.title = "No connection yet. Set one up.";
     return;
   }
   if (lastResult === true) dot.classList.add("on");
@@ -146,6 +148,7 @@ async function paintStatus() {
   const model = conn.mode === "server" ? (conn.model || "server default") : (conn.model || "no model chosen");
   label.textContent = model;
   el.setAttribute("aria-label", `Connection ${conn.name}, model ${model}${lastResult === false ? ", last request failed" : ""}. Open connection settings.`);
+  el.title = `${conn.name} · ${model}${lastResult === false ? " · last request failed" : ""}`;
 }
 
 
