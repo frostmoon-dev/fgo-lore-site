@@ -618,11 +618,16 @@ body.in-chat .site-footer { display: none; }
 .chat-log-inner { max-width: var(--measure); margin: 0 auto; display: grid; gap: var(--s4); }
 /* One picture size for everyone in a chat, faces included. */
 .msg { --pic: 96px; display: grid; grid-template-columns: var(--pic) minmax(0, 1fr); gap: var(--s4); }
+.msg > .avatar, .msg > .avatar-link > .avatar { --size: var(--pic) !important; }
+/* Picture size (Chat look, or Settings → Appearance). */
+:root[data-chat-pic="md"] .msg { --pic: 72px; }
+:root[data-chat-pic="sm"] .msg { --pic: 48px; gap: var(--s3); }
 /* A hairline keeps pictures crisp against any background. */
 .msg > .avatar, .msg > .avatar-link > .avatar, .msg .expr-face { box-shadow: 0 0 0 1px var(--line); }
 @media (max-width: 600px) {
   .msg { --pic: 56px; gap: var(--s3); }
-  .msg > .avatar, .msg > .avatar-link > .avatar { --size: 56px !important; }
+  :root[data-chat-pic="md"] .msg { --pic: 48px; }
+  :root[data-chat-pic="sm"] .msg { --pic: 40px; }
 }
 .msg-head { display: flex; align-items: baseline; gap: var(--s2); margin-bottom: var(--s1); }
 .msg-name { font-size: var(--t-ui); font-weight: 600; }

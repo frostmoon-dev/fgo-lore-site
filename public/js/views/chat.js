@@ -1980,6 +1980,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
 
   const LOOK_FONTS = [["rounded", "Rounded"], ["serif", "Book"], ["plain", "Plain"]];
   const LOOK_SIZES = [["sm", "Small"], ["md", "Default"], ["lg", "Large"], ["xl", "Largest"]];
+  const LOOK_PICS = [["sm", "Small"], ["md", "Medium"], ["lg", "Large"]];
   const readLocal = (key, fallback) => { try { return localStorage.getItem(key) ?? fallback; } catch { return fallback; } };
   // Same storage as Settings → Appearance, so both stay in step.
   function setLocal(key, dataKey, value, fallback) {
@@ -2005,6 +2006,10 @@ export async function render(main, [botId, chatId, jumpTo]) {
       </fieldset>
       <fieldset class="field"><legend class="field-label">Message size</legend>
         ${seg("look-size", LOOK_SIZES, readLocal("chatTextSize", "md"))}
+      </fieldset>
+      <fieldset class="field"><legend class="field-label">Picture size</legend>
+        ${seg("look-pic", LOOK_PICS, readLocal("chatPic", "lg"))}
+        <p class="hint">Avatars and expressions beside each message. Smaller on phones.</p>
       </fieldset>
       <div class="dialog-actions">
         <a class="btn btn-quiet push" href="#/settings" id="look-more">More in Settings</a>
@@ -2033,6 +2038,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
     });
     $$('input[name="look-font"]', dlg).forEach((r) => r.addEventListener("change", () => setLocal("chatFont", "chatFont", r.value, "rounded")));
     $$('input[name="look-size"]', dlg).forEach((r) => r.addEventListener("change", () => setLocal("chatTextSize", "chatText", r.value, "md")));
+    $$('input[name="look-pic"]', dlg).forEach((r) => r.addEventListener("change", () => setLocal("chatPic", "chatPic", r.value, "lg")));
     $("#look-done", dlg).addEventListener("click", () => dlg.close());
     $("#look-more", dlg).addEventListener("click", () => dlg.close());
   }
@@ -2218,7 +2224,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
     { label: "See the prompt", hint: "Exactly what the model gets next", onSelect: previewPrompt },
     { label: "Usage in this chat", hint: "Tokens used by replies here", onSelect: openChatUsage },
     "-",
-    { label: "Chat look", hint: "Background, font and text size", onSelect: openLook },
+    { label: "Chat look", hint: "Background, font, text and picture size", onSelect: openLook },
     { label: "Rename chat", onSelect: rename },
     { label: "Export chat", onSelect: exportChat },
     "-",
@@ -2259,7 +2265,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
       c(`Translate my message into ${chatLanguage()}`, translateOutgoing, "language", "Alt+T"),
       c("See the prompt", previewPrompt, "debug context"),
       c("Usage in this chat", openChatUsage, "tokens cost"),
-      c("Chat look", openLook, "background font text size appearance wallpaper"),
+      c("Chat look", openLook, "background font text size appearance wallpaper avatar picture resize"),
       c("Rename chat", rename, "title"),
       c("Edit my persona", editPersona, "who i am description me user"),
       c("Export chat", exportChat, "download save"),
