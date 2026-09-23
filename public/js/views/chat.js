@@ -1777,6 +1777,10 @@ export async function render(main, [botId, chatId, jumpTo]) {
     const submit = settings.enterToSend ? e.key === "Enter" && !e.shiftKey && !e.isComposing : e.key === "Enter" && (e.ctrlKey || e.metaKey);
     if (submit) { e.preventDefault(); send(); }
   });
+  // iPhones scroll the whole page up to make room for the keyboard and can
+  // leave it there. The chat page never scrolls, so put it back.
+  const settlePage = () => setTimeout(() => { if (window.scrollY || window.scrollX) window.scrollTo(0, 0); }, 50);
+  main.addEventListener("focusout", settlePage);
   const onGlobalKey = (e) => {
     if (e.key === "Escape" && busy) controller?.abort();
     if (e.key === "Escape" && drafting) drafting.abort();
@@ -2176,6 +2180,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
       const every = Math.max(4, Number(settings.journal?.every) || 12);
       if (settings.journal?.auto !== false && activeConn && chat.messages.length - journalFrom() >= every) journalInBackground();
       document.removeEventListener("keydown", onGlobalKey);
+      main.removeEventListener("focusout", settlePage);
       document.body.classList.remove("in-chat");
     },
   };
