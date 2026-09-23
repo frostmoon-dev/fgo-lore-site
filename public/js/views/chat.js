@@ -1,5 +1,5 @@
 import {
-  bots, chats, lore, personas, getSettings, getActiveConnection, getActivePreset,
+  bots, chats, lore, personas, getSettings, saveSettings, getActiveConnection, getActivePreset,
   getLorebooks, saveLorebooks, newLorebook, newLore, loreForBot, bondTier, bondLevels, BOND_KINDS, moodsOf, uid, now,
   getBotPersonas, rememberBotPersona,
 } from "../store.js";
@@ -16,7 +16,7 @@ import { bondChartHTML, wireBondChart } from "../chart.js";
 import { renderMarkdown } from "../markdown.js";
 import {
   $, $$, esc, icon, avatarHTML, toast, confirmDialog, promptDialog, openDialog, openMenu,
-  download, slug, timeAgo, clock, autosize, sliderHTML, wireSlider,
+  download, slug, timeAgo, clock, autosize, sliderHTML, wireSlider, imagePicker, imagePickerHTML, debounce,
 } from "../ui.js";
 
 // New chats are numbered per bot: Chat 1, Chat 2, … Renamed chats keep
@@ -112,8 +112,6 @@ export async function render(main, [botId, chatId, jumpTo]) {
   const translating = new Set(); // message ids being translated
 
   const persona = () => allPersonas.find((p) => p.id === chat.personaId) ?? activePersona;
-  const background = bot.background ?? settings.chatBackground ?? null;
-  if (background) main.style.setProperty("--bg-dim", String(settings.backgroundDim ?? 0.86));
 
   // ---------- Who is in the scene ----------
   const botById = new Map(allBots.map((b) => [b.id, b]));
@@ -207,8 +205,8 @@ export async function render(main, [botId, chatId, jumpTo]) {
       </aside>
       <div class="scrim" id="scrim" hidden></div>
 
-      <section class="chat-main${background ? " has-bg" : ""}" aria-label="Conversation">
-        ${background ? `<div class="chat-bg" style="background-image:url('${esc(background)}')" aria-hidden="true"></div>` : ""}
+      <section class="chat-main" aria-label="Conversation">
+        <div class="chat-bg" aria-hidden="true" hidden></div>
         <div class="chat-topbar">
           <button class="icon-btn only-mobile" type="button" id="open-sidebar" aria-label="Show chats" aria-controls="sidebar" aria-expanded="false">${icon("menu")}</button>
           ${botAvatar(bot, 36, " only-mobile")}
@@ -445,9 +443,9 @@ export async function render(main, [botId, chatId, jumpTo]) {
     const speaker = speakerOf(m);
     const name = isBot ? speaker.name : userName();
     const face = isBot && meta0(m).mood && speaker.expressions?.[meta0(m).mood];
-    const av = !isBot ? avatarHTML(p?.avatar, name, 40)
+    const av = !isBot ? avatarHTML(p?.avatar, name, 48)
       : face ? `<a class="avatar-link" href="#/bot/${speaker.id}" aria-label="Edit ${esc(speaker.name)}" title="${esc(speaker.name)}, ${esc(meta0(m).mood)}"><span class="expr-face"><img src="${esc(face)}" alt=""></span></a>`
-      : botById.has(speaker.id) ? botAvatar(speaker, 40) : avatarHTML(null, name, 40);
+      : botById.has(speaker.id) ? botAvatar(speaker, 48) : avatarHTML(null, name, 48);
     const text = currentText(m);
     const isLastBot = isBot && i === lastAssistantIndex() && i === chat.messages.length - 1;
     const streaming = busy && isLastBot;
@@ -1964,6 +1962,78 @@ export async function render(main, [botId, chatId, jumpTo]) {
     await persist(); paintHeader(); paintLog({ scroll: false });
   });
 
+  // ---------- Chat look ----------
+  // The bot's background (or the default one from Settings), dimmed so text
+  // stays readable. Repainted live from the Chat look dialog.
+  function paintBackground() {
+    const url = bot.background ?? settings.chatBackground ?? null;
+    const layer = $(".chat-bg", main);
+    $(".chat-main", main).classList.toggle("has-bg", !!url);
+    layer.hidden = !url;
+    layer.style.backgroundImage = url ? `url("${url}")` : "";
+    main.style.setProperty("--bg-dim", String(settings.backgroundDim ?? 0.86));
+  }
+  paintBackground();
+
+  const LOOK_FONTS = [["rounded", "Rounded"], ["serif", "Book"], ["plain", "Plain"]];
+  const LOOK_SIZES = [["sm", "Small"], ["md", "Default"], ["lg", "Large"], ["xl", "Largest"]];
+  const readLocal = (key, fallback) => { try { return localStorage.getItem(key) ?? fallback; } catch { return fallback; } };
+  // Same storage as Settings → Appearance, so both stay in step.
+  function setLocal(key, dataKey, value, fallback) {
+    try { value === fallback ? localStorage.removeItem(key) : localStorage.setItem(key, value); } catch { /* private mode */ }
+    if (value === fallback) delete document.documentElement.dataset[dataKey];
+    else document.documentElement.dataset[dataKey] = value;
+  }
+  const seg = (name, options, value) => `<div class="segmented">${options.map(([v, label]) =>
+    `<label><input type="radio" name="${name}" value="${v}" ${value === v ? "checked" : ""}><span>${label}</span></label>`).join("")}</div>`;
+
+  function openLook() {
+    const dlg = openDialog(`<div class="dialog-body look">
+      <h2>Chat look</h2>
+      <p class="hint">Changes show in the chat straight away.</p>
+      <div class="field"><span class="field-label">Background for ${esc(bot.name)}</span>
+        <div id="look-bg">${imagePickerHTML("look-bg-file", { label: "Upload background", hint: "Cropped to 16:9 and dimmed behind the text.", cls: "bg-edit" })}</div>
+        <p class="hint">${settings.chatBackground ? "Without one, this chat uses the default background from Settings." : "Only chats with this bot use it. The default for every bot is in Settings."}</p>
+      </div>
+      ${sliderHTML({ id: "look-dim", label: "Dim behind the text", min: 0.4, max: 0.98, step: 0.02, value: settings.backgroundDim ?? 0.86, hint: "Higher hides more of the picture. Applies to every chat." })}
+      <fieldset class="field"><legend class="field-label">Font</legend>
+        ${seg("look-font", LOOK_FONTS, readLocal("chatFont", "rounded"))}
+        <p class="hint">For messages and the box you type in.</p>
+      </fieldset>
+      <fieldset class="field"><legend class="field-label">Message size</legend>
+        ${seg("look-size", LOOK_SIZES, readLocal("chatTextSize", "md"))}
+      </fieldset>
+      <div class="dialog-actions">
+        <a class="btn btn-quiet push" href="#/settings" id="look-more">More in Settings</a>
+        <button class="btn btn-primary" type="button" id="look-done">Done</button>
+      </div>
+    </div>`);
+    imagePicker($("#look-bg", dlg), {
+      get: () => bot.background ?? null,
+      set: async (v) => {
+        if (v) bot.background = v; else delete bot.background;
+        await bots.save(bot);
+        paintBackground();
+      },
+      crop: { aspect: 16 / 9, outW: 1600, outH: 900, quality: 0.82, title: "Crop the chat background" },
+      preview: (url) => (url
+        ? `<span class="bg-thumb"><img src="${esc(url)}" alt=""></span>`
+        : `<span class="bg-thumb is-empty">No background</span>`),
+    });
+    const saveDim = debounce(() => saveSettings({ backgroundDim: settings.backgroundDim }), 300);
+    wireSlider(dlg, "look-dim", () => {
+      const v = Number($("#look-dim", dlg).value);
+      if (!Number.isFinite(v) || v < 0.4 || v > 0.98) return;
+      settings.backgroundDim = v;
+      paintBackground();
+      saveDim();
+    });
+    $$('input[name="look-font"]', dlg).forEach((r) => r.addEventListener("change", () => setLocal("chatFont", "chatFont", r.value, "rounded")));
+    $$('input[name="look-size"]', dlg).forEach((r) => r.addEventListener("change", () => setLocal("chatTextSize", "chatText", r.value, "md")));
+    $("#look-done", dlg).addEventListener("click", () => dlg.close());
+    $("#look-more", dlg).addEventListener("click", () => dlg.close());
+  }
+
   // Rename in place: click the name, type, Enter saves, Esc cancels.
   const titleBtn = $("#chat-title", main);
   const titleInput = $("#title-input", main);
@@ -2145,6 +2215,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
     { label: "See the prompt", hint: "Exactly what the model gets next", onSelect: previewPrompt },
     { label: "Usage in this chat", hint: "Tokens used by replies here", onSelect: openChatUsage },
     "-",
+    { label: "Chat look", hint: "Background, font and text size", onSelect: openLook },
     { label: "Rename chat", onSelect: rename },
     { label: "Export chat", onSelect: exportChat },
     "-",
@@ -2185,6 +2256,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
       c(`Translate my message into ${chatLanguage()}`, translateOutgoing, "language", "Alt+T"),
       c("See the prompt", previewPrompt, "debug context"),
       c("Usage in this chat", openChatUsage, "tokens cost"),
+      c("Chat look", openLook, "background font text size appearance wallpaper"),
       c("Rename chat", rename, "title"),
       c("Edit my persona", editPersona, "who i am description me user"),
       c("Export chat", exportChat, "download save"),

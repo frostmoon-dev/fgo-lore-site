@@ -11,6 +11,8 @@ try {
   if (palette !== "paper") root.dataset.palette = palette;
   if (text) root.dataset.text = text;
   if (chatText) root.dataset.chatText = chatText;
+  const chatFont = localStorage.getItem("chatFont");
+  if (chatFont) root.dataset.chatFont = chatFont;
 } catch {
   root.dataset.theme = "light";
   root.dataset.palette = "moon";

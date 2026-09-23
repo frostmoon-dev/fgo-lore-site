@@ -217,12 +217,19 @@ export async function cropImage(file, { aspect = 1, outW = 384, outH = 384, roun
     $("[data-act=save]", dlg).addEventListener("click", () => {
       const s = scale();
       const { width: w, height: h } = box();
+      // Take the centred part of the frame with the output's exact shape,
+      // so the picture is never stretched even if the frame is off by a pixel.
+      const target = outW / outH;
+      const rw = w / h > target ? h * target : w;
+      const rh = w / h > target ? h : w / target;
+      const rx = (w - rw) / 2;
+      const ry = (h - rh) / 2;
       const canvas = document.createElement("canvas");
       canvas.width = outW;
       canvas.height = outH;
       const ctx = canvas.getContext("2d");
       ctx.imageSmoothingQuality = "high";
-      ctx.drawImage(img, -ox / s, -oy / s, w / s, h / s, 0, 0, outW, outH);
+      ctx.drawImage(img, (rx - ox) / s, (ry - oy) / s, rw / s, rh / s, 0, 0, outW, outH);
       const url = encode(canvas, quality);
       finish(url);
       dlg.close();

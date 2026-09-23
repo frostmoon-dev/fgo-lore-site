@@ -146,7 +146,8 @@ async function paintStatus() {
   if (lastResult === true) dot.classList.add("on");
   if (lastResult === false) dot.classList.add("off");
   const model = conn.mode === "server" ? (conn.model || "server default") : (conn.model || "no model chosen");
-  label.textContent = model;
+  // "deepseek-ai/DeepSeek-V3" → "DeepSeek-V3": the provider part rarely fits.
+  label.textContent = model.split("/").pop();
   el.setAttribute("aria-label", `Connection ${conn.name}, model ${model}${lastResult === false ? ", last request failed" : ""}. Open connection settings.`);
   el.title = `${conn.name} · ${model}${lastResult === false ? " · last request failed" : ""}`;
 }
