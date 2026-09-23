@@ -1,14 +1,14 @@
 /* Shiru's Garden design system.
    - Spacing: 4px base, used in steps of 4 and 8 only (--s1 … --s9).
-   - Type: Source Serif 4 for headings, Instrument Sans for everything else,
-     JetBrains Mono for code. Sizes come
+   - Type: Fraunces (soft, rounded serifs) for headings, Nunito (rounded)
+     for everything else, JetBrains Mono for code. Sizes come
      from the ramp below and scale with the reader's text-size setting.
    - Shape: controls are pills, containers are soft rectangles. Three radii.
    - Colour: ink on warm cream. Orange marks the current choice only.
      Primary actions are ink, not colour. */
 :root {
-  --font: "Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-display: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --font: "Nunito", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: "Fraunces", Georgia, "Times New Roman", serif;
   --mono: "JetBrains Mono", ui-monospace, "SF Mono", Consolas, monospace;
 
   --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px;
