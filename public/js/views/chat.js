@@ -442,9 +442,12 @@ export async function render(main, [botId, chatId, jumpTo]) {
     const p = persona();
     const speaker = speakerOf(m);
     const name = isBot ? speaker.name : userName();
-    const face = isBot && meta0(m).mood && speaker.expressions?.[meta0(m).mood];
+    // A reply without a mood (the model skipped the tag, or it came before
+    // the pictures) falls back to the Neutral face when there is one.
+    const moodKey = isBot ? meta0(m).mood ?? (speaker.expressions?.neutral ? "neutral" : null) : null;
+    const face = moodKey && speaker.expressions?.[moodKey];
     const av = !isBot ? avatarHTML(p?.avatar, name, 48)
-      : face ? `<a class="avatar-link" href="#/bot/${speaker.id}" aria-label="Edit ${esc(speaker.name)}" title="${esc(speaker.name)}, ${esc(meta0(m).mood)}"><span class="expr-face"><img src="${esc(face)}" alt=""></span></a>`
+      : face ? `<a class="avatar-link" href="#/bot/${speaker.id}" aria-label="Edit ${esc(speaker.name)}" title="${esc(speaker.name)}, ${esc(moodKey)}"><span class="expr-face"><img src="${esc(face)}" alt=""></span></a>`
       : botById.has(speaker.id) ? botAvatar(speaker, 48) : avatarHTML(null, name, 48);
     const text = currentText(m);
     const isLastBot = isBot && i === lastAssistantIndex() && i === chat.messages.length - 1;
