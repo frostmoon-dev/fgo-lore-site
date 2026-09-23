@@ -1,6 +1,6 @@
 // Turns a bot, persona, prompt preset, lore and chat history into the
 // messages array sent to the API.
-import { DEFAULT_IMPERSONATE_PROMPT } from "./store.js";
+import { DEFAULT_IMPERSONATE_PROMPT, moodsOf } from "./store.js";
 
 // ---------- Mature content ----------
 // The site level applies unless the bot is set to stay safe for work.
@@ -73,7 +73,15 @@ export function readBond(text) {
   };
 }
 
-export const stripBond = (text) => String(text ?? "").replace(BOND_TAG, "").replace(/\n{3,}$/, "\n").trimEnd();
+// Mood tags pick the bot's expression picture: <mood:happy>.
+export const MOOD_TAG = /[<[]\s*mood\s*:\s*([a-z]+)\s*[>\]]/gi;
+export function readMood(text, allowed) {
+  const last = [...String(text ?? "").matchAll(MOOD_TAG)].at(-1);
+  const mood = last?.[1]?.toLowerCase();
+  return allowed.includes(mood) ? mood : null;
+}
+
+export const stripBond = (text) => String(text ?? "").replace(BOND_TAG, "").replace(MOOD_TAG, "").replace(/\n{3,}$/, "\n").trimEnd();
 
 // Cleans a message the model wrote for {{user}}: drops a "Name:" label
 // (plain or bold) or a bond tag it copied from the history.
@@ -165,6 +173,11 @@ export function buildPrompt({
   if (group && !asUser) {
     post = [post, `This is a group scene. Write only ${names.char}'s next reply. Do not write lines or actions for ${names.user} ` +
       `or for ${cast.map((c) => c.name).join(", ")}. Do not start with a name label.`].filter(Boolean).join("\n\n");
+  }
+  const moods = asUser ? [] : moodsOf(bot);
+  if (moods.length) {
+    post = [post, `At the very end of your reply, on its own line, add a tag like <mood:${moods[0]}> naming ${names.char}'s expression ` +
+      `as the reply ends, one of: ${moods.join(", ")}. Never mention the tag in the story.`].filter(Boolean).join("\n\n");
   }
   if (note?.trim()) post = [post, `For this reply only: ${m(note)}`].filter(Boolean).join("\n\n");
   if (bond) {

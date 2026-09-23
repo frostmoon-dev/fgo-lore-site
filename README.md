@@ -72,6 +72,29 @@ server-side storage of your key.
   you are 18 or older. Every request follows the level, including ideas, summaries and
   translations. A bot can be kept safe for work in its own settings. Characters in any
   sexual content are always adults. Your provider's own rules still apply.
+- **Install as an app**: Settings → Install as an app puts the site on your home screen or
+  app list. It opens full screen and loads bots and chats even offline (replies still
+  need your connection).
+- **Continue**: a reply cut off by the length limit says so and offers **Continue
+  writing**, which finishes it in the same message. Also in any last reply's ⋯ menu.
+- **Expressions**: upload a face per mood (neutral, happy, sad, angry, surprised,
+  flustered) in the bot editor. Replies end with a hidden mood tag, and the chat shows
+  the matching face, large on the latest reply. Only the moods you fill in are used.
+  Kept in backups; not included in exported character cards.
+- **Journal**: bots write a short private diary entry about the chat when you leave after
+  12 or more new messages, or on demand. Read them from the chat's ⋯ menu.
+- **Surprise me**: in the message box's + menu, a random event that fits the scene,
+  placed in the direction bar to check, edit or re-roll before it shapes the next reply.
+- **Usage**: Settings → Usage shows tokens for today, 7 and 30 days, a 14-day chart and
+  a table by model, with a cost estimate if you enter prices. Counts the provider does
+  not report are estimated and labelled as such. Each chat's ⋯ menu shows its own total.
+- **Model switch**: the model chip in the chat header shows which model answers and lets
+  you pick another for that chat only (in the ⋯ menu on phones).
+- **Swipe**: on touch screens, swipe a reply left or right to move between its versions;
+  swiping left on the newest version of the last reply writes a new one.
+- **At a glance**: header tools are labelled on wide screens, and a line under the
+  message box says what is happening in the background (writing, updating memory,
+  checking, translating, writing the journal).
 - **Confirmations**: deleting a message, saving an edit, branching and removing a
   character from a scene ask first. Turn this off in Settings.
 - **Start from an idea**: in the bot editor, describe a character in a line and the model

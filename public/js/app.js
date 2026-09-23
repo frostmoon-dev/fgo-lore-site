@@ -1,5 +1,6 @@
 import { seed, onChange, getActiveConnection } from "./store.js";
 import { $, $$, esc, confirmDialog, toast } from "./ui.js";
+import { registerServiceWorker } from "./install.js";
 
 // ---------- Routes ----------
 // Each view module exports render(main, params) and may return
@@ -156,3 +157,4 @@ try {
 }
 paintStatus();
 route();
+registerServiceWorker();
