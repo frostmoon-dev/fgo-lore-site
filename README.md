@@ -29,6 +29,10 @@ server-side storage of your key.
   Entries still enter the prompt only when their keywords appear in recent messages.
 - **Text size**: choose a size for the whole site and, separately, for chat messages
   (Settings > Appearance). Saved in this browser.
+- **Write my reply**: the pen button beside Send writes your next message as your persona,
+  answering the bot's latest reply. Type a keyword or rough line first and it becomes a full
+  message in your voice. The draft lands in the message box for you to edit, retry or undo;
+  nothing is sent until you press Send. Its prompt is editable on the Prompt page.
 - **Bond meter**: an optional relationship score per chat, shown in the chat header and
   told to the bot, so a conversation that goes badly makes the character colder.
 - **Chat**: streaming replies, stop, regenerate with swipes between versions, edit any

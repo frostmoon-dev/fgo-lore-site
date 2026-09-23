@@ -18,6 +18,7 @@ const P = {
   info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/>',
   check: '<path d="m5 12 5 5 9-10"/>',
   x: '<path d="M6 6l12 12M18 6 6 18"/>',
+  quill: '<path d="M20 4C12 4 7 9 5 20"/><path d="M8.5 13H14c3 0 5-3 6-9"/>',
   scroll: '<path d="M6 4h11a3 3 0 0 1 0 6h-1v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1h10M6 4a2 2 0 0 0-2 2v11M17 10H8"/>',
 };
 
