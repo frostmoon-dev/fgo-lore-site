@@ -66,7 +66,18 @@ export const EXPRESSIONS = [
   { key: "surprised", label: "Surprised" },
   { key: "flustered", label: "Flustered" },
 ];
-export const moodsOf = (bot) => EXPRESSIONS.map((e) => e.key).filter((k) => bot?.expressions?.[k]);
+// Moods a bot can add beyond the six above, offered as one-tap suggestions.
+export const MOOD_SUGGESTIONS = ["smug", "mocking", "devious", "plotting", "teasing", "embarrassed", "crying", "bored", "scared", "jealous", "pouting", "determined"];
+// Mood names are single lowercase words (hyphens allowed), so the model can
+// write them back exactly: "Very Smug!" → "very-smug".
+export const moodName = (s) => String(s ?? "").toLowerCase().trim().replace(/[\s_]+/g, "-").replace(/[^a-z-]/g, "")
+  .replace(/-+/g, "-").replace(/^-|-$/g, "").slice(0, 24);
+// Every mood with a picture: the six defaults in their order, then the bot's own.
+export function moodsOf(bot) {
+  const faces = bot?.expressions ?? {};
+  const base = EXPRESSIONS.map((e) => e.key);
+  return [...base.filter((k) => faces[k]), ...Object.keys(faces).filter((k) => !base.includes(k) && faces[k])];
+}
 
 // ---------- Bond ----------
 // Every bond has six levels at fixed points on the 0–100 meter. What the
