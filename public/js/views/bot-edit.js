@@ -1,6 +1,7 @@
-import { bots, newBot, getSettings, getLorebooks, loreForBot } from "../store.js";
+import { bots, newBot, getSettings, getLorebooks, loreForBot, BOND_KINDS, BOND_POINTS, bondLevels } from "../store.js";
 import { toCard, cardPng } from "../card.js";
 import { estimateTokens } from "../prompt.js";
+import { draftBot } from "../ai.js";
 import {
   $, $$, esc, icon, imagePicker, imagePickerHTML, avatarHTML, toast, confirmDialog,
   download, slug, parseTags, autosize, sliderHTML, wireSlider,
@@ -24,6 +25,9 @@ export async function render(main, [id]) {
   }
   const bot = structuredClone(existing ?? newBot());
   bot.lorebookIds ??= [];
+  bot.bondKind ??= "affection";
+  bot.bondLevels ??= null;
+  bot.bondMilestones ??= true;
   const settings = await getSettings();
   const books = await getLorebooks();
   let saved = JSON.stringify(bot);
@@ -38,6 +42,23 @@ export async function render(main, [id]) {
       </div>
       <form class="editor-layout" id="form" novalidate>
         <div class="form-grid">
+          <div class="card">
+            <details class="more" id="idea-box" ${isNew ? "open" : ""}>
+              <summary>Start from an idea</summary>
+              <div class="form-grid">
+                <p class="hint">Describe the character in a line or two. The model drafts the name, definition, scenario,
+                  first message and example dialogue for you to edit. Nothing is saved until you press Save bot.</p>
+                <div class="field">
+                  <label for="idea">Idea</label>
+                  <textarea id="idea" placeholder="A tired knight who guards a cursed library and hates visitors"></textarea>
+                </div>
+                <div class="actions">
+                  <button class="btn btn-primary" type="button" id="draft">Draft the bot</button>
+                  <span class="hint" id="draft-state" aria-live="polite"></span>
+                </div>
+              </div>
+            </details>
+          </div>
           <div class="card">
             <h2 class="card-title">Identity</h2>
             <p class="lead">How the bot appears in your library and in chat.</p>
@@ -103,7 +124,36 @@ export async function render(main, [id]) {
                   </label>`).join("")}</div>
               </fieldset>
               <label class="check"><input type="checkbox" id="bond-on" ${bot.bondEnabled === false ? "" : "checked"}>
-                <span>Track the bond with this bot<small>Shows a bond meter in the chat header and lets it colour how warm the bot is.</small></span></label>
+                <span>Track the bond with this bot<small>Shows a bond meter in the chat header and lets it shape how the bot treats you.</small></span></label>
+              <div class="bond-setup form-grid" id="bond-setup">
+                <div class="field">
+                  <label for="bond-kind">Kind of bond</label>
+                  <select id="bond-kind" aria-describedby="bond-kind-about">
+                    ${Object.entries(BOND_KINDS).map(([k, v]) => `<option value="${k}" ${bot.bondKind === k ? "selected" : ""}>${esc(v.name)}</option>`).join("")}
+                    <option value="custom" ${bot.bondKind === "custom" ? "selected" : ""}>Custom</option>
+                  </select>
+                  <p class="hint" id="bond-kind-about"></p>
+                </div>
+                <details class="more">
+                  <summary>The six levels</summary>
+                  <div class="bond-levels" id="bond-levels">
+                    ${BOND_POINTS.map((at, i) => `
+                      <div class="bond-level">
+                        <span class="bond-at" aria-hidden="true">${at}+</span>
+                        <div class="field">
+                          <label class="sr-only" for="bl-label-${i}">Name of level ${i + 1}, from ${at}</label>
+                          <input type="text" id="bl-label-${i}" data-level-label="${i}" autocomplete="off" maxlength="32">
+                          <label class="sr-only" for="bl-behavior-${i}">How the bot acts at level ${i + 1}</label>
+                          <textarea id="bl-behavior-${i}" data-level-behavior="${i}" rows="2"></textarea>
+                        </div>
+                      </div>`).join("")}
+                  </div>
+                  <p class="hint">What the bond is called at each point on the meter, and how the bot acts there. The bot is told the current level with every reply.
+                    Changing any of these makes this bot's bond Custom. Use <code>{{user}}</code> for you.</p>
+                </details>
+                <label class="check"><input type="checkbox" id="bond-milestones" ${bot.bondMilestones === false ? "" : "checked"}>
+                  <span>Mark level changes in the chat<small>Shows a divider when the bond changes level, and asks the next reply to show the change.</small></span></label>
+              </div>
             </div>
           </div>
 
@@ -196,6 +246,11 @@ export async function render(main, [id]) {
     bot.model = val("#model").trim();
     bot.lorebookIds = $$("[data-book]", main).filter((c) => c.checked && !c.disabled).map((c) => c.dataset.book);
     bot.bondEnabled = $("#bond-on", main).checked;
+    bot.bondKind = val("#bond-kind");
+    bot.bondLevels = bot.bondKind === "custom"
+      ? BOND_POINTS.map((_, i) => ({ label: val(`#bl-label-${i}`).trim(), behavior: val(`#bl-behavior-${i}`).trim() }))
+      : null;
+    bot.bondMilestones = $("#bond-milestones", main).checked;
     bot.gen = {};
     for (const k of ["temperature", "max_tokens"]) {
       const v = val(`#g-${k}`);
@@ -212,9 +267,11 @@ export async function render(main, [id]) {
     $("#token-total", main).textContent = `About ${estimateTokens(perm).toLocaleString()} tokens of definition sent with every message.`;
   }
 
+  let paintAvatar = null;
   function update() {
     collect();
     paintPreview();
+    if (!bot.avatar) paintAvatar?.(); // the letter placeholder follows the name
     for (const el of $$("[data-count]", main)) el.textContent = `~${estimateTokens(bot[el.dataset.count]).toLocaleString()} tokens`;
     $("#tagline-count", main).textContent = `${bot.tagline.length}/140`;
     const dirty = isDirty();
@@ -225,7 +282,7 @@ export async function render(main, [id]) {
   let deleted = false;
   const isDirty = () => { if (deleted) return false; collect(); return JSON.stringify(bot) !== saved; };
 
-  imagePicker($("#avatar", main), {
+  paintAvatar = imagePicker($("#avatar", main), {
     get: () => bot.avatar,
     set: (v) => { bot.avatar = v; update(); },
     name: () => val("#name"),
@@ -239,6 +296,38 @@ export async function render(main, [id]) {
       ? `<span class="bg-thumb"><img src="${esc(url)}" alt=""></span>`
       : `<span class="bg-thumb is-empty">No background</span>`),
   });
+  // ---- Kind of bond ----
+  function paintBondLevels(list) {
+    list.forEach((l, i) => {
+      $(`#bl-label-${i}`, main).value = l.label;
+      const ta = $(`#bl-behavior-${i}`, main);
+      ta.value = l.behavior;
+      ta.dispatchEvent(new Event("input")); // refit its height
+    });
+  }
+  function paintBondKind() {
+    const k = val("#bond-kind");
+    $("#bond-kind-about", main).textContent = k === "custom"
+      ? "Your own six levels, set below."
+      : BOND_KINDS[k].about.replace("{{user}}", "you");
+    $("#bond-setup", main).hidden = !$("#bond-on", main).checked;
+  }
+  $("#bond-kind", main).addEventListener("change", () => {
+    const k = val("#bond-kind");
+    // Custom starts from whatever the levels said before.
+    if (k !== "custom") paintBondLevels(BOND_KINDS[k].levels);
+    paintBondKind();
+    update();
+  });
+  // Editing a level makes the bond this bot's own. Runs before the form's
+  // own input handler, so the save sees "custom".
+  $("#bond-levels", main).addEventListener("input", (e) => {
+    if (e.isTrusted && val("#bond-kind") !== "custom") { $("#bond-kind", main).value = "custom"; paintBondKind(); }
+  });
+  $("#bond-on", main).addEventListener("change", paintBondKind);
+  paintBondLevels(bondLevels(bot));
+  paintBondKind();
+
   $$("textarea", main).forEach(autosize);
   wireSlider(main, "g-temperature", update);
   wireSlider(main, "g-max_tokens", update);
@@ -264,6 +353,46 @@ export async function render(main, [id]) {
   }
 
   form.addEventListener("submit", (e) => { e.preventDefault(); save(); });
+
+  // ---- Draft from an idea ----
+  async function draftFromIdea() {
+    const idea = val("#idea").trim();
+    const btn = $("#draft", main);
+    const state = $("#draft-state", main);
+    if (!idea) { $("#idea", main).focus(); state.textContent = "Write an idea first."; return; }
+    collect();
+    if ([bot.description, bot.greeting, bot.scenario, bot.examples].some((v) => v.trim())) {
+      const ok = await confirmDialog({
+        title: "Replace what is written?",
+        body: "The draft fills the definition, scenario, first message and example dialogue, replacing what is there now. You can still leave without saving.",
+        confirm: "Replace with a draft",
+      });
+      if (!ok) return;
+    }
+    btn.classList.add("is-loading");
+    btn.setAttribute("aria-busy", "true");
+    state.textContent = "Drafting. This can take a little while.";
+    try {
+      const d = await draftBot({ idea });
+      const set = (id, v) => { if (v) { const el = $(`#${id}`, main); el.value = v; el.dispatchEvent(new Event("input", { bubbles: true })); } };
+      if (!val("#name").trim()) set("name", d.name);
+      for (const k of ["tagline", "tags", "description", "personality", "scenario", "greeting", "examples"]) set(k, d[k]);
+      if (d.bondKind) { $("#bond-kind", main).value = d.bondKind; $("#bond-kind", main).dispatchEvent(new Event("change")); }
+      state.textContent = "Draft ready. Read it through, change anything, then save.";
+      $("#name", main).scrollIntoView({ behavior: "smooth", block: "center" });
+      toast(`Drafted ${d.name || "a bot"}. Nothing is saved yet.`, "ok");
+    } catch (err) {
+      state.textContent = "";
+      toast(err.message, "error");
+    } finally {
+      btn.classList.remove("is-loading");
+      btn.removeAttribute("aria-busy");
+    }
+  }
+  $("#draft", main).addEventListener("click", draftFromIdea);
+  $("#idea", main).addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); draftFromIdea(); }
+  });
   const onKey = (e) => { if ((e.ctrlKey || e.metaKey) && e.key === "s") { e.preventDefault(); save(); } };
   document.addEventListener("keydown", onKey);
 

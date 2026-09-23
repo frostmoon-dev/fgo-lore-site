@@ -64,16 +64,41 @@ export function cleanImpersonation(text, userName) {
 
 // mode "impersonate" writes {{user}}'s next message instead of {{char}}'s.
 // hint is what the person typed: a keyword or rough line to expand.
-export function buildPrompt({ bot, persona, preset, settings, history, loreEntries = [], bond = null, mode = "reply", hint = "" }) {
+// memory is the chat's running summary. note is a one-reply instruction
+// (a scene direction or a nudge like "shorter"). cast is the other bots in
+// a group scene; history messages then carry the botId of who spoke.
+export function buildPrompt({
+  bot, persona, preset, settings, history, loreEntries = [], bond = null,
+  mode = "reply", hint = "", memory = "", note = "", cast = [],
+}) {
   const asUser = mode === "impersonate";
   if (asUser) bond = null;
   const names = { char: bot.name || "Character", user: persona?.name || "User" };
   const m = (t) => applyMacros(t, names).trim();
+  const group = cast.length > 0;
+  const nameOf = (x) => (x.role === "user" ? names.user
+    : !x.botId || x.botId === bot.id ? names.char
+    : cast.find((c) => c.id === x.botId)?.name || "Someone");
 
-  const clean = history
+  // In a group scene, every line is labelled with its speaker, and other
+  // characters' lines reach this bot as user turns it can react to.
+  let clean = history
     .filter((x) => (x.role === "user" || x.role === "assistant") && !x.error)
-    .map((x) => ({ role: x.role, content: currentText(x) }))
+    .map((x) => {
+      const content = stripBond(currentText(x));
+      if (!group) return { role: x.role, content: currentText(x) };
+      const own = x.role === "assistant" && nameOf(x) === names.char;
+      return { role: own ? "assistant" : "user", content: own ? content : `${nameOf(x)}: ${content}` };
+    })
     .filter((x) => x.content.trim());
+  if (group) {
+    clean = clean.reduce((out, x) => {
+      const last = out.at(-1);
+      if (last && last.role === x.role) last.content += `\n\n${x.content}`;
+      else out.push({ ...x });
+      return out;
+    }, []);
+  }
 
   const scan = clean.slice(-settings.lore.scanDepth).map((x) => x.content).join("\n");
   const matched = matchLore(loreEntries, scan, settings.lore.maxEntries);
@@ -83,7 +108,12 @@ export function buildPrompt({ bot, persona, preset, settings, history, loreEntri
     : m(override(bot.systemPrompt, preset.main))];
   const about = [bot.description, bot.personality && `Personality: ${bot.personality}`].filter(Boolean).join("\n\n");
   if (about) parts.push(`## ${names.char}\n${m(about)}`);
+  if (group) {
+    parts.push("## Others in the scene\n" + cast.map((c) =>
+      `### ${c.name}\n${m(clip([c.description, c.personality && `Personality: ${c.personality}`].filter(Boolean).join("\n\n"), 1600))}`).join("\n\n"));
+  }
   if (preset.includeScenario !== false && bot.scenario?.trim()) parts.push(`## Scenario\n${m(bot.scenario)}`);
+  if (memory?.trim()) parts.push(`## Story so far (memory of earlier events)\n${m(memory)}`);
   // Impersonation always needs the persona: it is who the model is writing as.
   if ((asUser || preset.includePersona !== false) && persona?.description?.trim()) parts.push(`## ${names.user}\n${m(persona.description)}`);
   if (matched.length) {
@@ -94,11 +124,19 @@ export function buildPrompt({ bot, persona, preset, settings, history, loreEntri
     parts.push(`## Example dialogue (style reference only)\n${m(bot.examples.replace(/<START>\s*/gi, "---\n"))}`);
   }
   if (bond) {
-    parts.push(`## Bond\n${names.user}'s bond with ${names.char} is ${bond.value} out of 100 (${bond.label}).\n` +
-      "Let it show in how warm, guarded or hostile you are. Bonds move slowly, and rudeness or lies push them down.");
+    // bond: { value, label, behavior, kind } from the bot's kind of bond.
+    parts.push(`## Bond\n${names.user}'s bond with ${names.char}${bond.kind ? ` (${bond.kind.toLowerCase()})` : ""} ` +
+      `is ${bond.value} out of 100: ${bond.label}.\n` +
+      (bond.behavior ? `At this level: ${m(bond.behavior)}\n` : "") +
+      "Let it show in how you act, without naming the level. Bonds move slowly; what happens in the story moves them.");
   }
   const system = parts.filter(Boolean).join("\n\n");
   let post = asUser ? impersonateInstruction(names, hint) : m(override(bot.postHistory, preset.postHistory));
+  if (group && !asUser) {
+    post = [post, `This is a group scene. Write only ${names.char}'s next reply. Do not write lines or actions for ${names.user} ` +
+      `or for ${cast.map((c) => c.name).join(", ")}. Do not start with a name label.`].filter(Boolean).join("\n\n");
+  }
+  if (note?.trim()) post = [post, `For this reply only: ${m(note)}`].filter(Boolean).join("\n\n");
   if (bond) {
     post = [post, "After your reply, on its own last line, rate how this exchange went for the bond " +
       "as a tag like <bond:+1>, from -5 to +5. Use 0 when little changed. Never mention the tag, the number or the bond itself in the story."]
@@ -128,6 +166,8 @@ export function buildPrompt({ bot, persona, preset, settings, history, loreEntri
     tokens: estimateTokens(messages.map((x) => x.content).join("")),
   };
 }
+
+const clip = (s, n) => (s.length > n ? `${s.slice(0, n)}…` : s);
 
 function impersonateInstruction(names, hint) {
   const draft = String(hint ?? "").trim();
