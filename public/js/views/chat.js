@@ -408,7 +408,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
     select.innerHTML = `<option value="auto">Auto</option>` + everyone().map((b) => `<option value="${b.id}">${esc(b.name)}</option>`).join("");
     select.value = [...select.options].some((o) => o.value === prev) ? prev : "auto";
     select.title = "Auto picks the character your message names, otherwise whoever has been quiet longest.";
-    input.placeholder = group() ? "Message the scene…" : `Message ${bot.name}…`;
+    input.placeholder = placeholderText();
     const mem = $("#memory", main);
     mem.classList.toggle("has-dot", !!chat.memory?.text?.trim());
     mem.classList.toggle("is-loading", memoryBusy);
@@ -565,11 +565,16 @@ export async function render(main, [botId, chatId, jumpTo]) {
   const directBar = $("#direct-bar", main);
   const directInput = $("#direction", main);
   const direction = () => (directBar.hidden ? "" : directInput.value.trim());
+  // With a direction waiting, an empty send lets the bot go ahead with it.
+  const placeholderText = () => (!directBar.hidden
+    ? `Send now to let ${group() ? "the scene" : bot.name} react, or write your own message first`
+    : group() ? "Message the scene…" : `Message ${bot.name}…`);
   function setDirecting(open, { surprise = false } = {}) {
     directBar.hidden = !open;
     $("#composer-more", main).classList.toggle("has-dot", open);
     $("#direct-label", main).textContent = surprise ? "Surprise" : "Direction";
     $("#direct-reroll", main).hidden = !surprise;
+    input.placeholder = placeholderText();
     if (open) directInput.focus();
     else { directInput.value = ""; }
   }
@@ -605,7 +610,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
   $("#direct-clear", main).addEventListener("click", () => { setDirecting(false); input.focus(); });
   directInput.addEventListener("keydown", (e) => {
     if (e.key === "Escape") { e.stopPropagation(); setDirecting(false); input.focus(); }
-    if (e.key === "Enter") { e.preventDefault(); input.focus(); }
+    if (e.key === "Enter") { e.preventDefault(); if (!input.value.trim() && direction()) send(); else input.focus(); }
   });
 
   // ---------- Generation ----------
@@ -1677,7 +1682,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
     // On a phone the Ideas button lives here, to leave room for typing.
     ...(narrow.matches ? [{ label: "Ideas for what to say", hint: "Three options for your next move · Alt+S", onSelect: showIdeas }] : []),
     { label: directBar.hidden ? "Direct the next reply" : "Remove the direction", hint: "A hidden note for the next reply only · Alt+D", onSelect: () => setDirecting(directBar.hidden) },
-    { label: "Surprise me", hint: "A random twist for the next reply, to check first", onSelect: surprise },
+    { label: "Surprise me", hint: "A random twist; check it, then send to see the bot react", onSelect: surprise },
     { label: "Roll dice", hint: "A fair roll the reply has to respect · /roll d20", onSelect: openDice },
     { label: `Translate my message into ${chatLanguage()}`, hint: "Write in any language, check, then send · Alt+T", onSelect: translateOutgoing },
   ], { align: "end" }));
@@ -1696,7 +1701,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
     if (!text) {
       // Empty send: answer your last message, or in a group, let the next
       // character carry the scene on.
-      if (chat.messages.at(-1)?.role === "user" || group()) generate("new");
+      if (chat.messages.at(-1)?.role === "user" || group() || direction()) generate("new");
       else input.focus();
       return;
     }
