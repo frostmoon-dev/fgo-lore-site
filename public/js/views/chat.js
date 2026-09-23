@@ -446,9 +446,9 @@ export async function render(main, [botId, chatId, jumpTo]) {
     // the pictures) falls back to the Neutral face when there is one.
     const moodKey = isBot ? meta0(m).mood ?? (speaker.expressions?.neutral ? "neutral" : null) : null;
     const face = moodKey && speaker.expressions?.[moodKey];
-    const av = !isBot ? avatarHTML(p?.avatar, name, 48)
+    const av = !isBot ? avatarHTML(p?.avatar, name, 96)
       : face ? `<a class="avatar-link" href="#/bot/${speaker.id}" aria-label="Edit ${esc(speaker.name)}" title="${esc(speaker.name)}, ${esc(moodKey)}"><span class="expr-face"><img src="${esc(face)}" alt=""></span></a>`
-      : botById.has(speaker.id) ? botAvatar(speaker, 48) : avatarHTML(null, name, 48);
+      : botById.has(speaker.id) ? botAvatar(speaker, 96) : avatarHTML(null, name, 96);
     const text = currentText(m);
     const isLastBot = isBot && i === lastAssistantIndex() && i === chat.messages.length - 1;
     const streaming = busy && isLastBot;
