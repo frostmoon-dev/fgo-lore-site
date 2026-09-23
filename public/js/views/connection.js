@@ -110,7 +110,7 @@ export async function render(main) {
           <div class="form-grid">
             <div class="field">
               <label for="c-headers">Headers sent with every request</label>
-              <textarea id="c-headers" class="mono" placeholder="HTTP-Referer: https://my-site.example&#10;X-Title: Shiru&#39;s Garden" spellcheck="false">${esc(conn.headers)}</textarea>
+              <textarea id="c-headers" class="mono" placeholder="HTTP-Referer: https://my-site.example&#10;X-Title: MoonPaper" spellcheck="false">${esc(conn.headers)}</textarea>
               <p class="hint">One <code>Name: value</code> per line, or a JSON object. Some proxies want a password header here.</p>
               <p class="error-text" id="c-headers-err" hidden></p>
             </div>

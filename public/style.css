@@ -1,4 +1,4 @@
-/* Shiru's Garden design system.
+/* MoonPaper design system.
    - Spacing: 4px base, used in steps of 4 and 8 only (--s1 … --s9).
    - Type: Fraunces (soft, rounded serifs) for headings, Nunito (rounded)
      for everything else, JetBrains Mono for code. Sizes come
@@ -533,6 +533,19 @@ body.in-chat .site-footer { display: none; }
 .chat-topbar .avatar-link { align-self: center; }
 .chat-topbar .title { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chat-topbar .title small { display: block; font-weight: 400; color: var(--muted); overflow: hidden; text-overflow: ellipsis; }
+/* The chat name renames in place. The pencil shows on hover and focus. */
+.title-line { display: flex; align-items: center; gap: var(--s2); min-width: 0; }
+.title-edit {
+  flex: 0 1 auto; display: inline-flex; align-items: center; gap: var(--s1); min-width: 0; height: 28px;
+  margin-left: calc(-1 * var(--s2)); padding: 0 var(--s2); border: 0; border-radius: var(--r-sm);
+  background: none; color: inherit; font: inherit; cursor: text;
+}
+.title-edit > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.title-edit svg { flex: none; width: 14px; height: 14px; color: var(--muted); opacity: 0; transition: opacity var(--dur) var(--ease); }
+.title-edit:hover { background: var(--fill); }
+.title-edit:hover svg, .title-edit:focus-visible svg { opacity: 1; }
+@media (hover: none) { .title-edit svg { opacity: 1; } }
+.chat-topbar .title-input { height: 28px; width: min(320px, 100%); margin-left: calc(-1 * var(--s2)); padding: 0 var(--s2); font-weight: 600; border-radius: var(--r-sm); }
 .only-mobile { display: none; }
 
 .chat-log { flex: 1; overflow-y: auto; padding: var(--s6) var(--s5) var(--s4); }
@@ -593,6 +606,9 @@ body.in-chat .site-footer { display: none; }
 .composer-foot select { width: auto; height: 32px; font-size: var(--t-sm); padding-left: var(--s3); padding-right: var(--s6); background-position: calc(100% - 12px) center; }
 .persona-pick { display: inline-flex; align-items: center; gap: var(--s2); }
 .persona-pick > span { white-space: nowrap; }
+.persona-group { display: inline-flex; align-items: center; gap: var(--s1); }
+.composer-foot .persona-edit { width: 32px; height: 32px; }
+.composer-foot .persona-edit svg { width: 16px; height: 16px; }
 /* Write my reply: sits beside Send, quieter than it. */
 .composer-tool { width: 40px; height: 40px; }
 .composer-tool.is-active { background: var(--fill); color: var(--ink); }
@@ -1104,3 +1120,4 @@ dialog.palette-dialog { width: min(600px, calc(100vw - 32px)); margin-top: 12vh;
 .dice-chip svg { width: 14px; height: 14px; }
 #dice-roll svg { width: 16px; height: 16px; margin-right: var(--s2); }
 @media (prefers-reduced-motion: reduce) { .flash-card { animation: none; box-shadow: 0 0 0 2px var(--accent); } }
+.news-earlier { font-family: var(--font); font-size: var(--t-xs); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }

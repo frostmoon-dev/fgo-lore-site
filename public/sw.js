@@ -2,7 +2,7 @@
 // everything except talking to the model. Network first, so an update is
 // picked up on the next visit; the cache is only the fallback when offline.
 // API calls and other sites are never cached.
-const CACHE = "shirus-garden-v2";
+const CACHE = "moonpaper-v1";
 const SHELL = [
   "/", "/index.html", "/style.css", "/favicon.svg", "/manifest.webmanifest", "/icon-192.png", "/library.json",
   "/js/app.js", "/js/theme-init.js", "/js/store.js", "/js/db.js", "/js/ui.js", "/js/api.js", "/js/prompt.js",

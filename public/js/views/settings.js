@@ -73,7 +73,7 @@ export async function render(main) {
 
       <div class="card" id="set-install">
         <h2 class="card-title">Install as an app</h2>
-        <p class="lead">Put Shiru's Garden on your home screen or in your app list. It opens full screen, loads instantly,
+        <p class="lead">Put MoonPaper on your home screen or in your app list. It opens full screen, loads instantly,
           and your bots and chats open even without internet. Replies still need your connection.</p>
         <div id="install-box" aria-live="polite"></div>
       </div>
@@ -353,7 +353,7 @@ export async function render(main) {
     const box = $("#install-box", main);
     const state = installState();
     box.innerHTML = {
-      installed: `<p class="note">${icon("check")}<span>Installed. You are using Shiru's Garden as an app.</span></p>`,
+      installed: `<p class="note">${icon("check")}<span>Installed. You are using MoonPaper as an app.</span></p>`,
       ready: `<button class="btn btn-primary" type="button" id="install">Install app</button>`,
       ios: `<ol class="steps-list"><li>Tap the <strong>Share</strong> button in Safari's toolbar.</li>
         <li>Choose <strong>Add to Home Screen</strong>.</li><li>Tap <strong>Add</strong>.</li></ol>`,
@@ -363,7 +363,7 @@ export async function render(main) {
     $("#install", box)?.addEventListener("click", async (e) => {
       e.currentTarget.classList.add("is-loading");
       const ok = await promptInstall();
-      toast(ok ? "Installing. Look for Shiru's Garden on your home screen or app list." : "Not installed. You can install any time from here.", ok ? "ok" : "info");
+      toast(ok ? "Installing. Look for MoonPaper on your home screen or app list." : "Not installed. You can install any time from here.", ok ? "ok" : "info");
       paintInstall();
     });
   }
@@ -407,7 +407,7 @@ export async function render(main) {
 
   $("#backup", main).addEventListener("click", async () => {
     const data = await exportAll({ includeKeys: $("#with-keys", main).checked });
-    download(`shirus-garden-backup-${new Date().toISOString().slice(0, 10)}.json`, data);
+    download(`moonpaper-backup-${new Date().toISOString().slice(0, 10)}.json`, data);
     await markBackedUp();
     paintLastBackup();
   $("#show-tour", main).addEventListener("click", async () => (await import("../help.js")).showTour());

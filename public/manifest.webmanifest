@@ -1,6 +1,6 @@
 {
-  "name": "Shiru's Garden",
-  "short_name": "Shiru's Garden",
+  "name": "MoonPaper",
+  "short_name": "MoonPaper",
   "description": "Write your own characters and talk to them through any OpenAI-compatible API or proxy. Everything stays on your device.",
   "id": "/",
   "start_url": "/",

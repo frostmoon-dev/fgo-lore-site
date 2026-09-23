@@ -52,7 +52,7 @@ async function route() {
   }
   currentHash = location.hash;
   trackDepth();
-  document.title = "Shiru’s Garden";
+  document.title = "MoonPaper";
   current?.cleanup?.();
   current = null;
 
