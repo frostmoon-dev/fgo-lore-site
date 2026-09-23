@@ -1931,7 +1931,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
     if (meta && /<mood:/i.test(value)) {
       const speaker = speakerOf(m);
       const allowed = moodsOf(speaker);
-      const tagged = /<mood:\s*([a-z]+)\s*>/gi.exec(value)?.[1]?.toLowerCase();
+      const tagged = /<mood:\s*([a-z-]+)\s*>/gi.exec(value)?.[1]?.toLowerCase();
       const mood = readMood(value, allowed);
       text = value.replace(/\s*<mood:[^>]*>\s*/gi, "\n").trimEnd();
       if (mood) meta.mood = mood;

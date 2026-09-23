@@ -1067,7 +1067,7 @@ input[type="search"]::-webkit-search-cancel-button {
 
 /* ---------- Expressions ---------- */
 .expr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(136px, 1fr)); gap: var(--s4); }
-.expr-slot { display: grid; gap: var(--s2); }
+.expr-slot { display: grid; gap: var(--s2); align-content: start; }
 .expr-edit { display: grid; gap: var(--s2); justify-items: start; }
 .expr-edit .actions { gap: var(--s1); }
 .expr-edit .pick-hint:empty { display: none; }
@@ -1077,6 +1077,10 @@ input[type="search"]::-webkit-search-cancel-button {
 }
 .expr-thumb img { width: 100%; height: 100%; object-fit: cover; }
 .expr-thumb.is-empty { border: 1.5px dashed var(--line-strong); background: none; }
+.expr-slot-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s1); min-height: 32px; }
+.expr-slot-head .icon-btn { width: 32px; height: 32px; }
+.expr-add { display: grid; gap: var(--s3); margin-top: var(--s5); padding-top: var(--s5); border-top: 1px solid var(--line); }
+.expr-add .input-group { max-width: 360px; }
 /* In chat: the face that matches the reply. The latest reply shows it large. */
 .expr-face { display: block; width: var(--pic); height: var(--pic); border-radius: 50%; overflow: hidden; background: var(--fill); }
 .expr-face img { width: 100%; height: 100%; object-fit: cover; }

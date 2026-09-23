@@ -1,4 +1,4 @@
-import { bots, newBot, getSettings, getLorebooks, loreForBot, BOND_KINDS, BOND_POINTS, bondLevels, EXPRESSIONS } from "../store.js";
+import { bots, newBot, getSettings, getLorebooks, loreForBot, BOND_KINDS, BOND_POINTS, bondLevels, EXPRESSIONS, MOOD_SUGGESTIONS, moodName } from "../store.js";
 import { toCard, cardPng } from "../card.js";
 import { estimateTokens } from "../prompt.js";
 import { draftBot } from "../ai.js";
@@ -90,11 +90,17 @@ export async function render(main, [id]) {
             <h2 class="card-title">Expressions</h2>
             <p class="lead">Optional. Upload a face for each mood, and chats show the one that matches each reply.
               Leave any of them empty; the bot only uses the moods you fill in.</p>
-            <div class="expr-grid">${EXPRESSIONS.map((e) => `
-              <div class="expr-slot" id="expr-${e.key}">
-                <span class="field-label">${e.label}</span>
-                ${imagePickerHTML(`expr-file-${e.key}`, { label: "Upload", hint: "", cls: "expr-edit" })}
-              </div>`).join("")}</div>
+            <div class="expr-grid" id="expr-grid"></div>
+            <div class="expr-add">
+              <div class="field"><label for="mood-new">Add a mood</label>
+                <div class="input-group">
+                  <input type="text" id="mood-new" placeholder="e.g. devious" maxlength="24" autocomplete="off" spellcheck="false">
+                  <button class="btn" type="button" id="mood-add">Add</button>
+                </div>
+                <p class="hint">One or two words. The bot picks from every mood that has a picture.</p>
+              </div>
+              <div class="chips" id="mood-suggest" aria-label="Suggested moods"></div>
+            </div>
           </div>
 
           <div class="card">
@@ -312,19 +318,72 @@ export async function render(main, [id]) {
     name: () => val("#name"),
     crop: { round: true, title: "Crop the bot's picture" },
   });
-  for (const e of EXPRESSIONS) {
-    imagePicker($(`#expr-${e.key}`, main), {
-      get: () => bot.expressions[e.key] ?? null,
-      set: (v) => {
-        if (v) bot.expressions[e.key] = v; else delete bot.expressions[e.key];
-        update();
-      },
-      crop: { aspect: 1, outW: 384, outH: 384, title: `${e.label} expression` },
-      preview: (url) => (url
-        ? `<span class="expr-thumb"><img src="${esc(url)}" alt="${e.label} expression"></span>`
-        : `<span class="expr-thumb is-empty" aria-hidden="true">${e.label}</span>`),
-    });
+  // ---------- Expressions ----------
+  // The six defaults, then the bot's own moods. A mood added here stays an
+  // empty slot until it gets a picture; empty ones are not saved or used.
+  const baseKeys = EXPRESSIONS.map((e) => e.key);
+  const labelOf = (k) => EXPRESSIONS.find((e) => e.key === k)?.label ?? k.charAt(0).toUpperCase() + k.slice(1).replace(/-/g, " ");
+  const pendingMoods = [];
+  const customKeys = () => [...new Set([...Object.keys(bot.expressions).filter((k) => !baseKeys.includes(k)), ...pendingMoods])];
+  function paintExpressions(focusKey) {
+    const keys = [...baseKeys, ...customKeys()];
+    $("#expr-grid", main).innerHTML = keys.map((k) => `
+      <div class="expr-slot" id="expr-${k}">
+        <span class="expr-slot-head"><span class="field-label">${esc(labelOf(k))}</span>
+          ${baseKeys.includes(k) || bot.expressions[k] ? "" : `<button class="icon-btn" type="button" data-remove-mood="${k}" aria-label="Remove the ${esc(labelOf(k))} mood" title="Remove mood">${icon("x")}</button>`}</span>
+        ${imagePickerHTML(`expr-file-${k}`, { label: "Upload", hint: "", cls: "expr-edit" })}
+      </div>`).join("");
+    for (const k of keys) {
+      imagePicker($(`#expr-${k}`, main), {
+        get: () => bot.expressions[k] ?? null,
+        set: (v) => {
+          if (v) bot.expressions[k] = v; else delete bot.expressions[k];
+          // A mood of the bot's own goes when its picture goes; the × only
+          // shows while it has none.
+          if (!baseKeys.includes(k)) {
+            const i = pendingMoods.indexOf(k);
+            if (!v && i >= 0) pendingMoods.splice(i, 1);
+            paintExpressions();
+          }
+          update();
+        },
+        crop: { aspect: 1, outW: 384, outH: 384, title: `${labelOf(k)} expression` },
+        preview: (url) => (url
+          ? `<span class="expr-thumb"><img src="${esc(url)}" alt="${esc(labelOf(k))} expression"></span>`
+          : `<span class="expr-thumb is-empty" aria-hidden="true">${esc(labelOf(k))}</span>`),
+      });
+    }
+    const taken = new Set(keys);
+    $("#mood-suggest", main).innerHTML = MOOD_SUGGESTIONS.filter((m) => !taken.has(m))
+      .map((m) => `<button type="button" class="chip" data-suggest-mood="${m}">+ ${esc(labelOf(m))}</button>`).join("");
+    if (focusKey) $(`#expr-${focusKey} .btn`, main)?.focus();
   }
+  function addMood(raw) {
+    const k = moodName(raw);
+    if (!k) { toast("Give the mood a name, like devious or mocking.", "error"); $("#mood-new", main).focus(); return; }
+    if (baseKeys.includes(k) || customKeys().includes(k)) { toast(`${labelOf(k)} is already there.`); $(`#expr-${k} .btn`, main)?.focus(); return; }
+    pendingMoods.push(k);
+    $("#mood-new", main).value = "";
+    paintExpressions(k);
+  }
+  $("#mood-add", main).addEventListener("click", () => addMood($("#mood-new", main).value));
+  $("#mood-new", main).addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); addMood(e.target.value); } });
+  $("#mood-suggest", main).addEventListener("click", (e) => {
+    const s = e.target.closest("[data-suggest-mood]");
+    if (s) addMood(s.dataset.suggestMood);
+  });
+  $("#expr-grid", main).addEventListener("click", (e) => {
+    const r = e.target.closest("[data-remove-mood]");
+    if (!r) return;
+    const k = r.dataset.removeMood;
+    delete bot.expressions[k];
+    const i = pendingMoods.indexOf(k);
+    if (i >= 0) pendingMoods.splice(i, 1);
+    paintExpressions();
+    update();
+    toast(`${labelOf(k)} removed. Save the bot to keep the change.`);
+  });
+  paintExpressions();
   imagePicker($("#background", main), {
     get: () => bot.background,
     set: (v) => { bot.background = v; update(); },

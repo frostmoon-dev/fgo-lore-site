@@ -74,7 +74,7 @@ export function readBond(text) {
 }
 
 // Mood tags pick the bot's expression picture: <mood:happy>.
-export const MOOD_TAG = /[<[]\s*mood\s*:\s*([a-z]+)\s*[>\]]/gi;
+export const MOOD_TAG = /[<[]\s*mood\s*:\s*([a-z-]+)\s*[>\]]/gi;
 export function readMood(text, allowed) {
   const last = [...String(text ?? "").matchAll(MOOD_TAG)].at(-1);
   const mood = last?.[1]?.toLowerCase();
