@@ -15,6 +15,17 @@ function segmentedHTML(name, options, value) {
   return `<div class="segmented">${options.map(([v, label]) => `<label><input type="radio" name="${name}" value="${v}" ${value === v ? "checked" : ""}><span>${label}</span></label>`).join("")}</div>`;
 }
 
+const LANGUAGES = [
+  "English", "Thai", "Japanese", "Korean", "Chinese (Simplified)", "Chinese (Traditional)", "Vietnamese", "Indonesian",
+  "Malay", "Filipino", "Hindi", "Spanish", "Portuguese", "French", "German", "Italian", "Dutch", "Polish", "Russian",
+  "Ukrainian", "Turkish", "Arabic",
+];
+
+function browserLanguage() {
+  try { return new Intl.DisplayNames(["en"], { type: "language" }).of(navigator.language.split("-")[0]) || "English"; }
+  catch { return "English"; }
+}
+
 function bytes(n) {
   if (!n) return "0 KB";
   const units = ["B", "KB", "MB", "GB"];
@@ -86,6 +97,24 @@ export async function render(main) {
       </div>
 
       <div class="card">
+        <h2 class="card-title">Languages</h2>
+        <p class="lead">For translating in chats: read any message in your language, and write in your language and send it in the chat's language.</p>
+        <div class="form-row">
+          <div class="field">
+            <label for="lang-mine">Your language</label>
+            <input type="text" id="lang-mine" list="languages" value="${esc(settings.translate.mine)}" placeholder="${esc(browserLanguage())}" autocomplete="off">
+            <p class="hint">Messages are translated into this. Empty uses your browser's language (${esc(browserLanguage())}).</p>
+          </div>
+          <div class="field">
+            <label for="lang-chat">Language of your chats</label>
+            <input type="text" id="lang-chat" list="languages" value="${esc(settings.translate.chat)}" autocomplete="off">
+            <p class="hint">Your messages are translated into this before you send them.</p>
+          </div>
+        </div>
+        <datalist id="languages">${LANGUAGES.map((l) => `<option value="${l}">`).join("")}</datalist>
+      </div>
+
+      <div class="card">
         <h2 class="card-title">Memory</h2>
         <p class="lead">Each chat keeps a running summary, so bots remember what happened after old messages fall out of the context size. You can read and edit it from the book button in a chat.</p>
         <div class="form-grid">
@@ -102,6 +131,10 @@ export async function render(main) {
         <h2 class="card-title">Chat</h2>
         <label class="check"><input type="checkbox" id="enter" ${settings.enterToSend ? "checked" : ""}>
           <span>Enter sends the message<small>Off: Enter adds a new line and Ctrl+Enter sends. Handy on phones.</small></span></label>
+        <label class="check"><input type="checkbox" id="confirm-on" ${settings.confirm.enabled ? "checked" : ""}>
+          <span>Ask before changing a chat<small>Before deleting a message, saving an edit, branching, or removing a character from a scene.</small></span></label>
+        <label class="check"><input type="checkbox" id="recap-auto" ${settings.recap.auto ? "checked" : ""}>
+          <span>Recap when I come back to a chat<small>After a break of 12 hours or more, a few lines on where the story stands. One request each time.</small></span></label>
         <label class="check"><input type="checkbox" id="check-auto" ${settings.check.auto ? "checked" : ""}>
           <span>Check every reply for staying in character<small>Flags replies that break the bot's definition. Each check is a second request to your API, so it costs more.</small></span></label>
         <details class="more">
@@ -109,7 +142,8 @@ export async function render(main) {
           <ul class="hint shortcut-list">
             <li><code>Enter</code> send · <code>Shift+Enter</code> new line</li>
             <li><code>Esc</code> stop the reply being written</li>
-            <li><code>Alt+W</code> write my reply · <code>Alt+D</code> direct the next reply</li>
+            <li><code>Alt+W</code> write my reply · <code>Alt+S</code> ideas for what to say</li>
+            <li><code>Alt+D</code> direct the next reply · <code>Alt+T</code> translate my message</li>
             <li><code>Ctrl+Enter</code> save an edited message · <code>Esc</code> cancel editing</li>
             <li><code>Ctrl+S</code> save in the bot editor</li>
           </ul>
@@ -180,6 +214,17 @@ export async function render(main) {
     settings.memory = (await saveSettings({ memory: { ...settings.memory, every } })).memory;
   }, 300);
   wireSlider(main, "mem-every", saveEvery);
+  const saveLangs = debounce(async () => {
+    settings.translate = (await saveSettings({ translate: {
+      mine: $("#lang-mine", main).value.trim(),
+      chat: $("#lang-chat", main).value.trim() || "English",
+    } })).translate;
+    toast("Saved.", "ok");
+  }, 500);
+  $("#lang-mine", main).addEventListener("input", saveLangs);
+  $("#lang-chat", main).addEventListener("input", saveLangs);
+  $("#confirm-on", main).addEventListener("change", (e) => saveSettings({ confirm: { enabled: e.target.checked } }).then(() => toast("Saved.", "ok")));
+  $("#recap-auto", main).addEventListener("change", (e) => saveSettings({ recap: { auto: e.target.checked } }).then(() => toast("Saved.", "ok")));
   $("#check-auto", main).addEventListener("change", (e) => saveSettings({ check: { auto: e.target.checked } }).then(() => toast("Saved.", "ok")));
   $("#bond-enabled", main).addEventListener("change", (e) => saveSettings({ bond: { ...settings.bond, enabled: e.target.checked } }).then(() => toast("Saved.", "ok")));
   const saveStart = debounce(() => saveSettings({ bond: { ...settings.bond, start: Number($("#bond-start", main).value) } }), 300);

@@ -116,3 +116,75 @@ export async function checkCharacter({ bot, names, reply, context, signal }) {
   const issues = (Array.isArray(out?.issues) ? out.issues : []).map(String).filter(Boolean).slice(0, 4);
   return { ok: out?.ok !== false && !issues.length, issues, fix: typeof out?.fix === "string" ? out.fix : "" };
 }
+
+// ---------- Reply suggestions ----------
+
+export async function suggestReplies({ bot, names, persona, lines, signal }) {
+  const system =
+    `You help ${names.user} decide what to do next in a roleplay with ${names.char}. ` +
+    `Offer three clearly different options for ${names.user}'s next message: for example one bold, one careful, one that changes direction. ` +
+    `Each must fit ${names.user}'s personality and react to ${names.char}'s latest message. Never write ${names.char}'s words. ` +
+    'Answer with JSON only: an array of 3 objects with "label" (2 to 5 words, an action, e.g. "Call her bluff") and ' +
+    `"text" (the full message in ${names.user}'s voice, 1 to 3 sentences, actions in *asterisks*).`;
+  const user = `${persona?.trim() ? `About ${names.user}:\n${persona.trim()}\n\n` : ""}Recent chat:\n\n${lines}`;
+  const list = parseJSON(await ask([{ role: "system", content: system }, { role: "user", content: user }], { bot, maxTokens: 600, temperature: 0.9, signal }));
+  if (!Array.isArray(list)) throw new Error("The model did not return a list of options.");
+  return list
+    .filter((o) => o && typeof o.text === "string" && o.text.trim())
+    .slice(0, 3)
+    .map((o) => ({ label: clip(String(o.label || o.text).trim(), 40), text: o.text.trim() }));
+}
+
+// ---------- Translation ----------
+
+export async function translate({ text, to, bot, signal }) {
+  const system =
+    `Translate the user's text into ${to}. Keep the meaning, tone and formatting exactly: *asterisk actions*, "quotes", ` +
+    "names, line breaks and markdown. Do not add notes, explanations or quotation marks around the result. Output only the translation.";
+  return ask([{ role: "system", content: system }, { role: "user", content: text }], { bot, maxTokens: 1600, temperature: 0.2, signal });
+}
+
+// ---------- Scene tracker ----------
+
+export async function updateScene({ bot, names, previous, lines, signal }) {
+  const system =
+    `You track the current state of a roleplay scene between ${names.user} and ${names.char}. ` +
+    "From the previous state and the latest messages, write the state as it is now. Use exactly these lines, " +
+    'each starting with its label: "Location:", "Time:", "Present:", "Mood:", "Appearance:", "Holding:". ' +
+    "Keep each line short. Carry details forward unless the messages change them. Write unknown if nothing is known. No other text.";
+  const user = `${previous?.trim() ? `Previous state:\n${previous.trim()}\n\n` : ""}Latest messages:\n\n${lines}`;
+  return ask([{ role: "system", content: system }, { role: "user", content: user }], { bot, maxTokens: 300, temperature: 0.2, signal });
+}
+
+// ---------- Recap ----------
+
+export async function recap({ bot, names, memory, lines, signal }) {
+  const system =
+    `Write a short "previously on" recap of a roleplay between ${names.user} and ${names.char}, to help ${names.user} pick the story back up. ` +
+    `Two to four sentences of plain prose, past tense, ending with where things stand right now. Refer to ${names.user} as "you". No headings, no lists.`;
+  const user = `${memory?.trim() ? `Summary of earlier events:\n${memory.trim()}\n\n` : ""}Most recent messages:\n\n${lines}`;
+  return ask([{ role: "system", content: system }, { role: "user", content: user }], { bot, maxTokens: 300, temperature: 0.5, signal });
+}
+
+// ---------- Story ----------
+
+export async function storyFrom({ bot, names, lines, pov, signal }) {
+  const voice = pov === "char"
+    ? `first person, from ${names.char}'s point of view, past tense`
+    : "third person, past tense";
+  const system =
+    `Rewrite this roleplay chat as a piece of fiction in ${voice}. Keep every event, choice and important line of dialogue, in order. ` +
+    "Turn actions and dialogue into flowing prose with paragraphs; trim repetition and out-of-story chatter. Do not add new plot events. " +
+    "Start with a short title on its own line, prefixed with #. Use markdown paragraphs only.";
+  return ask([{ role: "system", content: system }, { role: "user", content: clip(lines, 24000) }], { bot, maxTokens: 3200, temperature: 0.7, signal });
+}
+
+// ---------- Chat names ----------
+
+export async function nameChat({ bot, names, lines, signal }) {
+  const system =
+    `Suggest a title for this roleplay chat between ${names.user} and ${names.char}, like a chapter title: ` +
+    "2 to 6 words, specific to what happened, no quotes, no trailing punctuation. Answer with the title only.";
+  const out = await ask([{ role: "system", content: system }, { role: "user", content: clip(lines, 8000) }], { bot, maxTokens: 30, temperature: 0.8, signal });
+  return out.split("\n")[0].replace(/^["'“”#\s]+|["'“”.\s]+$/g, "").slice(0, 60);
+}

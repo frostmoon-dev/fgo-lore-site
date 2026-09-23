@@ -67,9 +67,11 @@ export function cleanImpersonation(text, userName) {
 // memory is the chat's running summary. note is a one-reply instruction
 // (a scene direction or a nudge like "shorter"). cast is the other bots in
 // a group scene; history messages then carry the botId of who spoke.
+// scene is the tracked state of the scene right now. Pinned messages in
+// history are always included, even after they fall out of the context.
 export function buildPrompt({
   bot, persona, preset, settings, history, loreEntries = [], bond = null,
-  mode = "reply", hint = "", memory = "", note = "", cast = [],
+  mode = "reply", hint = "", memory = "", note = "", cast = [], scene = "",
 }) {
   const asUser = mode === "impersonate";
   if (asUser) bond = null;
@@ -114,6 +116,12 @@ export function buildPrompt({
   }
   if (preset.includeScenario !== false && bot.scenario?.trim()) parts.push(`## Scenario\n${m(bot.scenario)}`);
   if (memory?.trim()) parts.push(`## Story so far (memory of earlier events)\n${m(memory)}`);
+  const pinned = history.filter((x) => x.pinned && (x.role === "user" || x.role === "assistant")).slice(-10);
+  if (pinned.length) {
+    parts.push(`## Key moments (pinned by ${names.user}; always remember these)\n` +
+      pinned.map((x) => `- ${nameOf(x)}: ${m(clip(stripBond(currentText(x)).replace(/\s+/g, " "), 600))}`).join("\n"));
+  }
+  if (scene?.trim()) parts.push(`## The scene right now (keep these details consistent)\n${m(scene)}`);
   // Impersonation always needs the persona: it is who the model is writing as.
   if ((asUser || preset.includePersona !== false) && persona?.description?.trim()) parts.push(`## ${names.user}\n${m(persona.description)}`);
   if (matched.length) {
