@@ -276,6 +276,23 @@ export async function getActivePreset() {
   return list.find((p) => p.id === settings.presetId) ?? list[0];
 }
 
+// ---------- Site facts ----------
+// Small facts about this browser's copy of the site: last backup, tour
+// seen, what's-new version seen, snoozed reminders.
+export const getMeta = () => db.getKV("meta", {});
+export async function setMeta(patch) {
+  const next = { ...(await getMeta()), ...patch };
+  await db.setKV("meta", next);
+  return next;
+}
+export const markBackedUp = () => setMeta({ lastBackupAt: Date.now(), backupSnoozeUntil: 0 });
+
+// Which persona you last used with each bot, so new chats start with it.
+export const getBotPersonas = () => db.getKV("botPersonas", {});
+export async function rememberBotPersona(botId, personaId) {
+  await db.setKV("botPersonas", { ...(await getBotPersonas()), [botId]: personaId });
+}
+
 // ---------- Usage ----------
 // Token counts per day and model. Writes are queued so two requests that
 // finish together do not overwrite each other's numbers.
@@ -313,6 +330,8 @@ export const bots = {
   async save(bot) { bot.updatedAt = now(); await db.put("bots", bot); emit("bots"); return bot; },
   // Marks a chat without counting as an edit.
   async touch(bot) { bot.lastChatAt = now(); await db.put("bots", bot); },
+  // Favourites sit first on the home page. Not an edit either.
+  async setFavorite(bot, on) { bot.favorite = !!on; await db.put("bots", bot); emit("bots"); },
   async remove(id) {
     for (const c of await chats.forBot(id)) await db.delete("chats", c.id);
     await db.delete("bots", id);

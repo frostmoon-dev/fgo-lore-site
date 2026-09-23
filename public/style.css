@@ -1017,3 +1017,90 @@ input[type="search"]::-webkit-search-cancel-button {
 
 /* Swipe between versions on touch screens */
 .msg.assistant { transition: transform 180ms var(--ease); touch-action: pan-y; }
+
+/* ---------- Command palette ---------- */
+.palette-btn { width: auto; padding: 0 var(--s2); gap: var(--s2); }
+.palette-hint { display: none; }
+@media (min-width: 1000px) {
+  .palette-btn { padding: 0 var(--s2) 0 var(--s3); border: 1px solid var(--line); }
+  .palette-hint { display: inline-flex; }
+}
+kbd {
+  display: inline-flex; align-items: center; min-width: 20px; height: 20px; padding: 0 var(--s1); justify-content: center;
+  font-family: var(--mono); font-size: var(--t-xs); color: var(--muted);
+  background: var(--fill); border-radius: var(--r-sm); border-bottom: 1px solid var(--line);
+}
+dialog.palette-dialog { width: min(600px, calc(100vw - 32px)); margin-top: 12vh; margin-bottom: auto; }
+.palette { display: flex; flex-direction: column; max-height: min(560px, 72vh); }
+.palette #pal-input {
+  flex: none; height: 56px; padding: 0 var(--s5); border: 0; border-bottom: 1px solid var(--line); border-radius: 0;
+  background: none; font-size: var(--t-md); box-shadow: none;
+}
+.palette #pal-input:hover, .palette #pal-input:focus-visible { box-shadow: none; border-color: var(--line); }
+.pal-list { list-style: none; margin: 0; padding: var(--s2); overflow-y: auto; flex: 1; }
+.pal-group {
+  padding: var(--s3) var(--s3) var(--s1); font-size: var(--t-xs); font-weight: 600;
+  letter-spacing: .04em; text-transform: uppercase; color: var(--muted);
+}
+.pal-item {
+  display: flex; align-items: center; gap: var(--s3); min-height: 40px; padding: var(--s2) var(--s3);
+  border-radius: var(--r-md); cursor: pointer;
+}
+.pal-item .t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pal-item .h { flex: none; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--t-sm); color: var(--muted); }
+.pal-item[aria-selected="true"] { background: var(--accent-soft); }
+.pal-item[aria-selected="true"] .t { color: var(--ink); font-weight: 600; }
+.pal-foot { display: flex; gap: var(--s4); padding: var(--s3) var(--s5); border-top: 1px solid var(--line); }
+.pal-foot span { display: inline-flex; align-items: center; gap: var(--s1); }
+@media (hover: none) { .pal-foot { display: none; } }
+
+/* ---------- Tour and what's new ---------- */
+.tour { text-align: center; justify-items: center; max-width: 440px; }
+.tour-art {
+  width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--accent-soft); color: var(--accent);
+}
+.tour-art svg { width: 28px; height: 28px; }
+.tour p { max-width: 38ch; color: var(--muted); }
+#tour-action:empty { display: none; }
+.tour-dots { display: flex; gap: var(--s2); }
+.tour-dots span { width: 8px; height: 8px; border-radius: 50%; background: var(--line); transition: background var(--dur) var(--ease), width var(--dur) var(--ease); }
+.tour-dots span.on { width: 24px; border-radius: var(--r-pill); background: var(--accent); }
+.tour .dialog-actions { width: 100%; }
+.news-list { list-style: none; display: grid; gap: var(--s4); }
+.news-list li { display: grid; gap: var(--s1); padding-left: var(--s4); border-left: 2px solid var(--accent-soft); }
+.news-list span { color: var(--muted); }
+
+/* Notices on the home page */
+.notice-card {
+  display: flex; align-items: center; gap: var(--s4); flex-wrap: wrap;
+  margin-bottom: var(--s4); padding: var(--s4) var(--s5);
+  background: var(--surface); border-radius: var(--r-lg); box-shadow: var(--shadow-1);
+}
+.notice-icon {
+  flex: none; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--fill); color: var(--muted);
+}
+.notice-icon svg { width: 20px; height: 20px; }
+.notice-card.warn .notice-icon { background: var(--accent-soft); color: var(--accent); }
+.notice-card .grow { flex: 1 1 280px; min-width: 0; }
+.notice-card .card-title { font-size: var(--t-md); }
+.notice-card .actions { display: flex; align-items: center; gap: var(--s2); }
+
+/* Settings: the card the palette sent you to */
+@keyframes flash-card { 0%, 60% { box-shadow: 0 0 0 2px var(--accent); } 100% { box-shadow: var(--shadow-1); } }
+.flash-card { animation: flash-card 1.6s var(--ease) both; scroll-margin-top: var(--s9); }
+[id^="set-"] { scroll-margin-top: var(--s9); }
+
+/* Favourites */
+.fav-btn.is-on { color: var(--accent); }
+.fav-btn.is-on svg path { fill: currentColor; }
+.fav-btn:not(.is-on) { opacity: 0; }
+.bot-card:hover .fav-btn, .bot-card:focus-within .fav-btn { opacity: 1; }
+@media (hover: none) { .fav-btn:not(.is-on) { opacity: 1; } }
+
+/* Dice */
+.dice-chip { gap: var(--s1); color: var(--accent); background: var(--accent-soft); font-variant-numeric: tabular-nums; }
+.dice-chip svg { width: 14px; height: 14px; }
+#dice-roll svg { width: 16px; height: 16px; margin-right: var(--s2); }
+@media (prefers-reduced-motion: reduce) { .flash-card { animation: none; box-shadow: 0 0 0 2px var(--accent); } }

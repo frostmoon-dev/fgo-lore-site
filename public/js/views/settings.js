@@ -1,9 +1,9 @@
-import { getSettings, saveSettings, exportAll, importAll, wipeAll, getUsage, clearUsage, dayKey } from "../store.js";
+import { getSettings, saveSettings, exportAll, importAll, wipeAll, getUsage, clearUsage, dayKey, getMeta, markBackedUp } from "../store.js";
 import { usageChartHTML, wireUsageChart, shortNumber } from "../chart.js";
 import { installState, promptInstall, onInstallChange } from "../install.js";
 import {
   $, $$, esc, icon, toast, confirmDialog, download, pickFile,
-  imagePicker, imagePickerHTML, sliderHTML, wireSlider, debounce,
+  imagePicker, imagePickerHTML, sliderHTML, wireSlider, debounce, timeAgo,
 } from "../ui.js";
 
 const SIZES = [["sm", "Small"], ["md", "Default"], ["lg", "Large"], ["xl", "Largest"]];
@@ -47,7 +47,7 @@ export async function render(main) {
       <h1>Settings</h1>
       <p class="lead">How the site looks and behaves, and your data.</p>
 
-      <div class="card">
+      <div class="card" id="set-appearance">
         <h2 class="card-title">Appearance</h2>
         <p class="lead">Saved in this browser and applied straight away.</p>
         <div class="form-grid">
@@ -71,14 +71,14 @@ export async function render(main) {
         </div>
       </div>
 
-      <div class="card">
+      <div class="card" id="set-install">
         <h2 class="card-title">Install as an app</h2>
         <p class="lead">Put Shiru's Garden on your home screen or in your app list. It opens full screen, loads instantly,
           and your bots and chats open even without internet. Replies still need your connection.</p>
         <div id="install-box" aria-live="polite"></div>
       </div>
 
-      <div class="card">
+      <div class="card" id="set-content">
         <h2 class="card-title">Mature content</h2>
         <p class="lead">What the model may write in your chats. Off by default. Mature and Explicit are for adults only.</p>
         <div class="form-grid">
@@ -92,7 +92,7 @@ export async function render(main) {
         </div>
       </div>
 
-      <div class="card">
+      <div class="card" id="set-background">
         <h2 class="card-title">Chat background</h2>
         <p class="lead">Used for every bot that has no background of its own.</p>
         <div class="form-grid">
@@ -108,7 +108,7 @@ export async function render(main) {
         </div>
       </div>
 
-      <div class="card">
+      <div class="card" id="set-bond">
         <h2 class="card-title">Bond</h2>
         <div class="form-grid">
           <label class="check"><input type="checkbox" id="bond-enabled" ${settings.bond.enabled ? "checked" : ""}>
@@ -120,7 +120,7 @@ export async function render(main) {
         </div>
       </div>
 
-      <div class="card">
+      <div class="card" id="set-languages">
         <h2 class="card-title">Languages</h2>
         <p class="lead">For translating in chats: read any message in your language, and write in your language and send it in the chat's language.</p>
         <div class="form-row">
@@ -138,7 +138,7 @@ export async function render(main) {
         <datalist id="languages">${LANGUAGES.map((l) => `<option value="${l}">`).join("")}</datalist>
       </div>
 
-      <div class="card">
+      <div class="card" id="set-memory">
         <h2 class="card-title">Memory</h2>
         <p class="lead">Each chat keeps a running summary, so bots remember what happened after old messages fall out of the context size. You can read and edit it from the book button in a chat.</p>
         <div class="form-grid">
@@ -151,7 +151,7 @@ export async function render(main) {
         </div>
       </div>
 
-      <div class="card">
+      <div class="card" id="set-chat">
         <h2 class="card-title">Chat</h2>
         <label class="check"><input type="checkbox" id="enter" ${settings.enterToSend ? "checked" : ""}>
           <span>Enter sends the message<small>Off: Enter adds a new line and Ctrl+Enter sends. Handy on phones.</small></span></label>
@@ -177,7 +177,7 @@ export async function render(main) {
       </div>
 
       <h2 class="sub" id="usage-title">Usage</h2>
-      <div class="card" aria-labelledby="usage-title">
+      <div class="card" id="set-usage" aria-labelledby="usage-title">
         <p class="lead">Tokens sent to and received from your API by this browser: replies and every extra task, like memory and ideas.</p>
         <div class="form-grid">
           <div id="usage-body"></div>
@@ -194,9 +194,19 @@ export async function render(main) {
         </div>
       </div>
 
+      <h2 class="sub">Help</h2>
+      <div class="card" id="set-help">
+        <p class="lead">Press <kbd>Ctrl K</kbd> anywhere, or the search button at the top, to find any page, bot, setting or chat action.</p>
+        <div class="actions">
+          <button class="btn" type="button" id="show-tour">Show the welcome tour</button>
+          <button class="btn" type="button" id="show-news">What's new</button>
+        </div>
+      </div>
+
       <h2 class="sub">Your data</h2>
-      <div class="card">
+      <div class="card" id="set-data">
         <p class="lead" id="usage">Everything lives in this browser's storage.</p>
+        <p class="hint" id="last-backup"></p>
         <div class="form-grid">
           <label class="check"><input type="checkbox" id="with-keys">
             <span>Include API keys in the backup<small>Only if you will keep the file private.</small></span></label>
@@ -209,7 +219,7 @@ export async function render(main) {
         </div>
       </div>
 
-      <div class="card">
+      <div class="card" id="set-danger">
         <h2 class="card-title">Danger zone</h2>
         <p class="lead">Deletes every bot, chat, persona, lore entry, preset and saved key on this browser. Built-in bots come back on reload.</p>
         <button class="btn btn-danger" type="button" id="wipe">Delete all data</button>
@@ -398,6 +408,10 @@ export async function render(main) {
   $("#backup", main).addEventListener("click", async () => {
     const data = await exportAll({ includeKeys: $("#with-keys", main).checked });
     download(`shirus-garden-backup-${new Date().toISOString().slice(0, 10)}.json`, data);
+    await markBackedUp();
+    paintLastBackup();
+  $("#show-tour", main).addEventListener("click", async () => (await import("../help.js")).showTour());
+  $("#show-news", main).addEventListener("click", async () => (await import("../help.js")).showWhatsNew());
   });
   $("#restore", main).addEventListener("click", async () => {
     const file = await pickFile(".json,application/json");
@@ -431,5 +445,23 @@ export async function render(main) {
   });
 
   paintUsage();
+
+  async function paintLastBackup() {
+    const at = (await getMeta()).lastBackupAt;
+    $("#last-backup", main).textContent = at ? `Last backup: ${timeAgo(at)}.` : "No backup downloaded from this browser yet.";
+  }
+  paintLastBackup();
+  $("#show-tour", main).addEventListener("click", async () => (await import("../help.js")).showTour());
+  $("#show-news", main).addEventListener("click", async () => (await import("../help.js")).showWhatsNew());
+
+  // Opened from the command palette or a reminder: go straight to a section.
+  let focus = null;
+  try { focus = sessionStorage.getItem("settingsFocus"); sessionStorage.removeItem("settingsFocus"); } catch {}
+  if (focus) requestAnimationFrame(() => {
+    const el = $(`#set-${focus}`, main);
+    if (!el) return;
+    el.scrollIntoView({ block: "start", behavior: "smooth" });
+    el.classList.add("flash-card");
+  });
   return { cleanup: () => stopInstall() };
 }

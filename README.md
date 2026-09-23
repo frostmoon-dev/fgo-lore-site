@@ -62,7 +62,19 @@ server-side storage of your key.
   recap. Ask for one any time from the ⋯ menu.
 - **Turn into a story**: rewrite a chat, or its last messages, as prose to read or download.
 - **Chat names**: the Rename box can suggest a title from what happened.
-- **Search**: the search button in the header finds a line across every chat and jumps to it.
+- **Find anything**: Ctrl+K (⌘K on a Mac), or the search button in the header, opens one
+  box for every page, bot, setting and chat action. Type a word and press Enter. With
+  text typed, the last result searches every chat for that line and jumps to it.
+- **Welcome tour**: a six-step guide shows on the first visit. Open it again from
+  Settings → Help or by typing "tour" in the search box. After an update, the home page
+  shows a short "What's new" card.
+- **Backup reminders**: once you have 20 or more messages and no backup in 7 days, the home
+  page offers a one-click backup (API keys left out) or a reminder in 3 days.
+- **Dice**: type `/roll d20`, `/roll 2d6+1 to pick the lock`, or use + → Roll dice. The
+  roll is a fair random number, shown in the chat, and the next reply is told to respect it.
+- **Persona per bot**: each bot remembers who you last were with it, and new chats with it
+  start as that persona.
+- **Favourites**: star a bot on the home page to keep it at the front of the list.
 - **Bonds in group scenes**: every character in a group chat has a bond of their own.
   The bond meter opens all of them, with a chart of how each moved over the chat.
 - **Rewind**: from a message's ⋯ menu, delete every message after it and continue from
