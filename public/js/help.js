@@ -4,10 +4,19 @@
 import { getMeta, setMeta } from "./store.js";
 import { $, esc, icon, openDialog } from "./ui.js";
 
-export const APP_VERSION = "2026.09.23.3";
+export const APP_VERSION = "2026.09.24";
 
 // Newest first. Each item says what it is and where it lives.
 export const NEWS = [
+  {
+    version: "2026.09.24",
+    items: [
+      ["Chat look", "In a chat, ⋯ → Chat look changes the bot's background, how dim it is, the font and the message size."],
+      ["Bigger faces", "Pictures in chats are larger, with a thin crescent edge: the bot's in colour, yours in grey."],
+      ["Straight crops", "Cropping no longer squeezes pictures on short screens. Re-crop any that came out stretched."],
+      ["Moods from edits", "Editing a reply to end with <mood:happy> changes its expression picture."],
+    ],
+  },
   {
     version: "2026.09.23.3",
     items: [

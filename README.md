@@ -80,6 +80,8 @@ server-side storage of your key.
 - **Colours**: Moon Cell (violet and rose, after BB; the default) or Paper (warm cream and
   clay), in light and dark. Settings → Appearance → Colours.
 - **BB**: a built-in Moon Cancer bot, written from `bots/BB.md`.
+- **Chat look**: ⋯ → Chat look in a chat sets the bot's background, the dim amount, the font
+  (Rounded, Book or Plain) and the message size, live. The font is also in Settings → Appearance.
 - **Edit your persona from a chat**: the pencil beside "Speaking as" edits the persona's
   name and description. The change applies to every chat that uses that persona.
 - **Bonds in group scenes**: every character in a group chat has a bond of their own.

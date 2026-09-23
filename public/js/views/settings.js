@@ -70,6 +70,10 @@ export async function render(main) {
             ${segmentedHTML("chat-text-size", SIZES, chatTextPref)}
             <p class="hint">Only the messages and the box you type in. Adds to the text size above.</p>
           </fieldset>
+          <fieldset class="field">
+            <legend class="field-label">Chat font</legend>
+            ${segmentedHTML("chat-font", [["rounded", "Rounded"], ["serif", "Book"], ["plain", "Plain"]], readPref("chatFont", "rounded"))}
+          </fieldset>
           <div class="text-preview" aria-hidden="true">
             <div class="msg-body"><p>The tea has gone cold. <em>She sets the cup down without drinking.</em> “You came back later than you said.”</p></div>
           </div>
@@ -259,6 +263,11 @@ export async function render(main) {
   }));
   sizePref("text-size", "textSize", "text");
   sizePref("chat-text-size", "chatTextSize", "chatText");
+  $$('input[name="chat-font"]', main).forEach((r) => r.addEventListener("change", () => {
+    try { r.value === "rounded" ? localStorage.removeItem("chatFont") : localStorage.setItem("chatFont", r.value); } catch {}
+    if (r.value === "rounded") delete document.documentElement.dataset.chatFont;
+    else document.documentElement.dataset.chatFont = r.value;
+  }));
 
   $("#enter", main).addEventListener("change", (e) => saveSettings({ enterToSend: e.target.checked }).then(() => toast("Saved.", "ok")));
 

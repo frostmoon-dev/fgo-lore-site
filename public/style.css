@@ -616,12 +616,22 @@ body.in-chat .site-footer { display: none; }
 
 .chat-log { flex: 1; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; padding: var(--s6) var(--s5) var(--s4); }
 .chat-log-inner { max-width: var(--measure); margin: 0 auto; display: grid; gap: var(--s4); }
-.msg { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: var(--s3); }
-.msg .avatar { --size: 40px; }
+.msg { display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: var(--s3); }
+/* Avatars carry a thin crescent, like the lit edge of a moon: the bot's in
+   the accent on one side, yours in quiet grey on the other. */
+.msg.assistant > .avatar, .msg.assistant > .avatar-link > .avatar, .msg.assistant .expr-face { box-shadow: -3px 3px 0 var(--accent); }
+.msg.user > .avatar { box-shadow: 3px 3px 0 var(--line-strong); }
+@media (max-width: 600px) {
+  .msg { grid-template-columns: 40px minmax(0, 1fr); }
+  .msg > .avatar, .msg > .avatar-link > .avatar { --size: 40px !important; }
+}
 .msg-head { display: flex; align-items: baseline; gap: var(--s2); margin-bottom: var(--s1); }
 .msg-name { font-size: var(--t-ui); font-weight: 600; }
 .msg-time { font-size: var(--t-xs); color: var(--muted); }
-.msg-body { font-size: calc(var(--t-md) * var(--chat-scale)); line-height: var(--lh-read); overflow-wrap: anywhere; }
+.msg-body { font-family: var(--chat-font, var(--font)); font-size: calc(var(--t-md) * var(--chat-scale)); line-height: var(--lh-read); overflow-wrap: anywhere; }
+/* Chat font (Chat look, or Settings → Appearance): system faces, nothing extra to load. */
+:root[data-chat-font="serif"] { --chat-font: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif; }
+:root[data-chat-font="plain"] { --chat-font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
 .msg-body > * + * { margin-top: .75em; }
 .msg.user .msg-body { color: var(--muted); }
 .msg-body em { font-style: italic; color: var(--muted); }
@@ -655,6 +665,7 @@ body.in-chat .site-footer { display: none; }
 }
 .composer-box:focus-within { border-color: var(--ink); box-shadow: 0 0 0 3px var(--accent-soft); }
 .composer-box textarea {
+  font-family: var(--chat-font, var(--font));
   min-height: 40px; max-height: 40svh; border: 0; background: none; resize: none; padding: var(--s2);
   border-radius: 0; font-size: calc(var(--t-md) * var(--chat-scale));
 }
@@ -760,7 +771,8 @@ body.in-chat .site-footer { display: none; }
 /* ---------- Crop dialog ---------- */
 .crop-stage {
   position: relative; overflow: hidden; touch-action: none; cursor: grab;
-  width: 100%; aspect-ratio: var(--crop-aspect, 1); max-height: 46svh; margin: 0 auto;
+  /* Width follows the height limit, so the frame always keeps the picture's shape. */
+  width: min(100%, calc(46svh * var(--crop-aspect, 1))); aspect-ratio: var(--crop-aspect, 1); margin: 0 auto;
   background: var(--fill); border-radius: var(--r-md);
 }
 .crop-stage:active { cursor: grabbing; }
@@ -787,6 +799,7 @@ body.in-chat .site-footer { display: none; }
   position: absolute; inset: 0; z-index: 0; pointer-events: none;
   background-size: cover; background-position: center;
 }
+.chat-bg[hidden] { display: none; }
 .chat-bg::after { content: ""; position: absolute; inset: 0; background: var(--bg); opacity: var(--bg-dim, .86); }
 .chat-main.has-bg > *:not(.chat-bg) { position: relative; z-index: 1; }
 .chat-main.has-bg .chat-topbar, .chat-main.has-bg .composer { background: color-mix(in srgb, var(--bg) 90%, transparent); }
@@ -1061,12 +1074,12 @@ input[type="search"]::-webkit-search-cancel-button {
 .expr-thumb img { width: 100%; height: 100%; object-fit: cover; }
 .expr-thumb.is-empty { border: 1.5px dashed var(--line-strong); background: none; }
 /* In chat: the face that matches the reply. The latest reply shows it large. */
-.expr-face { display: block; width: 40px; height: 40px; border-radius: var(--r-sm); overflow: hidden; background: var(--fill); }
+.expr-face { display: block; width: 48px; height: 48px; border-radius: 50%; overflow: hidden; background: var(--fill); }
 .expr-face img { width: 100%; height: 100%; object-fit: cover; }
-.msg.has-face { grid-template-columns: 40px minmax(0, 1fr); }
+.msg.has-face { grid-template-columns: 48px minmax(0, 1fr); }
 .msg.has-face.is-last { grid-template-columns: 96px minmax(0, 1fr); }
-.msg.is-last .expr-face { width: 96px; height: 96px; border-radius: var(--r-md); box-shadow: var(--shadow-1); }
-@media (max-width: 600px) { .msg.has-face.is-last { grid-template-columns: 72px minmax(0, 1fr); } .msg.is-last .expr-face { width: 72px; height: 72px; } }
+.msg.is-last .expr-face { width: 96px; height: 96px; box-shadow: -4px 4px 0 var(--accent), var(--shadow-1); }
+@media (max-width: 600px) { .msg.has-face:not(.is-last) { grid-template-columns: 40px minmax(0, 1fr); } .msg.has-face:not(.is-last) .expr-face { width: 40px; height: 40px; } .msg.has-face.is-last { grid-template-columns: 72px minmax(0, 1fr); } .msg.is-last .expr-face { width: 72px; height: 72px; } }
 .mood-chip { text-transform: lowercase; }
 
 /* ---------- First-glance clarity ---------- */
