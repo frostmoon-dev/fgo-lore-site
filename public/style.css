@@ -347,6 +347,12 @@ h2.sub {
 .segmented label:hover span { background: var(--fill); }
 .segmented input:checked + span { background: var(--primary); color: var(--on-primary); }
 .segmented input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* On a phone the choices share the full width in one row instead of wrapping. */
+@media (max-width: 480px) {
+  .segmented { display: flex; flex-wrap: nowrap; width: 100%; }
+  .segmented label { flex: 1 1 0; min-width: 0; }
+  .segmented span { width: 100%; justify-content: center; padding: 0 var(--s2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+}
 
 /* ---------- Surfaces ---------- */
 .card { background: var(--surface); border-radius: var(--r-lg); padding: var(--s5); box-shadow: var(--shadow-1); }
@@ -545,8 +551,10 @@ dialog::backdrop { background: var(--scrim); }
 .dialog-body h2 { font-size: var(--t-xl); }
 .dialog-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--s2); }
 .dialog-actions .push { margin-right: auto; }
+/* On a phone, a third, quieter button moves under the main pair. With only
+   two buttons they share one row. */
 @media (max-width: 480px) {
-  .dialog-actions .push { order: 1; flex-basis: 100%; margin: var(--s1) 0 0; }
+  .dialog-actions:has(> :nth-child(3)) .push { order: 1; flex-basis: 100%; margin: var(--s1) 0 0; }
 }
 .prompt-preview {
   white-space: pre-wrap; font-family: var(--mono); font-size: var(--t-sm); line-height: 1.65;
@@ -625,9 +633,9 @@ body.in-chat .site-footer { display: none; }
 /* A hairline keeps pictures crisp against any background. */
 .msg > .avatar, .msg > .avatar-link > .avatar, .msg .expr-face { box-shadow: 0 0 0 1px var(--line); }
 @media (max-width: 600px) {
-  .msg { --pic: 56px; gap: var(--s3); }
-  :root[data-chat-pic="md"] .msg { --pic: 48px; }
-  :root[data-chat-pic="sm"] .msg { --pic: 40px; }
+  .msg { --pic: 40px; gap: var(--s3); }
+  :root[data-chat-pic="md"] .msg { --pic: 36px; }
+  :root[data-chat-pic="sm"] .msg { --pic: 32px; }
 }
 .msg-head { display: flex; align-items: baseline; gap: var(--s2); margin-bottom: var(--s1); }
 .msg-name { font-size: var(--t-ui); font-weight: 600; }
