@@ -1,6 +1,8 @@
 import { seed, onChange, getActiveConnection } from "./store.js";
 import { $, $$, esc, confirmDialog, toast } from "./ui.js";
 import { registerServiceWorker } from "./install.js";
+import { openPalette, goToSettings } from "./palette.js";
+import { maybeShowTour } from "./help.js";
 
 // ---------- Routes ----------
 // Each view module exports render(main, params) and may return
@@ -156,5 +158,19 @@ try {
   toast(`Browser storage is unavailable, so nothing will be saved. (${err.message})`, "error", { timeout: 0 });
 }
 paintStatus();
-route();
+await route();
 registerServiceWorker();
+maybeShowTour();
+
+// ---------- Command palette ----------
+const isMac = /mac|iphone|ipad/i.test(navigator.platform);
+const kbd = document.querySelector(".palette-hint kbd");
+if (kbd) kbd.textContent = isMac ? "⌘K" : "Ctrl K";
+$("#palette-btn").addEventListener("click", openPalette);
+document.addEventListener("keydown", (e) => {
+  if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === "k") {
+    e.preventDefault();
+    if (!document.querySelector("dialog[open]")) openPalette();
+  }
+});
+$("#footer-backup")?.addEventListener("click", (e) => { e.preventDefault(); goToSettings("data"); });

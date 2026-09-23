@@ -1,7 +1,9 @@
 import {
   bots, chats, lore, personas, getSettings, getActiveConnection, getActivePreset,
   getLorebooks, saveLorebooks, newLorebook, newLore, loreForBot, bondTier, bondLevels, BOND_KINDS, moodsOf, uid, now,
+  getBotPersonas, rememberBotPersona,
 } from "../store.js";
+import { registerCommands } from "../palette.js";
 import { chatCompletion, listModels } from "../api.js";
 import {
   buildPrompt, generationParams, currentText, applyMacros, readBond, readMood, stripBond, cleanImpersonation, contentLevel,
@@ -23,6 +25,33 @@ function nextChatTitle(existing) {
   const used = existing.map((c) => Number(/^Chat (\d+)$/.exec(c.title)?.[1])).filter(Number.isFinite);
   return `Chat ${Math.max(existing.length, ...used, 0) + 1}`;
 }
+
+// Dice: "/roll 2d6+1 to pick the lock" → { expr, rolls, mod, total, label }.
+// Up to 20 dice of up to 1000 sides. Returns null when it is not a roll.
+export function parseRoll(text) {
+  const m = /^\/roll\s+(\d{0,2})d(\d{1,4})\s*([+-]\s*\d{1,4})?\s*(.*)$/i.exec(text.trim());
+  if (!m) return null;
+  const n = Number(m[1] || 1);
+  const sides = Number(m[2]);
+  if (n < 1 || n > 20 || sides < 2 || sides > 1000) return null;
+  const mod = m[3] ? Number(m[3].replace(/\s/g, "")) : 0;
+  const label = m[4].replace(/^(for|to)\s+/i, "").trim();
+  return rollDice(n, sides, mod, label);
+}
+export function rollDice(n, sides, mod = 0, label = "") {
+  const rolls = Array.from({ length: n }, () => {
+    const buf = new Uint32Array(1);
+    crypto.getRandomValues(buf);
+    return 1 + (buf[0] % sides);
+  });
+  const total = rolls.reduce((a, b) => a + b, 0) + mod;
+  const expr = `${n}d${sides}${mod ? (mod > 0 ? `+${mod}` : `${mod}`) : ""}`;
+  return { expr, rolls, mod, total, sides, n, label };
+}
+const rollText = (r) => {
+  const parts = r.rolls.length > 1 || r.mod ? ` (${r.rolls.join(" + ")}${r.mod ? ` ${r.mod > 0 ? "+" : "−"} ${Math.abs(r.mod)}` : ""})` : "";
+  return `*rolls ${r.expr}${r.label ? ` to ${r.label}` : ""}: **${r.total}**${parts}*`;
+};
 
 function newChat(bot, personaId, existing = []) {
   const openings = [bot.greeting, ...(bot.altGreetings ?? [])].filter((g) => g?.trim());
@@ -57,11 +86,13 @@ export async function render(main, [botId, chatId, jumpTo]) {
   }
   document.body.classList.add("in-chat");
 
-  const [settings, allPersonas, activePersona, allBots] = await Promise.all([getSettings(), personas.all(), personas.active(), bots.all()]);
+  const [settings, allPersonas, activePersona, allBots, botPersonas] = await Promise.all([getSettings(), personas.all(), personas.active(), bots.all(), getBotPersonas()]);
+  // New chats start as whoever you last were with this bot.
+  let startPersonaId = allPersonas.some((p) => p.id === botPersonas[bot.id]) ? botPersonas[bot.id] : activePersona?.id ?? null;
   let list = await chats.forBot(bot.id);
   let chat = (chatId && list.find((c) => c.id === chatId)) || (!chatId && list[0]) || null;
   if (!chat) {
-    chat = newChat(bot, activePersona?.id ?? null, list);
+    chat = newChat(bot, startPersonaId, list);
     await chats.save(chat);
     list = await chats.forBot(bot.id);
   }
@@ -284,7 +315,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
 
   $("#new-chat", main).addEventListener("click", async () => {
     if (busy) return;
-    const c = newChat(bot, persona()?.id ?? null, list);
+    const c = newChat(bot, startPersonaId, list);
     await chats.save(c);
     location.hash = `#/chat/${bot.id}/${c.id}`;
   });
@@ -455,6 +486,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
     const isChecking = checking.has(m.id);
     if (isChecking) info.unshift(`<span class="chip">checking character…</span>`);
     if (m.pinned) info.unshift(`<span class="chip pinned-chip">pinned</span>`);
+    if (m.roll) info.unshift(`<span class="chip dice-chip" title="${esc(`Rolled ${m.roll.rolls.join(", ")}${m.roll.mod ? `, ${m.roll.mod > 0 ? "+" : ""}${m.roll.mod}` : ""}`)}">${icon("dice")}${esc(m.roll.expr)} → ${m.roll.total}</span>`);
     const tr = isBot ? meta.translation : m.translation;
     const translation = translating.has(m.id)
       ? `<div class="translation" aria-busy="true"><span class="skeleton skeleton-line"></span><span class="skeleton skeleton-line"></span></div>`
@@ -615,7 +647,13 @@ export async function render(main, [botId, chatId, jumpTo]) {
     const continueNote = kind === "continue"
       ? "Your last reply was cut off. Continue it exactly where it stopped, mid-sentence if needed. Do not repeat or summarize anything already written; write only the rest."
       : "";
-    const fullNote = [directed, note, shiftNote, continueNote].filter(Boolean).join(" ");
+    // A dice roll in the message being answered is binding.
+    const before = chat.messages[chat.messages.indexOf(target) - 1];
+    const r = before?.role === "user" ? before.roll : null;
+    const rollNote = r
+      ? `${userName()} rolled ${r.expr}${r.label ? ` to ${r.label}` : ""} and got ${r.total} (lowest possible ${r.n + r.mod}, highest ${r.n * r.sides + r.mod}). Respect this result: the outcome must match how good or bad the roll was. Do not reroll or ignore it.`
+      : "";
+    const fullNote = [directed, note, shiftNote, continueNote, rollNote].filter(Boolean).join(" ");
 
     const [freshSettings, preset, loreEntries] = await Promise.all([getSettings(), getActivePreset(), loreForBot(speaker)]);
     const beforeBond = bondFor(speaker);
@@ -1640,6 +1678,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
     ...(narrow.matches ? [{ label: "Ideas for what to say", hint: "Three options for your next move · Alt+S", onSelect: showIdeas }] : []),
     { label: directBar.hidden ? "Direct the next reply" : "Remove the direction", hint: "A hidden note for the next reply only · Alt+D", onSelect: () => setDirecting(directBar.hidden) },
     { label: "Surprise me", hint: "A random twist for the next reply, to check first", onSelect: surprise },
+    { label: "Roll dice", hint: "A fair roll the reply has to respect · /roll d20", onSelect: openDice },
     { label: `Translate my message into ${chatLanguage()}`, hint: "Write in any language, check, then send · Alt+T", onSelect: translateOutgoing },
   ], { align: "end" }));
   $("#draft-retry", main).addEventListener("click", () => impersonate({ retry: true }));
@@ -1663,11 +1702,61 @@ export async function render(main, [botId, chatId, jumpTo]) {
     }
     hideDraftBar();
     closeIdeas();
-    chat.messages.push({ id: uid(), role: "user", content: text, at: now() });
+    const roll = text.startsWith("/roll") ? parseRoll(text) : null;
+    if (text.startsWith("/roll") && !roll) { toast("Write a roll like /roll d20, /roll 2d6+1 or /roll d100 to open the door.", "error"); return; }
+    if (roll) await addRoll(roll);
+    else chat.messages.push({ id: uid(), role: "user", content: text, at: now() });
     input.value = "";
     fitInput();
     await persist();
     generate("new");
+  }
+
+  // A roll is its own message; the reply that answers it must honour it.
+  async function addRoll(roll) {
+    chat.messages.push({ id: uid(), role: "user", content: rollText(roll), roll, at: now() });
+    await persist();
+    paintLog();
+  }
+  function openDice() {
+    if (busy) return;
+    const dlg = openDialog(`<form method="dialog" class="dialog-body" id="dice-form">
+      <h2>Roll dice</h2>
+      <p class="hint">The roll goes into the chat, and ${esc(group() ? "the next character" : bot.name)} has to go along with the result. You can also type <code>/roll 2d6+1</code> in the message box.</p>
+      <fieldset class="field dice-pick"><legend class="field-label">Dice</legend>
+        <div class="segmented">
+          ${["d20", "d6", "2d6", "d100"].map((d, i) => `<label><input type="radio" name="dice" value="${d}" ${i === 0 ? "checked" : ""}><span>${d}</span></label>`).join("")}
+          <label><input type="radio" name="dice" value="custom"><span>Other</span></label>
+        </div>
+      </fieldset>
+      <div class="field" id="dice-custom-field" hidden><label for="dice-custom">Other dice</label>
+        <input type="text" id="dice-custom" placeholder="3d8+2" autocomplete="off" spellcheck="false"></div>
+      <div class="field"><label for="dice-label">What is it for? <span class="count">Optional</span></label>
+        <input type="text" id="dice-label" placeholder="pick the lock" autocomplete="off" maxlength="80"></div>
+      <div class="dialog-actions">
+        <button class="btn btn-ghost" value="cancel" formnovalidate>Cancel</button>
+        <button class="btn btn-primary" value="roll" id="dice-roll">${icon("dice")}Roll and send</button>
+      </div>
+    </form>`);
+    const customField = $("#dice-custom-field", dlg);
+    $$("input[name=dice]", dlg).forEach((r) => r.addEventListener("change", () => {
+      customField.hidden = $("input[name=dice]:checked", dlg).value !== "custom";
+      if (!customField.hidden) $("#dice-custom", dlg).focus();
+    }));
+    $("#dice-form", dlg).addEventListener("submit", async (e) => {
+      if (e.submitter?.value !== "roll") return;
+      const pick = $("input[name=dice]:checked", dlg).value;
+      const expr = pick === "custom" ? $("#dice-custom", dlg).value.trim() : pick;
+      const roll = parseRoll(`/roll ${expr} ${$("#dice-label", dlg).value.trim()}`);
+      if (!roll) {
+        e.preventDefault();
+        toast("Write dice like d20, 2d6 or 3d8+2 (up to 20 dice, up to 1000 sides).", "error");
+        $("#dice-custom", dlg).focus();
+        return;
+      }
+      await addRoll(roll);
+      generate("new");
+    });
   }
 
   $("#composer", main).addEventListener("submit", (e) => { e.preventDefault(); send(); });
@@ -1836,6 +1925,8 @@ export async function render(main, [botId, chatId, jumpTo]) {
   // ---------- Top bar ----------
   $("#persona", main).addEventListener("change", async (e) => {
     chat.personaId = e.target.value;
+    startPersonaId = chat.personaId;
+    rememberBotPersona(bot.id, chat.personaId);
     await persist(); paintHeader(); paintLog({ scroll: false });
   });
 
@@ -1974,8 +2065,38 @@ export async function render(main, [botId, chatId, jumpTo]) {
   if (jumpTo) requestAnimationFrame(() => scrollToMessage(jumpTo));
   if (matchMedia("(hover: hover)").matches) input.focus();
 
+  // ---------- Command palette ----------
+  const unregister = registerCommands(() => {
+    const c = (title, run, keywords = "", hint = "") => ({ group: "This chat", title, run, keywords, hint });
+    return [
+      c("New chat", () => $("#new-chat", main).click(), "start fresh"),
+      c("Memory", openMemory, "summary remember"),
+      c("Scene tracker", openScene, "where location"),
+      c("Characters in this chat", openCast, "group cast add bot"),
+      ...(bondOn ? [c("Bond", openBonds, "relationship meter chart")] : []),
+      c("Pinned moments", openPinned, "pin remembered"),
+      c(`${bot.name}'s journal`, openJournal, "diary"),
+      c("Recap so far", showRecap, "summary what happened"),
+      c("Turn into a story", openStory, "prose novel"),
+      c("Suggest lore from this chat", openLoreSuggestions, "lorebook"),
+      c("Change the model", () => openModelMenu($("#more", main)), "switch model", currentModel()),
+      c("Ideas for what to say", showIdeas, "suggest replies", "Alt+S"),
+      c("Write my reply", () => impersonate(), "impersonate draft", "Alt+W"),
+      c("Direct the next reply", () => setDirecting(true), "note instruction", "Alt+D"),
+      c("Surprise me", surprise, "twist random event"),
+      c("Roll dice", openDice, "d20 roll random"),
+      c(`Translate my message into ${chatLanguage()}`, translateOutgoing, "language", "Alt+T"),
+      c("See the prompt", previewPrompt, "debug context"),
+      c("Usage in this chat", openChatUsage, "tokens cost"),
+      c("Rename chat", rename, "title"),
+      c("Export chat", exportChat, "download save"),
+      c("Delete chat", deleteChat, "remove"),
+    ];
+  });
+
   return {
     cleanup: () => {
+      unregister();
       controller?.abort();
       drafting?.abort();
       // Leaving after a good stretch of chat: the bot writes in its journal.
