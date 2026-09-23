@@ -1,13 +1,16 @@
 import {
   bots, chats, lore, personas, getSettings, getActiveConnection, getActivePreset,
-  getLorebooks, saveLorebooks, newLorebook, newLore, loreForBot, bondTier, BOND_KINDS, uid, now,
+  getLorebooks, saveLorebooks, newLorebook, newLore, loreForBot, bondTier, bondLevels, BOND_KINDS, uid, now,
 } from "../store.js";
 import { chatCompletion } from "../api.js";
 import { buildPrompt, generationParams, currentText, applyMacros, readBond, stripBond, cleanImpersonation } from "../prompt.js";
-import { summarize, suggestLore, checkCharacter, transcript } from "../ai.js";
+import {
+  summarize, suggestLore, checkCharacter, transcript, suggestReplies, translate, updateScene, recap, storyFrom, nameChat,
+} from "../ai.js";
+import { bondChartHTML, wireBondChart } from "../chart.js";
 import { renderMarkdown } from "../markdown.js";
 import {
-  $, $$, esc, icon, avatarHTML, toast, confirmDialog, promptDialog, openDialog, openMenu,
+  $, $$, esc, icon, avatarHTML, toast, confirmDialog, openDialog, openMenu,
   download, slug, timeAgo, clock, autosize, sliderHTML, wireSlider,
 } from "../ui.js";
 
@@ -42,7 +45,7 @@ const NUDGES = [
   { label: "More dialogue", note: "Make this reply mostly spoken dialogue, with little narration." },
 ];
 
-export async function render(main, [botId, chatId]) {
+export async function render(main, [botId, chatId, jumpTo]) {
   const bot = await bots.get(botId);
   if (!bot) {
     main.innerHTML = `<div class="wrap page"><div class="empty"><h2>Not found</h2>
@@ -60,6 +63,7 @@ export async function render(main, [botId, chatId]) {
     list = await chats.forBot(bot.id);
   }
   chat.castIds ??= [];
+  const lastVisit = chat.updatedAt ?? 0;
   history.replaceState(history.state, "", `#/chat/${bot.id}/${chat.id}`);
 
   let busy = false;
@@ -67,12 +71,13 @@ export async function render(main, [botId, chatId]) {
   let pendingError = null; // shown under the log, not saved
   let editingId = null;
   let memoryBusy = false;
-  const checking = new Set(); // message ids being checked
+  let sceneBusy = false;
+  const checking = new Set();    // message ids being checked
+  const translating = new Set(); // message ids being translated
 
   const persona = () => allPersonas.find((p) => p.id === chat.personaId) ?? activePersona;
   const background = bot.background ?? settings.chatBackground ?? null;
   if (background) main.style.setProperty("--bg-dim", String(settings.backgroundDim ?? 0.86));
-  const bondOn = settings.bond?.enabled !== false && bot.bondEnabled !== false;
 
   // ---------- Who is in the scene ----------
   const botById = new Map(allBots.map((b) => [b.id, b]));
@@ -102,26 +107,49 @@ export async function render(main, [botId, chatId]) {
     return [...everyone()].sort((a, b) => lastSpoke(a) - lastSpoke(b))[0];
   }
 
-  // ---------- Bond (with the chat's own bot) ----------
-  const bondDefault = () => Number(settings.bond?.start ?? 20);
-  const bondStart = () => (Number.isFinite(chat.bondStart) ? Number(chat.bondStart) : bondDefault());
-  // The bond is the starting value plus the deltas of the replies now on
+  // ---------- Bonds ----------
+  // The chat's own bot keeps chat.bondStart; in a group scene every other
+  // character has a bond of its own, started from chat.bondStarts[id].
+  // A bond is its start plus the changes in that character's replies now on
   // screen, so swiping, editing or deleting a reply keeps it honest.
-  function bondEarned() {
-    return chat.messages.reduce((total, m) => {
-      const delta = m.role === "assistant" ? m.meta?.[m.swipeIndex ?? 0]?.bond : 0;
+  chat.bondStarts ??= {};
+  chat.pendingMilestones ??= chat.pendingMilestone ? { [bot.id]: chat.pendingMilestone } : {};
+  delete chat.pendingMilestone;
+  const bondOnFor = (b) => settings.bond?.enabled !== false && b?.bondEnabled !== false && botById.has(b?.id);
+  const milestonesFor = (b) => b.bondMilestones !== false;
+  const bondDefault = () => Number(settings.bond?.start ?? 20);
+  const bondStartFor = (b) => {
+    const v = b.id === bot.id ? chat.bondStart : chat.bondStarts[b.id];
+    return Number.isFinite(v) ? Number(v) : bondDefault();
+  };
+  const spokeBy = (m, b) => m.role === "assistant" && (m.botId ?? bot.id) === b.id;
+  function bondEarnedFor(b, upTo = chat.messages.length) {
+    return chat.messages.slice(0, upTo).reduce((total, m) => {
+      const delta = spokeBy(m, b) ? m.meta?.[m.swipeIndex ?? 0]?.bond : 0;
       return total + (Number.isFinite(delta) ? delta : 0);
     }, 0);
   }
-  // The bot's own kind of bond decides the level names and behaviour.
-  const bondKind = bot.bondKind === "custom" ? "" : (BOND_KINDS[bot.bondKind] ?? BOND_KINDS.affection).name;
-  const milestonesOn = bot.bondMilestones !== false;
-  function bondFrom(base) {
-    const value = Math.max(0, Math.min(100, base + bondEarned()));
-    const t = bondTier(value, bot);
-    return { value, label: t.label, behavior: t.behavior, index: t.index, kind: bondKind };
+  const kindName = (b) => (b.bondKind === "custom" ? "" : (BOND_KINDS[b.bondKind] ?? BOND_KINDS.affection).name);
+  const levelOf = (b, raw) => {
+    const value = Math.max(0, Math.min(100, raw));
+    const t = bondTier(value, b);
+    return { value, label: t.label, behavior: t.behavior, index: t.index, kind: kindName(b) };
+  };
+  const bondFor = (b, start = bondStartFor(b)) => levelOf(b, start + bondEarnedFor(b));
+  // Every point where this character's bond changed, for the chart.
+  function bondHistory(b) {
+    let running = bondStartFor(b);
+    const points = [{ x: 0, ...levelOf(b, running) }];
+    chat.messages.forEach((m, i) => {
+      const delta = spokeBy(m, b) ? m.meta?.[m.swipeIndex ?? 0]?.bond : 0;
+      if (Number.isFinite(delta) && delta !== 0) { running += delta; points.push({ x: i + 1, ...levelOf(b, running) }); }
+    });
+    // Carry the line to the latest message so the chart reads to "now".
+    if (points.at(-1).x < chat.messages.length) points.push({ x: chat.messages.length, ...levelOf(b, running) });
+    return points;
   }
-  const bondNow = () => bondFrom(bondStart());
+  const bondOn = bondOnFor(bot); // the meter in the header follows the chat's own bot
+  const bondNow = () => bondFor(bot);
 
   // A bot's picture always opens its editor.
   const botAvatar = (b, size, extra = "") =>
@@ -154,6 +182,7 @@ export async function render(main, [botId, chatId]) {
             <span class="bond-bar"><span class="bond-fill" id="bond-fill"></span></span>
           </button>` : ""}
           <button class="icon-btn hide-narrow" type="button" id="memory" aria-label="Memory" title="Memory">${icon("book")}</button>
+          <button class="icon-btn hide-narrow" type="button" id="scene" aria-label="Scene tracker" title="Scene tracker">${icon("map")}</button>
           <button class="icon-btn hide-narrow" type="button" id="cast" aria-label="Characters in this chat" title="Characters in this chat">${icon("users")}</button>
           <button class="icon-btn" type="button" id="more" aria-label="More chat actions" aria-haspopup="menu" aria-expanded="false" title="More">${icon("dots")}</button>
         </div>
@@ -168,6 +197,11 @@ export async function render(main, [botId, chatId]) {
             <div class="note bad" id="no-conn" hidden>
               ${icon("info")}<span>No API connection yet. <a href="#/connection">Set one up</a> to start talking.</span>
             </div>
+            <section class="recap-card" id="recap" hidden aria-labelledby="recap-title">
+              <div class="recap-head"><h2 id="recap-title">Previously…</h2>
+                <button class="icon-btn" type="button" id="recap-close" aria-label="Dismiss recap" title="Dismiss">${icon("x")}</button></div>
+              <div class="recap-body" id="recap-body"></div>
+            </section>
             <div class="draft-bar" id="draft-bar" hidden>
               <span class="grow" id="draft-status" aria-live="polite"></span>
               <button class="btn btn-quiet btn-sm" type="button" id="draft-retry">Try again</button>
@@ -180,10 +214,17 @@ export async function render(main, [botId, chatId]) {
               <button class="icon-btn" type="button" id="direct-clear" aria-label="Remove direction" title="Remove">${icon("x")}</button>
               <span class="sr-only" id="direct-hint">Sent to the model with the next reply, then cleared. It does not appear in the chat.</span>
             </div>
+            <div class="suggest-bar" id="suggest-bar" hidden>
+              <span class="suggest-title" id="suggest-title">Ideas</span>
+              <div class="suggest-list" id="suggest-list" aria-live="polite"></div>
+              <button class="icon-btn" type="button" id="suggest-more" aria-label="Other ideas" title="Other ideas">${icon("refresh")}</button>
+              <button class="icon-btn" type="button" id="suggest-close" aria-label="Close ideas" title="Close">${icon("x")}</button>
+            </div>
             <div class="composer-box">
               <label for="input" class="sr-only">Message</label>
               <textarea id="input" rows="1" placeholder="Message ${esc(bot.name)}…" enterkeyhint="send"></textarea>
-              <button class="icon-btn composer-tool" type="button" id="direct" aria-label="Direct the next reply" aria-controls="direct-bar" aria-expanded="false" title="Direct the next reply (Alt+D)">${icon("megaphone")}</button>
+              <button class="icon-btn composer-tool" type="button" id="composer-more" aria-label="More tools: direct the next reply, translate your message" aria-haspopup="menu" aria-expanded="false" title="More tools">${icon("plus")}</button>
+              <button class="icon-btn composer-tool hide-narrow" type="button" id="suggest" aria-label="Ideas for what to say next" title="Ideas for what to say (Alt+S)">${icon("bulb")}</button>
               <button class="icon-btn composer-tool" type="button" id="impersonate"
                 aria-label="Write my reply. Uses what you typed as the idea." title="Write my reply (Alt+W)">${icon("quill")}</button>
               <button class="send-btn" type="submit" id="send" aria-label="Send message">${icon("send")}</button>
@@ -209,6 +250,7 @@ export async function render(main, [botId, chatId]) {
   const sidebar = $("#sidebar", main);
   const scrim = $("#scrim", main);
   const fitInput = autosize(input);
+  const narrow = matchMedia("(max-width: 600px)"); // phones: rarer tools move into menus
 
   // ---------- Sidebar ----------
   function paintList() {
@@ -240,55 +282,70 @@ export async function render(main, [botId, chatId]) {
 
   function paintBond() {
     if (!bondOn) return;
-    const { value, label } = bondNow();
+    const { value, label, index } = bondNow();
     $("#bond-label", main).textContent = label;
     $("#bond-fill", main).style.width = `${value}%`;
     $("#bond", main).setAttribute("aria-label",
-      `Bond with ${bot.name}: ${label}, ${value} of 100. Set where this chat starts.`);
-    $("#bond", main).dataset.level = String(bondNow().index);
+      `Bond with ${bot.name}: ${label}, ${value} of 100. Open bonds, history and starting points.`);
+    $("#bond", main).dataset.level = String(index);
   }
 
-  // Click the meter to say how warm the two of them already are before the
-  // first line. Existing replies keep their own changes on top.
-  function editBondStart() {
-    const earned = bondEarned();
+  // The meter opens every bond in the chat: where it stands, how it moved,
+  // and where it starts. Existing replies keep their changes on top.
+  function openBonds() {
+    const people = everyone().filter(bondOnFor);
     const dlg = openDialog(`
       <form method="dialog" class="dialog-body">
-        <h2>Bond with ${esc(bot.name)}</h2>
-        <p class="hint">How close the two of them are before the first line of this chat${
-          earned ? `. So far this conversation has ${earned > 0 ? "added" : "taken"} ${Math.abs(earned)}` : ""}.</p>
-        ${sliderHTML({
-          id: "cb-start", label: "Starting bond", min: 0, max: 100, step: 1, value: bondStart(),
-        })}
-        <p class="bond-read" id="cb-read"></p>
+        <h2>${people.length > 1 ? "Bonds in this chat" : `Bond with ${esc(bot.name)}`}</h2>
+        <p class="hint">Each reply can move a bond up or down. Set where a bond starts before the first line of this chat.</p>
+        <div class="bond-rows">${people.map((b, i) => {
+          const now = bondFor(b);
+          return `<section class="bond-row" aria-labelledby="bh-${i}">
+            <div class="bond-row-head">
+              ${avatarHTML(b.avatar, b.name, 36)}
+              <div class="grow"><h3 id="bh-${i}">${esc(b.name)}</h3>
+                <small>${now.kind ? `${esc(now.kind)} · ` : ""}${esc(now.label)}, ${now.value} of 100</small></div>
+            </div>
+            ${bondChartHTML({ id: b.id, name: b.name, points: bondHistory(b), levels: bondLevels(b) })}
+            ${sliderHTML({ id: `bs-${i}`, label: "Starts at", min: 0, max: 100, step: 1, value: bondStartFor(b) })}
+            <p class="hint" id="bs-read-${i}"></p>
+          </section>`;
+        }).join("")}</div>
         <div class="dialog-actions">
-          <button class="btn btn-quiet push" type="button" id="cb-default">Use the default (${bondDefault()})</button>
+          <button class="btn btn-quiet push" type="button" id="bs-default">Use the default start (${bondDefault()})</button>
           <button class="btn btn-ghost" value="cancel" formnovalidate>Cancel</button>
           <button class="btn btn-primary" value="ok">Save</button>
         </div>
       </form>`, {
+      wide: true,
       onClose: async (v) => {
         if (v !== "ok") return;
-        chat.bondStart = Number($("#cb-start", dlg).value);
+        people.forEach((b, i) => {
+          const start = Number($(`#bs-${i}`, dlg).value);
+          if (b.id === bot.id) chat.bondStart = start;
+          else chat.bondStarts[b.id] = start;
+        });
         await persist();
         paintBond();
-        toast(`${bot.name} starts this chat at ${bondTier(chat.bondStart, bot).label}.`, "ok");
+        toast("Bond starting points saved.", "ok");
       },
     });
-    const read = () => {
-      const { value, label } = bondFrom(Number($("#cb-start", dlg).value || 0));
-      $("#cb-read", dlg).textContent = earned
-        ? `The meter would read ${label}, ${value} of 100.`
-        : `${bot.name} begins as ${label}.`;
-    };
-    wireSlider(dlg, "cb-start", read);
-    $("#cb-default", dlg).addEventListener("click", () => {
-      $("#cb-start", dlg).value = String(bondDefault());
-      $("#cb-start-range", dlg).value = String(bondDefault());
+    people.forEach((b, i) => {
+      wireBondChart($(`[data-chart="${CSS.escape(b.id)}"]`, dlg) ?? dlg, bondHistory(b));
+      const read = () => {
+        const next = bondFor(b, Number($(`#bs-${i}`, dlg).value || 0));
+        $(`#bs-read-${i}`, dlg).textContent = `With this start the meter reads ${next.label}, ${next.value} of 100.`;
+      };
+      wireSlider(dlg, `bs-${i}`, read);
       read();
     });
-    read();
-    $("#cb-start", dlg).select();
+    $("#bs-default", dlg).addEventListener("click", () => {
+      people.forEach((_, i) => {
+        $(`#bs-${i}`, dlg).value = String(bondDefault());
+        $(`#bs-${i}-range`, dlg).value = String(bondDefault());
+        $(`#bs-${i}`, dlg).dispatchEvent(new Event("input"));
+      });
+    });
   }
 
   function paintHeader() {
@@ -311,6 +368,9 @@ export async function render(main, [botId, chatId]) {
     mem.classList.toggle("is-loading", memoryBusy);
     mem.setAttribute("aria-label", memoryBusy ? "Memory, updating" : chat.memory?.text ? "Memory" : "Memory, empty");
     $("#cast", main).classList.toggle("has-dot", group());
+    const sc = $("#scene", main);
+    sc.classList.toggle("has-dot", !!chat.scene?.text?.trim());
+    sc.classList.toggle("is-loading", sceneBusy);
   }
 
   // ---------- Messages ----------
@@ -367,28 +427,38 @@ export async function render(main, [botId, chatId]) {
     if (meta.lore?.length) info.push(meta.lore.map((t) => `<span class="chip" title="Lore used">${esc(t)}</span>`).join(""));
     if (meta.usage) info.push(`<span title="Tokens in / out">${meta.usage.prompt_tokens ?? "?"} → ${meta.usage.completion_tokens ?? "?"} tokens</span>`);
     if (meta.finish === "length") info.push(`<span title="The reply hit the max reply tokens limit">cut off</span>`);
-    if (bondOn && Number.isFinite(meta.bond) && meta.bond !== 0) {
+    const speakerBond = isBot && bondOnFor(speaker);
+    if (speakerBond && Number.isFinite(meta.bond) && meta.bond !== 0) {
       info.push(`<span class="bond-chip ${meta.bond > 0 ? "up" : "down"}" title="Bond change">${meta.bond > 0 ? "+" : "−"}${Math.abs(meta.bond)} bond</span>`);
     }
     const isChecking = checking.has(m.id);
-    const milestone = bondOn && milestonesOn && meta.milestone
+    if (isChecking) info.unshift(`<span class="chip">checking character…</span>`);
+    if (m.pinned) info.unshift(`<span class="chip pinned-chip">pinned</span>`);
+    const tr = isBot ? meta.translation : m.translation;
+    const translation = translating.has(m.id)
+      ? `<div class="translation" aria-busy="true"><span class="skeleton skeleton-line"></span><span class="skeleton skeleton-line"></span></div>`
+      : tr?.text ? `<div class="translation">
+          <div class="translation-head"><span>${esc(tr.lang)}</span>
+            <button type="button" class="link-btn" data-action="hide-translation">Hide</button></div>
+          ${renderMarkdown(applyMacros(tr.text, namesFor(speaker ?? bot)))}</div>` : "";
+    const milestone = speakerBond && milestonesFor(speaker) && meta.milestone
       ? `<div class="milestone ${meta.milestone.up ? "up" : "down"}" role="note">
-          <span>Bond with ${esc(bot.name)}: ${esc(meta.milestone.from)} → ${esc(meta.milestone.to)}</span></div>` : "";
+          <span>Bond with ${esc(speaker.name)}: ${esc(meta.milestone.from)} → ${esc(meta.milestone.to)}</span></div>` : "";
 
     return `<article class="msg ${m.role} ${isLastBot ? "is-last" : ""}" data-id="${m.id}" aria-label="${esc(name)}">
       ${av}
       <div style="min-width:0">
         <div class="msg-head"><span class="msg-name">${esc(name)}</span><time class="msg-time" datetime="${new Date(m.at).toISOString()}">${clock(m.at)}</time></div>
         <div class="msg-body">${bodyHTML(m, text, streaming)}</div>
+        ${translation}
         <div class="msg-foot">
           ${swipeNav}
           <span class="msg-tools">
-            <button class="icon-btn" type="button" data-action="copy" aria-label="Copy message" title="Copy">${icon("copy")}</button>
             <button class="icon-btn" type="button" data-action="edit" aria-label="Edit message" title="Edit" ${busy ? "disabled" : ""}>${icon("edit")}</button>
             ${isLastBot ? `<button class="icon-btn" type="button" data-action="regenerate" aria-label="Regenerate reply, with options" aria-haspopup="menu" aria-expanded="false" title="Regenerate" ${busy ? "disabled" : ""}>${icon("refresh")}</button>` : ""}
-            ${isBot && !streaming ? `<button class="icon-btn${isChecking ? " is-loading" : ""}" type="button" data-action="check" aria-label="${isChecking ? "Checking character" : "Check this reply stays in character"}" title="Check character" ${isChecking ? "disabled" : ""}>${icon("shield")}</button>` : ""}
-            <button class="icon-btn" type="button" data-action="branch" aria-label="Branch a new chat from here" title="Branch from here" ${busy ? "disabled" : ""}>${icon("branch")}</button>
-            <button class="icon-btn" type="button" data-action="delete" aria-label="Delete message" title="Delete" ${busy ? "disabled" : ""}>${icon("trash")}</button>
+            <button class="icon-btn${m.pinned ? " is-on" : ""}" type="button" data-action="pin" aria-pressed="${m.pinned ? "true" : "false"}"
+              aria-label="${m.pinned ? "Unpin" : "Pin this moment so it is always remembered"}" title="${m.pinned ? "Unpin" : "Pin"}">${icon("pin")}</button>
+            <button class="icon-btn" type="button" data-action="msg-menu" aria-label="More message actions" aria-haspopup="menu" aria-expanded="false" title="More" ${streaming ? "disabled" : ""}>${icon("dots")}</button>
           </span>
           ${info.length ? `<span class="msg-meta">${info.join(" · ")}</span>` : ""}
         </div>
@@ -438,16 +508,13 @@ export async function render(main, [botId, chatId]) {
   // reply and then cleared; it never appears in the chat.
   const directBar = $("#direct-bar", main);
   const directInput = $("#direction", main);
-  const directBtn = $("#direct", main);
   const direction = () => (directBar.hidden ? "" : directInput.value.trim());
   function setDirecting(open) {
     directBar.hidden = !open;
-    directBtn.setAttribute("aria-expanded", String(open));
-    directBtn.classList.toggle("is-active", open);
+    $("#composer-more", main).classList.toggle("has-dot", open);
     if (open) directInput.focus();
     else { directInput.value = ""; }
   }
-  directBtn.addEventListener("click", () => setDirecting(directBar.hidden));
   $("#direct-clear", main).addEventListener("click", () => { setDirecting(false); input.focus(); });
   directInput.addEventListener("keydown", (e) => {
     if (e.key === "Escape") { e.stopPropagation(); setDirecting(false); input.focus(); }
@@ -478,22 +545,22 @@ export async function render(main, [botId, chatId]) {
     }
     const si = target.swipeIndex;
     const speaker = speakerOf(target);
-    const withBond = bondOn && speaker.id === bot.id;
+    const withBond = bondOnFor(speaker);
     const directed = direction();
     // After the bond changes level, the next reply is asked to show it.
-    const shift = withBond && milestonesOn && kind === "new" && chat.pendingMilestone ? chat.pendingMilestone : null;
+    const shift = withBond && milestonesFor(speaker) && kind === "new" ? chat.pendingMilestones[speaker.id] ?? null : null;
     const shiftNote = shift
       ? `The bond has just moved ${shift.up ? "up" : "down"} from ${shift.from} to ${shift.to}. Let this change show clearly in this reply, in character, without naming it.`
       : "";
     const fullNote = [directed, note, shiftNote].filter(Boolean).join(" ");
 
     const [freshSettings, preset, loreEntries] = await Promise.all([getSettings(), getActivePreset(), loreForBot(speaker)]);
-    const beforeBond = bondNow();
+    const beforeBond = bondFor(speaker);
     const prompt = buildPrompt({
       bot: speaker, persona: persona(), preset, settings: freshSettings, loreEntries,
       history: withSpeakers(chat.messages.slice(0, chat.messages.indexOf(target))),
       bond: withBond ? beforeBond : null,
-      memory: chat.memory?.text ?? "", note: fullNote, cast: group() ? others(speaker) : [],
+      memory: chat.memory?.text ?? "", scene: chat.scene?.text ?? "", note: fullNote, cast: group() ? others(speaker) : [],
     });
     const body = {
       model: speaker.model || conn.model || undefined,
@@ -537,15 +604,16 @@ export async function render(main, [botId, chatId]) {
         ...(directed || note ? { note: [directed, note].filter(Boolean).join(" ") } : {}),
       };
       if (!parsed.text.trim()) throw new Error("The model sent back an empty reply. Try again, or check the model name on the Connection page.");
-      if (shift) chat.pendingMilestone = null;
-      if (withBond && bondNow().index !== beforeBond.index) {
-        const change = { from: beforeBond.label, to: bondNow().label, up: bondNow().index > beforeBond.index };
+      if (shift) delete chat.pendingMilestones[speaker.id];
+      const afterBond = bondFor(speaker);
+      if (withBond && afterBond.index !== beforeBond.index) {
+        const change = { from: beforeBond.label, to: afterBond.label, up: afterBond.index > beforeBond.index };
         target.meta[si].milestone = change;
-        chat.pendingMilestone = change;
-        toast(`${bot.name}: ${change.from} \u2192 ${change.to}`);
+        chat.pendingMilestones[speaker.id] = change;
+        toast(`${speaker.name}: ${change.from} \u2192 ${change.to}`);
       } else if (withBond && kind === "swipe") {
         // A new version that no longer crosses a level takes the milestone back.
-        chat.pendingMilestone = null;
+        delete chat.pendingMilestones[speaker.id];
       }
       window.dispatchEvent(new CustomEvent("api-status", { detail: true }));
       if (prompt.dropped > 0 && !chat.warnedTrim && !chat.memory?.text) {
@@ -579,6 +647,7 @@ export async function render(main, [botId, chatId]) {
     }
     if (ok) {
       if (freshSettings.check?.auto) runCheck(target, { quiet: true });
+      if (chat.scene?.auto) refreshScene({ quiet: true });
       maybeRemember(freshSettings);
     }
   }
@@ -721,6 +790,12 @@ export async function render(main, [botId, chatId]) {
 
   // ---------- Branches ----------
   async function branchFrom(i) {
+    const ok = await askFirst({
+      title: "Branch from this message?",
+      body: `A new chat starts with the first ${i + 1} message${i ? "s" : ""} of this one, and you move to it. This chat stays exactly as it is.`,
+      confirm: "Branch",
+    });
+    if (!ok || busy) return;
     const upTo = i + 1;
     const copy = {
       ...structuredClone(chat),
@@ -738,14 +813,206 @@ export async function render(main, [botId, chatId]) {
     location.hash = `#/chat/${bot.id}/${copy.id}`;
   }
 
+  // ---------- Scene tracker ----------
+  // Where everyone is and what they have on them, right now. Updated after
+  // each reply when switched on, and sent with every reply.
+  async function refreshScene({ quiet = false } = {}) {
+    if (sceneBusy || !chat.messages.length) return false;
+    sceneBusy = true;
+    paintHeader();
+    try {
+      const text = await updateScene({
+        bot, names: namesFor(), previous: chat.scene?.text ?? "",
+        lines: transcript(chat.messages.slice(chat.scene?.text ? -2 : -12), nameOf, namesFor()),
+      });
+      if (!text) throw new Error("The model sent back an empty scene.");
+      chat.scene = { auto: chat.scene?.auto ?? false, text, updatedAt: now() };
+      await persist();
+      if (!quiet) toast("Scene updated.", "ok");
+      return true;
+    } catch (err) {
+      toast(`The scene was not updated. ${err.message}`, "error");
+      return false;
+    } finally {
+      sceneBusy = false;
+      paintHeader();
+    }
+  }
+
+  function openScene() {
+    const sc = chat.scene ?? { text: "", auto: false };
+    const dlg = openDialog(`
+      <form method="dialog" class="dialog-body">
+        <h2>Scene tracker</h2>
+        <p class="hint">The state of the scene right now, sent with every reply so small details stay consistent:
+          where everyone is, the time, the mood, what they wear and hold. Edit it freely.</p>
+        <div class="field">
+          <label for="sc-text">Right now <span class="count" id="sc-status"></span></label>
+          <textarea id="sc-text" class="tall" placeholder="Location: …&#10;Time: …&#10;Present: …&#10;Mood: …&#10;Appearance: …&#10;Holding: …">${esc(sc.text ?? "")}</textarea>
+        </div>
+        <label class="check"><input type="checkbox" id="sc-auto" ${sc.auto ? "checked" : ""}>
+          <span>Update after every reply<small>One extra request per reply.</small></span></label>
+        <div class="dialog-actions">
+          <button class="btn btn-quiet push" type="button" id="sc-now">Update now</button>
+          <button class="btn btn-ghost" value="cancel" formnovalidate>Cancel</button>
+          <button class="btn btn-primary" value="ok">Save</button>
+        </div>
+      </form>`, {
+      wide: true,
+      onClose: async (v) => {
+        if (v !== "ok") return;
+        chat.scene = { ...(chat.scene ?? {}), text: $("#sc-text", dlg).value.trim(), auto: $("#sc-auto", dlg).checked, updatedAt: now() };
+        await persist(); paintHeader();
+        toast("Scene saved.", "ok");
+      },
+    });
+    const ta = $("#sc-text", dlg);
+    autosize(ta);
+    const status = () => { $("#sc-status", dlg).textContent = chat.scene?.text ? `updated ${timeAgo(chat.scene.updatedAt)}` : "empty"; };
+    status();
+    $("#sc-now", dlg).addEventListener("click", async (e) => {
+      const b = e.currentTarget;
+      chat.scene = { ...(chat.scene ?? { auto: false }), text: ta.value.trim() };
+      b.classList.add("is-loading"); b.setAttribute("aria-busy", "true"); ta.readOnly = true;
+      if (await refreshScene({ quiet: true })) ta.value = chat.scene.text;
+      b.classList.remove("is-loading"); b.removeAttribute("aria-busy"); ta.readOnly = false;
+      ta.dispatchEvent(new Event("input"));
+      status();
+    });
+  }
+
+  // ---------- Pinned moments ----------
+  function scrollToMessage(id) {
+    const el = $(`[data-id="${CSS.escape(id)}"]`, logInner);
+    if (!el) return false;
+    el.scrollIntoView({ block: "center", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+    el.classList.remove("flash");
+    void el.offsetWidth; // restart the highlight
+    el.classList.add("flash");
+    return true;
+  }
+
+  function openPinned() {
+    const pins = chat.messages.filter((m) => m.pinned);
+    const dlg = openDialog(`<div class="dialog-body">
+      <h2>Pinned moments</h2>
+      <p class="hint">Pinned messages are always sent to the model, even after they fall out of the context. Pin or unpin from any message.</p>
+      ${pins.length ? `<ul class="pin-list">${pins.map((m) => `
+        <li class="pin-row">
+          <div class="grow"><strong>${esc(nameOf(m))}</strong>
+            <p>${esc(stripBond(currentText(m)).replace(/\s+/g, " ").slice(0, 180))}${currentText(m).length > 180 ? "…" : ""}</p></div>
+          <button class="btn btn-sm" type="button" data-go="${m.id}">Go to</button>
+          <button class="btn btn-sm btn-quiet" type="button" data-unpin="${m.id}">Unpin</button>
+        </li>`).join("")}</ul>`
+      : `<p class="note">${icon("info")}<span>Nothing pinned yet. Use the pin button on a message that matters, like a promise or a confession.</span></p>`}
+      <form method="dialog" class="dialog-actions"><button class="btn btn-primary">Close</button></form>
+    </div>`);
+    dlg.addEventListener("click", async (e) => {
+      const go = e.target.closest("[data-go]");
+      const un = e.target.closest("[data-unpin]");
+      if (go) { dlg.close(); scrollToMessage(go.dataset.go); }
+      if (un) {
+        const m = chat.messages.find((x) => x.id === un.dataset.unpin);
+        if (m) { m.pinned = false; await persist(); paintLog({ scroll: false }); }
+        un.closest("li").remove();
+      }
+    });
+  }
+
+  // ---------- Recap ----------
+  const recapCard = $("#recap", main);
+  async function showRecap() {
+    if (chat.messages.length < 2) { toast("There is not much to recap yet."); return; }
+    recapCard.hidden = false;
+    const body = $("#recap-body", main);
+    body.setAttribute("aria-busy", "true");
+    body.innerHTML = '<span class="skeleton skeleton-line"></span><span class="skeleton skeleton-line"></span>';
+    try {
+      const text = await recap({
+        bot, names: namesFor(), memory: chat.memory?.text ?? "",
+        lines: transcript(chat.messages.slice(-16), nameOf, namesFor()),
+      });
+      if (!text) throw new Error("The model sent back an empty recap.");
+      body.innerHTML = renderMarkdown(text);
+    } catch (err) {
+      recapCard.hidden = true;
+      toast(`No recap. ${err.message}`, "error");
+    } finally {
+      body.removeAttribute("aria-busy");
+    }
+  }
+  $("#recap-close", main).addEventListener("click", () => { recapCard.hidden = true; input.focus(); });
+
+  // ---------- Story ----------
+  function openStory() {
+    const dlg = openDialog(`<div class="dialog-body">
+      <h2>Turn this chat into a story</h2>
+      <p class="hint">Rewrites the chat as prose, keeping every event and choice. Nothing in the chat changes.</p>
+      <div class="form-row">
+        <div class="field"><label for="st-range">Which part</label>
+          <select id="st-range">
+            <option value="20">The last 20 messages</option>
+            <option value="50" selected>The last 50 messages</option>
+            <option value="all">The whole chat (${chat.messages.length} messages)</option>
+          </select></div>
+        <div class="field"><label for="st-pov">Told as</label>
+          <select id="st-pov">
+            <option value="third">Third person</option>
+            <option value="char">First person, by ${esc(bot.name)}</option>
+          </select></div>
+      </div>
+      <div id="st-out" class="story-out" hidden></div>
+      <div class="dialog-actions">
+        <button class="btn btn-quiet push" type="button" id="st-copy" hidden>Copy</button>
+        <button class="btn" type="button" id="st-download" hidden>Download</button>
+        <button class="btn btn-ghost" type="button" data-close>Close</button>
+        <button class="btn btn-primary" type="button" id="st-write">Write the story</button>
+      </div>
+    </div>`, { wide: true });
+    $("[data-close]", dlg).addEventListener("click", () => dlg.close());
+    const out = $("#st-out", dlg);
+    let story = "";
+    const aborter = new AbortController();
+    dlg.addEventListener("close", () => aborter.abort());
+    $("#st-write", dlg).addEventListener("click", async (e) => {
+      const b = e.currentTarget;
+      const range = $("#st-range", dlg).value;
+      const msgs = range === "all" ? chat.messages : chat.messages.slice(-Number(range));
+      b.classList.add("is-loading"); b.setAttribute("aria-busy", "true");
+      out.hidden = false;
+      out.innerHTML = '<span class="skeleton skeleton-title"></span>' + '<span class="skeleton skeleton-line"></span>'.repeat(5);
+      try {
+        story = await storyFrom({
+          bot, names: namesFor(), pov: $("#st-pov", dlg).value,
+          lines: transcript(msgs, nameOf, namesFor()), signal: aborter.signal,
+        });
+        if (!story) throw new Error("The model sent back an empty story.");
+        out.innerHTML = `<div class="prose">${renderMarkdown(story)}</div>`;
+        $("#st-copy", dlg).hidden = false;
+        $("#st-download", dlg).hidden = false;
+        b.textContent = "Write it again";
+      } catch (err) {
+        if (err.name === "AbortError") return;
+        out.innerHTML = `<p class="note bad">${icon("info")}<span>${esc(err.message)}</span></p>`;
+      } finally {
+        b.classList.remove("is-loading"); b.removeAttribute("aria-busy");
+      }
+    });
+    $("#st-copy", dlg).addEventListener("click", async () => {
+      try { await navigator.clipboard.writeText(story); toast("Story copied."); }
+      catch { toast("Could not copy. Your browser blocked clipboard access.", "error"); }
+    });
+    $("#st-download", dlg).addEventListener("click", () => download(`${slug(bot.name)}-${slug(chat.title)}-story.md`, story, "text/markdown"));
+  }
+
   // ---------- Cast (group scenes) ----------
   function openCast() {
     const candidates = allBots.filter((b) => b.id !== bot.id);
     const dlg = openDialog(`
       <form method="dialog" class="dialog-body">
         <h2>Characters in this chat</h2>
-        <p class="hint">Add other bots to make this a group scene. ${esc(bot.name)} stays the host: the bond meter and this chat's
-          place in the sidebar belong to ${esc(bot.name)}. Pick who replies next under the message box, or leave it on Auto.</p>
+        <p class="hint">Add other bots to make this a group scene. Each character keeps a bond of their own; the meter in the header
+          shows ${esc(bot.name)}'s and opens all of them. The chat stays in ${esc(bot.name)}'s list. Pick who replies next under the message box, or leave it on Auto.</p>
         ${candidates.length ? `<div class="cast-list">${candidates.map((b) => `
           <label class="cast-row">
             <input type="checkbox" value="${b.id}" ${chat.castIds.includes(b.id) ? "checked" : ""}>
@@ -760,7 +1027,14 @@ export async function render(main, [botId, chatId]) {
       onClose: async (v) => {
         if (v !== "ok") return;
         const before = chat.castIds.length;
-        chat.castIds = $$('input[type="checkbox"]', dlg).filter((c) => c.checked).map((c) => c.value);
+        const next = $$('input[type="checkbox"]', dlg).filter((c) => c.checked).map((c) => c.value);
+        const leaving = chat.castIds.filter((id) => !next.includes(id)).map((id) => botById.get(id)?.name).filter(Boolean);
+        if (leaving.length && !(await askFirst({
+          title: `Remove ${leaving.join(" and ")} from this scene?`,
+          body: `${leaving.length > 1 ? "They" : leaving[0]} will stop replying here. Messages already written stay in the chat.`,
+          confirm: "Remove", danger: true,
+        }))) return;
+        chat.castIds = next;
         await persist(); paintHeader(); paintLog({ scroll: false });
         if (chat.castIds.length !== before) {
           toast(chat.castIds.length ? `Now a group scene with ${everyone().map((b) => b.name).join(", ")}.` : `Back to just ${bot.name}.`, "ok");
@@ -865,10 +1139,12 @@ export async function render(main, [botId, chatId]) {
   const draftBar = $("#draft-bar", main);
   const draftBtn = $("#impersonate", main);
 
-  function showDraftBar(text, { tools = true } = {}) {
+  // The bar above the box after something was written into it for you:
+  // a draft, an idea, or a translation. Undo puts back what was there.
+  function showDraftBar(text, { tools = true, retry = true } = {}) {
     draftBar.hidden = false;
     $("#draft-status", main).textContent = text;
-    $("#draft-retry", main).hidden = !tools;
+    $("#draft-retry", main).hidden = !tools || !retry;
     $("#draft-undo", main).hidden = !tools;
   }
   function hideDraftBar() { draftBar.hidden = true; draftSource = null; }
@@ -900,7 +1176,7 @@ export async function render(main, [botId, chatId]) {
     const prompt = buildPrompt({
       bot: partner, persona: persona(), preset, settings: freshSettings, loreEntries,
       history: withSpeakers(chat.messages), mode: "impersonate", hint,
-      memory: chat.memory?.text ?? "", cast: group() ? others(partner) : [],
+      memory: chat.memory?.text ?? "", scene: chat.scene?.text ?? "", cast: group() ? others(partner) : [],
     });
     const body = {
       model: partner.model || conn.model || undefined,
@@ -948,6 +1224,83 @@ export async function render(main, [botId, chatId]) {
   }
 
   draftBtn.addEventListener("click", () => impersonate());
+
+  // ---------- Reply ideas ----------
+  const suggestBar = $("#suggest-bar", main);
+  const suggestList = $("#suggest-list", main);
+  let ideas = [];
+  let ideasBusy = null;
+  async function showIdeas() {
+    if (ideasBusy) return;
+    if (busy || drafting) return;
+    suggestBar.hidden = false;
+    suggestList.setAttribute("aria-busy", "true");
+    suggestList.innerHTML = '<span class="skeleton skeleton-chip"></span>'.repeat(3);
+    $("#suggest-title", main).textContent = "Thinking of ideas…";
+    ideasBusy = new AbortController();
+    const last = chat.messages.findLast((m) => m.role === "assistant");
+    const partner = last ? speakerOf(last) : bot;
+    try {
+      ideas = await suggestReplies({
+        bot: partner, names: namesFor(partner), persona: persona()?.description ?? "",
+        lines: transcript(chat.messages.slice(-8), nameOf, namesFor(partner)), signal: ideasBusy.signal,
+      });
+      if (!ideas.length) throw new Error("No ideas came back. Try again.");
+      $("#suggest-title", main).textContent = "Ideas";
+      suggestList.innerHTML = ideas.map((o, i) => `<button type="button" class="suggest-chip" data-idea="${i}" title="${esc(o.text)}">${esc(o.label)}</button>`).join("");
+    } catch (err) {
+      if (err.name !== "AbortError") toast(err.message, "error");
+      suggestBar.hidden = true;
+    } finally {
+      suggestList.removeAttribute("aria-busy");
+      ideasBusy = null;
+    }
+  }
+  function closeIdeas() { ideasBusy?.abort(); suggestBar.hidden = true; }
+  $("#suggest", main).addEventListener("click", () => (suggestBar.hidden ? showIdeas() : closeIdeas()));
+  $("#suggest-more", main).addEventListener("click", showIdeas);
+  $("#suggest-close", main).addEventListener("click", () => { closeIdeas(); input.focus(); });
+  suggestList.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-idea]");
+    if (!b) return;
+    draftSource = input.value;
+    input.value = ideas[Number(b.dataset.idea)].text;
+    fitInput();
+    closeIdeas();
+    showDraftBar("Idea added. Edit it if you like, then send.", { retry: false });
+    input.focus();
+    input.setSelectionRange(input.value.length, input.value.length);
+  });
+
+  // ---------- Translate my message ----------
+  async function translateOutgoing() {
+    const text = input.value.trim();
+    if (!text) { toast(`Write your message first, in any language. It will be translated into ${chatLanguage()}.`); input.focus(); return; }
+    if (busy || drafting) return;
+    const btn = $("#composer-more", main);
+    btn.classList.add("is-loading");
+    input.readOnly = true;
+    try {
+      const out = await translate({ text, to: chatLanguage(), bot });
+      if (!out) throw new Error("The model sent back an empty translation.");
+      draftSource = text;
+      input.value = out;
+      fitInput();
+      showDraftBar(`Translated into ${chatLanguage()}. Check it, then send.`, { retry: false });
+    } catch (err) {
+      toast(`Could not translate. ${err.message}`, "error");
+    } finally {
+      btn.classList.remove("is-loading");
+      input.readOnly = false;
+      input.focus();
+    }
+  }
+  $("#composer-more", main).addEventListener("click", (e) => openMenu(e.currentTarget, [
+    // On a phone the Ideas button lives here, to leave room for typing.
+    ...(narrow.matches ? [{ label: "Ideas for what to say", hint: "Three options for your next move · Alt+S", onSelect: showIdeas }] : []),
+    { label: directBar.hidden ? "Direct the next reply" : "Remove the direction", hint: "A hidden note for the next reply only · Alt+D", onSelect: () => setDirecting(directBar.hidden) },
+    { label: `Translate my message into ${chatLanguage()}`, hint: "Write in any language, check, then send · Alt+T", onSelect: translateOutgoing },
+  ], { align: "end" }));
   $("#draft-retry", main).addEventListener("click", () => impersonate({ retry: true }));
   $("#draft-undo", main).addEventListener("click", () => {
     input.value = draftSource ?? "";
@@ -968,6 +1321,7 @@ export async function render(main, [botId, chatId]) {
       return;
     }
     hideDraftBar();
+    closeIdeas();
     chat.messages.push({ id: uid(), role: "user", content: text, at: now() });
     input.value = "";
     fitInput();
@@ -979,6 +1333,8 @@ export async function render(main, [botId, chatId]) {
   input.addEventListener("keydown", (e) => {
     if (e.altKey && e.code === "KeyW") { e.preventDefault(); impersonate(); return; }
     if (e.altKey && e.code === "KeyD") { e.preventDefault(); setDirecting(directBar.hidden); return; }
+    if (e.altKey && e.code === "KeyS") { e.preventDefault(); suggestBar.hidden ? showIdeas() : closeIdeas(); return; }
+    if (e.altKey && e.code === "KeyT") { e.preventDefault(); translateOutgoing(); return; }
     const submit = settings.enterToSend ? e.key === "Enter" && !e.shiftKey && !e.isComposing : e.key === "Enter" && (e.ctrlKey || e.metaKey);
     if (submit) { e.preventDefault(); send(); }
   });
@@ -999,24 +1355,13 @@ export async function render(main, [botId, chatId]) {
     const m = chat.messages[i];
     if (!m) return;
 
-    if (action === "copy") {
-      try { await navigator.clipboard.writeText(currentText(m)); toast("Copied."); }
-      catch { toast("Could not copy. Your browser blocked clipboard access.", "error"); }
-    } else if (action === "edit") {
+    if (action === "edit") {
       if (busy) return;
       editingId = m.id; paintLog({ scroll: false });
     } else if (action === "cancel-edit") {
       editingId = null; paintLog({ scroll: false });
     } else if (action === "save-edit") {
       saveEdit(m);
-    } else if (action === "delete") {
-      if (busy) return;
-      chat.messages.splice(i, 1);
-      await persist(); paintLog({ scroll: false });
-      toast("Message deleted.", "info", {
-        action: "Undo",
-        onAction: async () => { chat.messages.splice(i, 0, m); await persist(); paintLog({ scroll: false }); },
-      });
     } else if (action === "swipe-prev") {
       m.swipeIndex = Math.max(0, (m.swipeIndex ?? 0) - 1);
       await persist(); paintLog({ scroll: false });
@@ -1032,6 +1377,23 @@ export async function render(main, [botId, chatId]) {
         "-",
         ...NUDGES.map((n) => ({ label: n.label, onSelect: () => generate("swipe", { note: n.note }) })),
       ], { align: "start" });
+    } else if (action === "msg-menu") {
+      const isBot = m.role === "assistant";
+      const hasTr = isBot ? m.meta?.[m.swipeIndex ?? 0]?.translation : m.translation;
+      openMenu(btn, [
+        { label: "Copy", onSelect: () => copyMessage(m) },
+        { label: hasTr ? "Hide translation" : `Translate into ${myLanguage()}`, onSelect: () => (hasTr ? hideTranslation(m) : translateMessage(m)) },
+        ...(isBot ? [{ label: "Check character", hint: "Does this stay true to the definition?", disabled: checking.has(m.id), onSelect: () => runCheck(m) }] : []),
+        { label: "Branch from here", hint: "A new chat that continues from this message", disabled: busy, onSelect: () => branchFrom(i) },
+        "-",
+        { label: "Delete message", danger: true, disabled: busy, onSelect: () => deleteMessage(m) },
+      ], { align: "start" });
+    } else if (action === "pin") {
+      m.pinned = !m.pinned;
+      await persist(); paintLog({ scroll: false });
+      toast(m.pinned ? "Pinned. This moment is always sent to the model." : "Unpinned.");
+    } else if (action === "hide-translation") {
+      hideTranslation(m);
     } else if (action === "check") {
       runCheck(m);
     } else if (action === "show-check") {
@@ -1042,12 +1404,80 @@ export async function render(main, [botId, chatId]) {
     }
   });
 
+  async function copyMessage(m) {
+    try { await navigator.clipboard.writeText(currentText(m)); toast("Copied."); }
+    catch { toast("Could not copy. Your browser blocked clipboard access.", "error"); }
+  }
+
+  // Asks first unless the person turned confirmations off in Settings.
+  const askFirst = (opts) => (settings.confirm?.enabled === false ? Promise.resolve(true) : confirmDialog(opts));
+
+  async function deleteMessage(m) {
+    if (busy) return;
+    const ok = await askFirst({
+      title: "Delete this message?",
+      body: `${nameOf(m)}'s message will be removed from the chat${m.swipes?.length > 1 ? `, with all ${m.swipes.length} versions` : ""}. You can undo right after.`,
+      confirm: "Delete message", danger: true,
+    });
+    if (!ok || busy) return;
+    const i = chat.messages.indexOf(m);
+    if (i === -1) return;
+    chat.messages.splice(i, 1);
+    await persist(); paintLog({ scroll: false });
+    toast("Message deleted.", "info", {
+      action: "Undo",
+      onAction: async () => { chat.messages.splice(i, 0, m); await persist(); paintLog({ scroll: false }); },
+    });
+  }
+
+  // ---------- Translation ----------
+  // Your language comes from Settings, or from the browser if not set.
+  function myLanguage() {
+    if (settings.translate?.mine?.trim()) return settings.translate.mine.trim();
+    try { return new Intl.DisplayNames(["en"], { type: "language" }).of(navigator.language.split("-")[0]) || "English"; }
+    catch { return "English"; }
+  }
+  const chatLanguage = () => settings.translate?.chat?.trim() || "English";
+
+  async function translateMessage(m) {
+    const speaker = speakerOf(m) ?? bot;
+    const lang = myLanguage();
+    translating.add(m.id);
+    paintLog({ scroll: false });
+    try {
+      const text = await translate({ text: stripBond(currentText(m)), to: lang, bot: speaker });
+      if (!text) throw new Error("The model sent back an empty translation.");
+      const tr = { lang, text };
+      if (m.role === "assistant") m.meta[m.swipeIndex ?? 0] = { ...m.meta[m.swipeIndex ?? 0], translation: tr };
+      else m.translation = tr;
+      await persist();
+    } catch (err) {
+      toast(`Could not translate. ${err.message}`, "error");
+    } finally {
+      translating.delete(m.id);
+      paintLog({ scroll: false });
+    }
+  }
+  async function hideTranslation(m) {
+    if (m.role === "assistant") delete m.meta[m.swipeIndex ?? 0].translation;
+    else delete m.translation;
+    await persist(); paintLog({ scroll: false });
+  }
+
   async function saveEdit(m) {
     const value = $("#edit-box", logInner).value;
-    if (m.swipes) m.swipes[m.swipeIndex ?? 0] = value;
-    else m.content = value;
+    const before = currentText(m);
+    if (value === before) { editingId = null; paintLog({ scroll: false }); return; }
+    const ok = await askFirst({ title: "Save your changes?", body: "The old text of this message will be replaced. You can undo right after.", confirm: "Save changes" });
+    if (!ok) { $("#edit-box", logInner)?.focus(); return; } // keep editing
+    const si = m.swipeIndex ?? 0;
+    const put = (text) => { if (m.swipes) m.swipes[si] = text; else m.content = text; };
+    put(value);
     editingId = null;
     await persist(); paintLog({ scroll: false });
+    toast("Message edited.", "info", {
+      action: "Undo", onAction: async () => { put(before); await persist(); paintLog({ scroll: false }); },
+    });
   }
   logInner.addEventListener("keydown", (e) => {
     if (e.target.id !== "edit-box") return;
@@ -1062,15 +1492,51 @@ export async function render(main, [botId, chatId]) {
     await persist(); paintHeader(); paintLog({ scroll: false });
   });
 
-  if (bondOn) $("#bond", main).addEventListener("click", editBondStart);
+  if (bondOn) $("#bond", main).addEventListener("click", openBonds);
   $("#memory", main).addEventListener("click", openMemory);
   $("#cast", main).addEventListener("click", openCast);
+  $("#scene", main).addEventListener("click", openScene);
 
-  async function rename() {
-    const title = await promptDialog({ title: "Rename chat", label: "Chat name", value: chat.title });
-    if (!title) return;
-    chat.title = title;
-    await persist(); paintHeader();
+  function rename() {
+    const dlg = openDialog(`
+      <form method="dialog" class="dialog-body">
+        <h2>Rename chat</h2>
+        <div class="field"><label for="rn-input">Chat name</label>
+          <div class="input-group">
+            <input type="text" id="rn-input" value="${esc(chat.title)}" autocomplete="off" maxlength="80">
+            <button class="btn" type="button" id="rn-suggest" ${chat.messages.length < 2 ? "disabled" : ""}>Suggest</button>
+          </div>
+          <p class="hint">Suggest reads the chat and proposes a title like a chapter name.</p></div>
+        <div class="dialog-actions">
+          <button class="btn btn-ghost" value="cancel" formnovalidate>Cancel</button>
+          <button class="btn btn-primary" value="ok">Save</button>
+        </div>
+      </form>`, {
+      onClose: async (v) => {
+        const title = $("#rn-input", dlg).value.trim();
+        if (v !== "ok" || !title) return;
+        chat.title = title;
+        await persist(); paintHeader();
+      },
+    });
+    const field = $("#rn-input", dlg);
+    field.focus(); field.select();
+    // Enter saves (the form's first button is Cancel).
+    field.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); dlg.close("ok"); } });
+    $("#rn-suggest", dlg).addEventListener("click", async (e) => {
+      const b = e.currentTarget;
+      b.classList.add("is-loading"); b.setAttribute("aria-busy", "true");
+      try {
+        const name = await nameChat({ bot, names: namesFor(), lines: transcript(chat.messages.slice(-40), nameOf, namesFor()) });
+        if (!name) throw new Error("No name came back.");
+        field.value = name;
+        field.focus(); field.select();
+      } catch (err) {
+        toast(`No suggestion. ${err.message}`, "error");
+      } finally {
+        b.classList.remove("is-loading"); b.removeAttribute("aria-busy");
+      }
+    });
   }
 
   async function deleteChat() {
@@ -1109,8 +1575,8 @@ export async function render(main, [botId, chatId]) {
     const hist = draft ? [...chat.messages, { role: "user", content: draft }] : chat.messages;
     const p = buildPrompt({
       bot: speaker, persona: persona(), preset, settings: s, history: withSpeakers(hist), loreEntries: entries,
-      bond: bondOn && speaker.id === bot.id ? bondNow() : null,
-      memory: chat.memory?.text ?? "", note: direction(), cast: group() ? others(speaker) : [],
+      bond: bondOnFor(speaker) ? bondFor(speaker) : null,
+      memory: chat.memory?.text ?? "", scene: chat.scene?.text ?? "", note: direction(), cast: group() ? others(speaker) : [],
     });
     const params = generationParams(s, speaker);
     openDialog(`<div class="dialog-body">
@@ -1126,15 +1592,19 @@ export async function render(main, [botId, chatId]) {
   }
 
   // On a phone, Memory and Characters live in this menu instead of the bar.
-  const narrow = matchMedia("(max-width: 600px)");
   $("#more", main).addEventListener("click", (e) => openMenu(e.currentTarget, [
     ...(narrow.matches ? [
       { label: "Memory", hint: chat.memory?.text ? "Summary of the story so far" : "Empty so far", onSelect: openMemory },
+      { label: "Scene tracker", hint: chat.scene?.text ? "Where everyone is right now" : "Off so far", onSelect: openScene },
       { label: "Characters in this chat", hint: group() ? `${everyone().length} in the scene` : "Add bots for a group scene", onSelect: openCast },
       "-",
     ] : []),
-    { label: "See the prompt", hint: "Exactly what the model gets next", onSelect: previewPrompt },
+    { label: `Pinned moments (${chat.messages.filter((m) => m.pinned).length})`, hint: "Always remembered by the model", onSelect: openPinned },
+    { label: "Recap so far", hint: "A few lines on what has happened", onSelect: showRecap },
+    { label: "Turn into a story", hint: "Rewrite the chat as prose", onSelect: openStory },
     { label: "Suggest lore from this chat", hint: "New entries from what happened", onSelect: openLoreSuggestions },
+    "-",
+    { label: "See the prompt", hint: "Exactly what the model gets next", onSelect: previewPrompt },
     "-",
     { label: "Rename chat", onSelect: rename },
     { label: "Export chat", onSelect: exportChat },
@@ -1143,10 +1613,14 @@ export async function render(main, [botId, chatId]) {
   ]));
 
   // ---------- Start ----------
-  $("#no-conn", main).hidden = !!(await getActiveConnection());
+  const hasConnection = !!(await getActiveConnection());
+  $("#no-conn", main).hidden = hasConnection;
   paintHeader();
   paintList();
   paintLog();
+  // Coming back after a break: a few lines on where the story stands.
+  if (hasConnection && settings.recap?.auto !== false && chat.messages.length >= 6 && Date.now() - lastVisit > 12 * 3600 * 1000) showRecap();
+  if (jumpTo) requestAnimationFrame(() => scrollToMessage(jumpTo));
   if (matchMedia("(hover: hover)").matches) input.focus();
 
   return {

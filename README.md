@@ -48,6 +48,25 @@ server-side storage of your key.
   facts that came up. Edit, untick, and save them to a lorebook.
 - **Character check**: the shield button on a reply checks it against the bot's definition
   and can write a new version that fixes what it found. Can run on every reply (Settings).
+- **Ideas for what to say**: the bulb button (Alt+S) offers three options for your next move
+  that fit your persona. Tap one to put it in the message box.
+- **Translate**: translate any message into your language from its ⋯ menu, or write in
+  your language and translate it into the chat's language before sending (Alt+T). Set
+  both languages in Settings.
+- **Scene tracker**: the map button keeps the state of the scene (location, time, who is
+  there, mood, clothes, what they hold) and sends it with every reply. It can update
+  itself after every reply.
+- **Pinned moments**: pin a message that matters; pinned messages are always sent to the
+  model, even after they fall out of the context. List them from the chat's ⋯ menu.
+- **Recaps**: coming back to a chat after 12 hours or more shows a short "Previously…"
+  recap. Ask for one any time from the ⋯ menu.
+- **Turn into a story**: rewrite a chat, or its last messages, as prose to read or download.
+- **Chat names**: the Rename box can suggest a title from what happened.
+- **Search**: the search button in the header finds a line across every chat and jumps to it.
+- **Bonds in group scenes**: every character in a group chat has a bond of their own.
+  The bond meter opens all of them, with a chart of how each moved over the chat.
+- **Confirmations**: deleting a message, saving an edit, branching and removing a
+  character from a scene ask first. Turn this off in Settings.
 - **Start from an idea**: in the bot editor, describe a character in a line and the model
   drafts every field for you to edit before saving.
 - **Bond meter**: an optional relationship score per chat, shown in the chat header and
