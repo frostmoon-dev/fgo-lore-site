@@ -43,6 +43,9 @@ export const DEFAULT_SETTINGS = {
   recap: { auto: true },
   // Ask before deleting a message, saving an edit, branching, or removing a character.
   confirm: { enabled: true },
+  // Mature content: "off", "mature" or "explicit". adult records the 18+
+  // confirmation; without it the level is treated as off.
+  content: { level: "off", adult: false },
   chatBackground: null,
   backgroundDim: 0.86,
   enterToSend: true,
@@ -167,6 +170,7 @@ export function newBot(partial = {}) {
     model: "", gen: {}, builtin: false,
     lorebookIds: [], background: null, bondEnabled: true,
     bondKind: "affection", bondLevels: null, bondMilestones: true,
+    contentMode: "site", // "site" follows Settings; "safe" keeps this bot safe for work
     createdAt: now(), updatedAt: now(), lastChatAt: 0, ...partial,
   };
 }
@@ -224,7 +228,7 @@ function emit(what) { listeners.forEach((fn) => fn(what)); }
 
 function merge(base, extra) {
   const out = { ...base, ...extra };
-  for (const k of ["gen", "lore", "bond", "memory", "check", "translate", "recap", "confirm"]) out[k] = { ...base[k], ...(extra?.[k] ?? {}) };
+  for (const k of ["gen", "lore", "bond", "memory", "check", "translate", "recap", "confirm", "content"]) out[k] = { ...base[k], ...(extra?.[k] ?? {}) };
   return out;
 }
 

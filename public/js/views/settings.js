@@ -36,6 +36,7 @@ function bytes(n) {
 export async function render(main) {
   const settings = await getSettings();
   const themePref = readPref("theme", "system");
+  const contentPref = settings.content.adult ? settings.content.level : "off";
   const textPref = readPref("textSize", "md");
   const chatTextPref = readPref("chatTextSize", "md");
 
@@ -65,6 +66,20 @@ export async function render(main) {
           <div class="text-preview" aria-hidden="true">
             <div class="msg-body"><p>The tea has gone cold. <em>She sets the cup down without drinking.</em> “You came back later than you said.”</p></div>
           </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2 class="card-title">Mature content</h2>
+        <p class="lead">What the model may write in your chats. Off by default. Mature and Explicit are for adults only.</p>
+        <div class="form-grid">
+          <fieldset class="field">
+            <legend class="field-label">Level</legend>
+            ${segmentedHTML("content-level", [["off", "Off"], ["mature", "Mature"], ["explicit", "Explicit"]], contentPref)}
+            <p class="hint" id="content-about"></p>
+          </fieldset>
+          <p class="note">${icon("info")}<span>Characters in any sexual content are always adults. Your model provider's own rules still apply, and some models refuse
+            explicit content whatever this says. A bot can be kept safe for work in its own settings.</span></p>
         </div>
       </div>
 
@@ -223,6 +238,33 @@ export async function render(main) {
   }, 500);
   $("#lang-mine", main).addEventListener("input", saveLangs);
   $("#lang-chat", main).addEventListener("input", saveLangs);
+  // ---- Mature content, behind an 18+ check ----
+  const CONTENT_ABOUT = {
+    off: "No instruction is added. The model follows its own defaults, usually suitable for general audiences.",
+    mature: "Violence, dark themes, strong language and romance. Sexual content stays implied, never explicit.",
+    explicit: "Explicit sexual content, graphic violence and dark themes, written without censoring or fading to black.",
+  };
+  const paintContent = (level) => { $("#content-about", main).textContent = CONTENT_ABOUT[level]; };
+  paintContent(contentPref);
+  $$('input[name="content-level"]', main).forEach((r) => r.addEventListener("change", async () => {
+    let level = r.value;
+    if (level !== "off" && !settings.content.adult) {
+      const adult = await confirmDialog({
+        title: "Are you 18 or older?",
+        body: "Mature and Explicit content is for adults only. Only continue if you are 18 or older and it is legal for you to view this content where you live.",
+        confirm: "I am 18 or older",
+      });
+      if (!adult) {
+        level = "off";
+        $('input[name="content-level"][value="off"]', main).checked = true;
+      }
+    }
+    const adult = settings.content.adult || level !== "off";
+    settings.content = (await saveSettings({ content: { level, adult } })).content;
+    paintContent(level);
+    toast(level === "off" ? "Mature content is off." : `Content level: ${level === "mature" ? "Mature" : "Explicit"}.`, "ok");
+  }));
+
   $("#confirm-on", main).addEventListener("change", (e) => saveSettings({ confirm: { enabled: e.target.checked } }).then(() => toast("Saved.", "ok")));
   $("#recap-auto", main).addEventListener("change", (e) => saveSettings({ recap: { auto: e.target.checked } }).then(() => toast("Saved.", "ok")));
   $("#check-auto", main).addEventListener("change", (e) => saveSettings({ check: { auto: e.target.checked } }).then(() => toast("Saved.", "ok")));

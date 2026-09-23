@@ -65,6 +65,13 @@ server-side storage of your key.
 - **Search**: the search button in the header finds a line across every chat and jumps to it.
 - **Bonds in group scenes**: every character in a group chat has a bond of their own.
   The bond meter opens all of them, with a chart of how each moved over the chat.
+- **Rewind**: from a message's ⋯ menu, delete every message after it and continue from
+  there. Offers to rebuild memory and the scene so they match. Can be undone.
+- **Mature content**: Settings has three levels: Off (default), Mature (dark themes and
+  violence, sexual content kept implied) and Explicit. Turning it on asks you to confirm
+  you are 18 or older. Every request follows the level, including ideas, summaries and
+  translations. A bot can be kept safe for work in its own settings. Characters in any
+  sexual content are always adults. Your provider's own rules still apply.
 - **Confirmations**: deleting a message, saving an edit, branching and removing a
   character from a scene ask first. Turn this off in Settings.
 - **Start from an idea**: in the bot editor, describe a character in a line and the model

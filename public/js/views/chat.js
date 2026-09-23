@@ -3,7 +3,9 @@ import {
   getLorebooks, saveLorebooks, newLorebook, newLore, loreForBot, bondTier, bondLevels, BOND_KINDS, uid, now,
 } from "../store.js";
 import { chatCompletion } from "../api.js";
-import { buildPrompt, generationParams, currentText, applyMacros, readBond, stripBond, cleanImpersonation } from "../prompt.js";
+import {
+  buildPrompt, generationParams, currentText, applyMacros, readBond, stripBond, cleanImpersonation, contentLevel,
+} from "../prompt.js";
 import {
   summarize, suggestLore, checkCharacter, transcript, suggestReplies, translate, updateScene, recap, storyFrom, nameChat,
 } from "../ai.js";
@@ -176,7 +178,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
         <div class="chat-topbar">
           <button class="icon-btn only-mobile" type="button" id="open-sidebar" aria-label="Show chats" aria-controls="sidebar" aria-expanded="false">${icon("menu")}</button>
           ${botAvatar(bot, 36, " only-mobile")}
-          <div class="title"><span id="chat-title"></span><small id="chat-sub"></small></div>
+          <div class="title"><span id="chat-title"></span> <span class="content-tag" id="content-tag" hidden></span><small id="chat-sub"></small></div>
           ${bondOn ? `<button class="bond" type="button" id="bond" title="Bond with ${esc(bot.name)} · set where it starts">
             <span class="bond-label" id="bond-label"></span>
             <span class="bond-bar"><span class="bond-fill" id="bond-fill"></span></span>
@@ -352,6 +354,11 @@ export async function render(main, [botId, chatId, jumpTo]) {
     $("#chat-title", main).textContent = chat.title;
     const p = persona();
     $("#chat-sub", main).textContent = `with ${everyone().map((b) => b.name).join(", ")}${p ? ` · as ${p.name}` : ""}`;
+    const level = contentLevel(settings, bot);
+    const tag = $("#content-tag", main);
+    tag.hidden = level === "off";
+    tag.textContent = level === "explicit" ? "18+ explicit" : "18+";
+    tag.title = level === "explicit" ? "Explicit content is on for this chat (Settings)" : "Mature content is on for this chat (Settings)";
     $("#persona", main).value = p?.id ?? "";
     document.title = `${bot.name} · Shiru’s Garden`;
     // Speaker picker only matters when more than one bot can answer.
@@ -786,6 +793,63 @@ export async function render(main, [botId, chatId, jumpTo]) {
       dlg.close();
       generate("swipe", { note: `Stay true to ${speaker.name}'s character. Avoid these problems from the last attempt: ${c.issues.join("; ")}. ${c.fix}` });
     });
+  }
+
+  // ---------- Rewind ----------
+  // Deletes everything after message i. Memory and the scene would still
+  // describe what was removed, so the dialog offers to rebuild them.
+  function askRewind(later) {
+    const stale = !!(chat.memory?.text || chat.scene?.text);
+    if (settings.confirm?.enabled === false) return Promise.resolve({ ok: true, refresh: stale });
+    return new Promise((resolve) => {
+      const dlg = openDialog(`
+        <form method="dialog" class="dialog-body">
+          <h2>Rewind to this message?</h2>
+          <p>The ${later} message${later === 1 ? "" : "s"} after it will be deleted, and the chat continues from here. You can undo right after.</p>
+          ${stale ? `<label class="check"><input type="checkbox" id="rw-refresh" checked>
+            <span>Update memory and the scene to match<small>They may describe events that are being removed. Uses one or two requests.</small></span></label>` : ""}
+          <div class="dialog-actions">
+            <button class="btn btn-ghost" value="cancel">Cancel</button>
+            <button class="btn btn-danger" value="ok" autofocus>Rewind</button>
+          </div>
+        </form>`, { onClose: (v) => resolve({ ok: v === "ok", refresh: !!$("#rw-refresh", dlg)?.checked }) });
+    });
+  }
+
+  async function rewindTo(i) {
+    if (busy) return;
+    const upTo = i + 1;
+    const later = chat.messages.length - upTo;
+    if (later < 1) return;
+    const { ok, refresh } = await askRewind(later);
+    if (!ok || busy) return;
+    const saved = {
+      removed: chat.messages.slice(upTo),
+      memory: structuredClone(chat.memory ?? null),
+      scene: structuredClone(chat.scene ?? null),
+      pending: structuredClone(chat.pendingMilestones ?? {}),
+    };
+    chat.messages = chat.messages.slice(0, upTo);
+    chat.pendingMilestones = {};
+    pendingError = null;
+    const memoryStale = (chat.memory?.upTo ?? 0) > upTo;
+    if (memoryStale) chat.memory = { ...chat.memory, upTo: Math.min(chat.memory.upTo, upTo) };
+    await persist();
+    paintLog();
+    toast(`Rewound. ${later} message${later === 1 ? "" : "s"} removed.`, "info", {
+      action: "Undo",
+      onAction: async () => {
+        chat.messages = [...chat.messages, ...saved.removed];
+        chat.memory = saved.memory;
+        chat.scene = saved.scene;
+        chat.pendingMilestones = saved.pending;
+        await persist(); paintLog(); paintHeader();
+      },
+    });
+    if (refresh) {
+      if (memoryStale && chat.memory?.text) { chat.memory = { ...chat.memory, text: "", upTo: 0 }; updateMemory({ quiet: true }); }
+      if (chat.scene?.text) { chat.scene = { ...chat.scene, text: "" }; refreshScene({ quiet: true }); }
+    }
   }
 
   // ---------- Branches ----------
@@ -1385,6 +1449,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
         { label: hasTr ? "Hide translation" : `Translate into ${myLanguage()}`, onSelect: () => (hasTr ? hideTranslation(m) : translateMessage(m)) },
         ...(isBot ? [{ label: "Check character", hint: "Does this stay true to the definition?", disabled: checking.has(m.id), onSelect: () => runCheck(m) }] : []),
         { label: "Branch from here", hint: "A new chat that continues from this message", disabled: busy, onSelect: () => branchFrom(i) },
+        ...(i < chat.messages.length - 1 ? [{ label: "Rewind to here", hint: "Delete every message after this one", disabled: busy, onSelect: () => rewindTo(i) }] : []),
         "-",
         { label: "Delete message", danger: true, disabled: busy, onSelect: () => deleteMessage(m) },
       ], { align: "start" });
