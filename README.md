@@ -100,7 +100,8 @@ server-side storage of your key.
   writing**, which finishes it in the same message. Also in any last reply's ⋯ menu.
 - **Expressions**: upload a face per mood (neutral, happy, sad, angry, surprised,
   flustered) in the bot editor. Replies end with a hidden mood tag, and the chat shows
-  the matching face, large on the latest reply. Only the moods you fill in are used.
+  the matching face, large on the latest reply. Only the moods you fill in are used; a reply
+  without a mood shows the Neutral face if there is one.
   Kept in backups; not included in exported character cards.
 - **Journal**: bots write a short private diary entry about the chat when you leave after
   12 or more new messages, or on demand. Read them from the chat's ⋯ menu.
