@@ -574,7 +574,9 @@ dialog::backdrop { background: var(--scrim); }
 @media (max-width: 600px) { .toasts { right: var(--s4); left: var(--s4); bottom: var(--s4); width: auto; } }
 
 /* ---------- Chat ---------- */
-body.in-chat { height: 100svh; overflow: hidden; }
+body.in-chat { height: 100svh; height: 100dvh; overflow: hidden; }
+/* In a chat only the messages scroll: the page itself never moves or bounces. */
+html:has(body.in-chat) { overflow: hidden; overscroll-behavior: none; }
 body.in-chat main { min-height: 0; display: flex; }
 body.in-chat .site-footer { display: none; }
 .chat-layout { flex: 1; min-height: 0; width: 100%; display: grid; grid-template-columns: 272px minmax(0, 1fr); }
@@ -612,7 +614,7 @@ body.in-chat .site-footer { display: none; }
 .chat-topbar .title-input { height: 28px; width: min(320px, 100%); margin-left: calc(-1 * var(--s2)); padding: 0 var(--s2); font-weight: 600; border-radius: var(--r-sm); }
 .only-mobile { display: none; }
 
-.chat-log { flex: 1; overflow-y: auto; padding: var(--s6) var(--s5) var(--s4); }
+.chat-log { flex: 1; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; padding: var(--s6) var(--s5) var(--s4); }
 .chat-log-inner { max-width: var(--measure); margin: 0 auto; display: grid; gap: var(--s4); }
 .msg { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: var(--s3); }
 .msg .avatar { --size: 40px; }
@@ -1203,3 +1205,10 @@ dialog.palette-dialog { width: min(600px, calc(100vw - 32px)); margin-top: 12vh;
 #dice-roll svg { width: 16px; height: 16px; margin-right: var(--s2); }
 @media (prefers-reduced-motion: reduce) { .flash-card { animation: none; box-shadow: 0 0 0 2px var(--accent); } }
 .news-earlier { font-family: var(--font); font-size: var(--t-xs); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+
+/* Phones zoom in on any field with text under 16px, and the page then slides
+   around. Fields on touch screens are never smaller than that. */
+@media (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea { font-size: max(16px, var(--t-base)) !important; }
+  .composer-box textarea { font-size: max(16px, calc(var(--t-md) * var(--chat-scale))) !important; }
+}
