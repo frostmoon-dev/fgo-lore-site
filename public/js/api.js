@@ -94,6 +94,7 @@ export async function listModels(conn) {
 // Sends a chat request. Calls onDelta as text streams in. Resolves with the
 // full reply; rejects with AbortError when stopped.
 import { recordUsage } from "./store.js";
+import { cachedTokens } from "./memory.js";
 
 // Every finished request is counted. Providers that do not report token
 // counts get an estimate (about four characters per token), marked as such.
@@ -105,6 +106,7 @@ function count(payload, result) {
     prompt: Number(u?.prompt_tokens) || est(payload.messages?.map((m) => m.content).join("\n")),
     completion: Number(u?.completion_tokens) || est(`${result.content}${result.reasoning ?? ""}`),
     estimated: !(u?.prompt_tokens && u?.completion_tokens),
+    cached: Number(cachedTokens(u)) || 0,
   });
 }
 

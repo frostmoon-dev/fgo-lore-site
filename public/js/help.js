@@ -4,10 +4,17 @@
 import { getMeta, setMeta } from "./store.js";
 import { $, esc, icon, openDialog } from "./ui.js";
 
-export const APP_VERSION = "2026.09.24.2";
+export const APP_VERSION = "2026.09.24.3";
 
 // Newest first. Each item says what it is and where it lives.
 export const NEWS = [
+  {
+    version: "2026.09.24.3",
+    items: [
+      ["Stronger, cheaper memory", "Long chats are now remembered as chapters, a story so far and a list of key facts, and old moments come back when they are mentioned. Each reply sends far fewer tokens. See it all from the book button in a chat."],
+      ["Cache savings", "When your provider reuses part of a request from its cache, the token count under a reply says how much, and Settings → Usage shows the total."],
+    ],
+  },
   {
     version: "2026.09.24.2",
     items: [

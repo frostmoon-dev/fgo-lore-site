@@ -1238,3 +1238,13 @@ dialog.palette-dialog { width: min(600px, calc(100vw - 32px)); margin-top: 12vh;
   input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea { font-size: max(16px, var(--t-base)) !important; }
   .composer-box textarea { font-size: max(16px, calc(var(--t-md) * var(--chat-scale))) !important; }
 }
+
+/* Memory dialog: facts, story and chapters, newest chapter first. */
+.memory-status { font-size: var(--t-sm); color: var(--ink); padding: var(--s3) var(--s4); background: var(--fill); border-radius: var(--r-md); }
+.memory-status:empty { display: none; }
+.memory-dialog textarea { min-height: 96px; }
+.chapters { display: grid; gap: var(--s2); }
+.chapters .chapter { border-top: 1px solid var(--line); padding-top: var(--s2); }
+.chapters .chapter:first-child { border-top: 0; padding-top: 0; }
+.chapters .chapter summary { display: flex; justify-content: space-between; gap: var(--s3); font-weight: 500; }
+.chapters .chapter textarea { margin-top: var(--s2); }

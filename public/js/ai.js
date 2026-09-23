@@ -58,6 +58,23 @@ export async function summarize({ bot, names, previous, lines, signal }) {
   return ask([{ role: "system", content: system }, { role: "user", content: user }], { bot, maxTokens: 700, signal });
 }
 
+// One chapter of a long chat, plus the updated list of lasting facts. The
+// facts are rewritten in full each time, so outdated ones can be dropped.
+export async function writeChapter({ bot, names, facts, lines, signal }) {
+  const system =
+    `You keep the memory for a long roleplay between ${names.user} and ${names.char}. ` +
+    "Answer in exactly two sections.\n\n" +
+    "CHAPTER: 3 to 6 bullet points summarising only the new messages, under 120 words, past tense. Be concrete: " +
+    "who did what, names, places, objects, promises, decisions, and how feelings changed. No commentary.\n\n" +
+    "FACTS: the full, updated list of lasting facts a writer must never get wrong, as short bullet points: names and who " +
+    "people are, relationships, promises and debts, secrets and who knows them, injuries and conditions, possessions, " +
+    "places and rules of the world. Keep every fact from the current list that is still true, fix any that changed, " +
+    "drop ones that no longer matter, and add new ones. At most 25 bullets.";
+  const user = `Current facts:\n${facts?.trim() || "(none yet)"}\n\nNew messages:\n\n${lines}\n\n` +
+    "Reply in this format:\nCHAPTER:\n- ...\nFACTS:\n- ...";
+  return ask([{ role: "system", content: system }, { role: "user", content: user }], { bot, maxTokens: 900, signal });
+}
+
 // ---------- Lore suggestions ----------
 
 export async function suggestLore({ bot, names, lines, existing, signal }) {
