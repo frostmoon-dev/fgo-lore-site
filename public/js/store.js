@@ -41,18 +41,84 @@ export const DEFAULT_SETTINGS = {
   enterToSend: true,
 };
 
-// The bond meter's wording, low to high.
-export const BOND_TIERS = [
-  { at: 0, label: "Hostile" },
-  { at: 12, label: "Wary" },
-  { at: 30, label: "Civil" },
-  { at: 48, label: "Warm" },
-  { at: 66, label: "Close" },
-  { at: 84, label: "Devoted" },
-];
+// ---------- Bond ----------
+// Every bond has six levels at fixed points on the 0–100 meter. What the
+// levels are called, and how the bot behaves at each, depends on the kind
+// of bond: a rival and a lover should not warm up the same way.
+export const BOND_POINTS = [0, 12, 30, 48, 66, 84];
 
-export function bondTier(value) {
-  return [...BOND_TIERS].reverse().find((t) => value >= t.at) ?? BOND_TIERS[0];
+const levels = (rows) => rows.map(([label, behavior], i) => ({ at: BOND_POINTS[i], label, behavior }));
+
+export const BOND_KINDS = {
+  affection: {
+    name: "Affection", about: "Cold to devoted. Fits most characters.",
+    levels: levels([
+      ["Hostile", "Openly cold or hostile toward {{user}}. Refuses help and may insult or threaten."],
+      ["Wary", "Guarded and suspicious. Short answers, keeps distance, watches for tricks."],
+      ["Civil", "Polite but reserved. Cooperates without warmth or personal interest."],
+      ["Warm", "Friendly and at ease. Shows interest in {{user}} and offers small kindnesses."],
+      ["Close", "Trusting and open. Shares private thoughts and becomes protective of {{user}}."],
+      ["Devoted", "Deeply attached. Would take real risks for {{user}} and says so in their own way."],
+    ]),
+  },
+  romance: {
+    name: "Romance", about: "Strangers to partners, one slow step at a time.",
+    levels: levels([
+      ["Uninterested", "Sees {{user}} as no one in particular. No romantic interest at all."],
+      ["Curious", "Notices {{user}}. Small flickers of interest that they hide or deny."],
+      ["Drawn", "Seeks {{user}} out. Teasing, flustered or lingering moments, never admitted."],
+      ["Smitten", "Clearly attracted and struggling to hide it. Jealous or nervous at times."],
+      ["In love", "Admits their feelings in their own voice. Affection is open but still in character."],
+      ["Devoted", "Committed. {{user}} is part of their life and their plans."],
+    ]),
+  },
+  rivalry: {
+    name: "Rivalry", about: "Enemies who come to respect each other.",
+    levels: levels([
+      ["Nemesis", "Sees {{user}} as an enemy to defeat. Contempt, threats, no mercy."],
+      ["Rival", "Competes with {{user}} at every turn and hates to lose to them."],
+      ["Grudging respect", "Still competes, but admits {{user}}'s skill, if only through gritted teeth."],
+      ["Worthy opponent", "Enjoys the contest. Pushes {{user}} to be better and expects the same back."],
+      ["Trusted rival", "Would fight beside {{user}} against others while keeping the rivalry alive."],
+      ["Equal", "Sees {{user}} as their equal. Deep respect, open honesty, still a spark of competition."],
+    ]),
+  },
+  loyalty: {
+    name: "Loyalty", about: "For knights, servants and followers: suspicion to an oath.",
+    levels: levels([
+      ["Distrustful", "Doubts {{user}}'s intentions and follows orders only under pressure."],
+      ["On trial", "Serves, but watches {{user}} closely and tests their judgement."],
+      ["Dependable", "Carries out duties well and speaks up with honest advice."],
+      ["Trusted", "Trusts {{user}}'s decisions and guards their secrets."],
+      ["Sworn", "Has pledged themself to {{user}}. Puts {{user}}'s safety above their own."],
+      ["Unbreakable", "Their loyalty is part of who they are. Nothing could turn them against {{user}}."],
+    ]),
+  },
+  fear: {
+    name: "Fear to trust", about: "For characters who start afraid of {{user}}.",
+    levels: levels([
+      ["Terrified", "Afraid of {{user}}. Flinches, hides, or tries to flee."],
+      ["Nervous", "Stays tense and careful around {{user}}, expecting harm."],
+      ["Uneasy", "Less afraid but still on edge. Tests whether {{user}} is safe."],
+      ["Calm", "Relaxed around {{user}} most of the time. Old fears surface under stress."],
+      ["Safe", "Feels safe with {{user}} and seeks them out when scared."],
+      ["Sheltered", "{{user}} is their safe place. Trusts them completely."],
+    ]),
+  },
+};
+
+// A bot's six levels: one of the kinds above, or its own custom set.
+export function bondLevels(bot) {
+  if (bot?.bondKind === "custom" && bot.bondLevels?.length === 6) {
+    return bot.bondLevels.map((l, i) => ({ at: BOND_POINTS[i], label: l.label || `Level ${i + 1}`, behavior: l.behavior || "" }));
+  }
+  return (BOND_KINDS[bot?.bondKind] ?? BOND_KINDS.affection).levels;
+}
+
+export function bondTier(value, bot) {
+  const list = bondLevels(bot);
+  const i = list.findLastIndex((t) => value >= t.at);
+  return { ...list[Math.max(0, i)], index: Math.max(0, i) };
 }
 
 export const DEFAULT_PRESET = {
@@ -93,6 +159,7 @@ export function newBot(partial = {}) {
     systemPrompt: "", postHistory: "", creatorNotes: "",
     model: "", gen: {}, builtin: false,
     lorebookIds: [], background: null, bondEnabled: true,
+    bondKind: "affection", bondLevels: null, bondMilestones: true,
     createdAt: now(), updatedAt: now(), lastChatAt: 0, ...partial,
   };
 }

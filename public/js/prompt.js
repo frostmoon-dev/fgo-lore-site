@@ -124,8 +124,11 @@ export function buildPrompt({
     parts.push(`## Example dialogue (style reference only)\n${m(bot.examples.replace(/<START>\s*/gi, "---\n"))}`);
   }
   if (bond) {
-    parts.push(`## Bond\n${names.user}'s bond with ${names.char} is ${bond.value} out of 100 (${bond.label}).\n` +
-      "Let it show in how warm, guarded or hostile you are. Bonds move slowly, and rudeness or lies push them down.");
+    // bond: { value, label, behavior, kind } from the bot's kind of bond.
+    parts.push(`## Bond\n${names.user}'s bond with ${names.char}${bond.kind ? ` (${bond.kind.toLowerCase()})` : ""} ` +
+      `is ${bond.value} out of 100: ${bond.label}.\n` +
+      (bond.behavior ? `At this level: ${m(bond.behavior)}\n` : "") +
+      "Let it show in how you act, without naming the level. Bonds move slowly; what happens in the story moves them.");
   }
   const system = parts.filter(Boolean).join("\n\n");
   let post = asUser ? impersonateInstruction(names, hint) : m(override(bot.postHistory, preset.postHistory));

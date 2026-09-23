@@ -217,7 +217,7 @@ export async function render(main) {
     const bondOn = s.bond?.enabled !== false && bot.bondEnabled !== false;
     const p = buildPrompt({
       bot, persona, preset, settings: s, history, loreEntries: entries,
-      bond: bondOn ? { value: start, label: bondTier(start).label } : null,
+      bond: bondOn ? { value: start, ...bondTier(start, bot) } : null,
     });
     openDialog(`<div class="dialog-body">
       <h2>${esc(bot.name)}'s prompt</h2>

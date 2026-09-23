@@ -1,4 +1,4 @@
-import { bots, newBot, getSettings, getLorebooks, loreForBot } from "../store.js";
+import { bots, newBot, getSettings, getLorebooks, loreForBot, BOND_KINDS, BOND_POINTS, bondLevels } from "../store.js";
 import { toCard, cardPng } from "../card.js";
 import { estimateTokens } from "../prompt.js";
 import { draftBot } from "../ai.js";
@@ -25,6 +25,9 @@ export async function render(main, [id]) {
   }
   const bot = structuredClone(existing ?? newBot());
   bot.lorebookIds ??= [];
+  bot.bondKind ??= "affection";
+  bot.bondLevels ??= null;
+  bot.bondMilestones ??= true;
   const settings = await getSettings();
   const books = await getLorebooks();
   let saved = JSON.stringify(bot);
@@ -121,7 +124,36 @@ export async function render(main, [id]) {
                   </label>`).join("")}</div>
               </fieldset>
               <label class="check"><input type="checkbox" id="bond-on" ${bot.bondEnabled === false ? "" : "checked"}>
-                <span>Track the bond with this bot<small>Shows a bond meter in the chat header and lets it colour how warm the bot is.</small></span></label>
+                <span>Track the bond with this bot<small>Shows a bond meter in the chat header and lets it shape how the bot treats you.</small></span></label>
+              <div class="bond-setup form-grid" id="bond-setup">
+                <div class="field">
+                  <label for="bond-kind">Kind of bond</label>
+                  <select id="bond-kind" aria-describedby="bond-kind-about">
+                    ${Object.entries(BOND_KINDS).map(([k, v]) => `<option value="${k}" ${bot.bondKind === k ? "selected" : ""}>${esc(v.name)}</option>`).join("")}
+                    <option value="custom" ${bot.bondKind === "custom" ? "selected" : ""}>Custom</option>
+                  </select>
+                  <p class="hint" id="bond-kind-about"></p>
+                </div>
+                <details class="more">
+                  <summary>The six levels</summary>
+                  <div class="bond-levels" id="bond-levels">
+                    ${BOND_POINTS.map((at, i) => `
+                      <div class="bond-level">
+                        <span class="bond-at" aria-hidden="true">${at}+</span>
+                        <div class="field">
+                          <label class="sr-only" for="bl-label-${i}">Name of level ${i + 1}, from ${at}</label>
+                          <input type="text" id="bl-label-${i}" data-level-label="${i}" autocomplete="off" maxlength="32">
+                          <label class="sr-only" for="bl-behavior-${i}">How the bot acts at level ${i + 1}</label>
+                          <textarea id="bl-behavior-${i}" data-level-behavior="${i}" rows="2"></textarea>
+                        </div>
+                      </div>`).join("")}
+                  </div>
+                  <p class="hint">What the bond is called at each point on the meter, and how the bot acts there. The bot is told the current level with every reply.
+                    Changing any of these makes this bot's bond Custom. Use <code>{{user}}</code> for you.</p>
+                </details>
+                <label class="check"><input type="checkbox" id="bond-milestones" ${bot.bondMilestones === false ? "" : "checked"}>
+                  <span>Mark level changes in the chat<small>Shows a divider when the bond changes level, and asks the next reply to show the change.</small></span></label>
+              </div>
             </div>
           </div>
 
@@ -214,6 +246,11 @@ export async function render(main, [id]) {
     bot.model = val("#model").trim();
     bot.lorebookIds = $$("[data-book]", main).filter((c) => c.checked && !c.disabled).map((c) => c.dataset.book);
     bot.bondEnabled = $("#bond-on", main).checked;
+    bot.bondKind = val("#bond-kind");
+    bot.bondLevels = bot.bondKind === "custom"
+      ? BOND_POINTS.map((_, i) => ({ label: val(`#bl-label-${i}`).trim(), behavior: val(`#bl-behavior-${i}`).trim() }))
+      : null;
+    bot.bondMilestones = $("#bond-milestones", main).checked;
     bot.gen = {};
     for (const k of ["temperature", "max_tokens"]) {
       const v = val(`#g-${k}`);
@@ -259,6 +296,38 @@ export async function render(main, [id]) {
       ? `<span class="bg-thumb"><img src="${esc(url)}" alt=""></span>`
       : `<span class="bg-thumb is-empty">No background</span>`),
   });
+  // ---- Kind of bond ----
+  function paintBondLevels(list) {
+    list.forEach((l, i) => {
+      $(`#bl-label-${i}`, main).value = l.label;
+      const ta = $(`#bl-behavior-${i}`, main);
+      ta.value = l.behavior;
+      ta.dispatchEvent(new Event("input")); // refit its height
+    });
+  }
+  function paintBondKind() {
+    const k = val("#bond-kind");
+    $("#bond-kind-about", main).textContent = k === "custom"
+      ? "Your own six levels, set below."
+      : BOND_KINDS[k].about.replace("{{user}}", "you");
+    $("#bond-setup", main).hidden = !$("#bond-on", main).checked;
+  }
+  $("#bond-kind", main).addEventListener("change", () => {
+    const k = val("#bond-kind");
+    // Custom starts from whatever the levels said before.
+    if (k !== "custom") paintBondLevels(BOND_KINDS[k].levels);
+    paintBondKind();
+    update();
+  });
+  // Editing a level makes the bond this bot's own. Runs before the form's
+  // own input handler, so the save sees "custom".
+  $("#bond-levels", main).addEventListener("input", (e) => {
+    if (e.isTrusted && val("#bond-kind") !== "custom") { $("#bond-kind", main).value = "custom"; paintBondKind(); }
+  });
+  $("#bond-on", main).addEventListener("change", paintBondKind);
+  paintBondLevels(bondLevels(bot));
+  paintBondKind();
+
   $$("textarea", main).forEach(autosize);
   wireSlider(main, "g-temperature", update);
   wireSlider(main, "g-max_tokens", update);
@@ -308,6 +377,7 @@ export async function render(main, [id]) {
       const set = (id, v) => { if (v) { const el = $(`#${id}`, main); el.value = v; el.dispatchEvent(new Event("input", { bubbles: true })); } };
       if (!val("#name").trim()) set("name", d.name);
       for (const k of ["tagline", "tags", "description", "personality", "scenario", "greeting", "examples"]) set(k, d[k]);
+      if (d.bondKind) { $("#bond-kind", main).value = d.bondKind; $("#bond-kind", main).dispatchEvent(new Event("change")); }
       state.textContent = "Draft ready. Read it through, change anything, then save.";
       $("#name", main).scrollIntoView({ behavior: "smooth", block: "center" });
       toast(`Drafted ${d.name || "a bot"}. Nothing is saved yet.`, "ok");

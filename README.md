@@ -51,9 +51,12 @@ server-side storage of your key.
 - **Start from an idea**: in the bot editor, describe a character in a line and the model
   drafts every field for you to edit before saving.
 - **Bond meter**: an optional relationship score per chat, shown in the chat header and
-  told to the bot, so a conversation that goes badly makes the character colder.
+  told to the bot. Each bot has its own kind of bond (Affection, Romance, Rivalry, Loyalty,
+  Fear to trust, or Custom), which names the six levels and says how the bot acts at each.
+  When the bond changes level, a divider marks it in the chat and the next reply shows
+  the change.
 - **Chat**: streaming replies, stop, regenerate with swipes between versions, edit any
-  message, delete with undo, several chats per bot, export a chat as text, Markdown or
+  message, delete with undo, several chats per bot (named Chat 1, Chat 2, … until you rename them), export a chat as text, Markdown or
   JSON, and a per-message view of which lore was used and how many tokens were spent.
 - **Connection**: as many API profiles as you like, a model list fetched from the
   provider, a test button, and custom headers for fussy proxies.

@@ -1,6 +1,6 @@
 import {
   bots, chats, lore, personas, getSettings, getActiveConnection, getActivePreset,
-  getLorebooks, saveLorebooks, newLorebook, newLore, loreForBot, bondTier, uid, now,
+  getLorebooks, saveLorebooks, newLorebook, newLore, loreForBot, bondTier, BOND_KINDS, uid, now,
 } from "../store.js";
 import { chatCompletion } from "../api.js";
 import { buildPrompt, generationParams, currentText, applyMacros, readBond, stripBond, cleanImpersonation } from "../prompt.js";
@@ -11,12 +11,18 @@ import {
   download, slug, timeAgo, clock, autosize, sliderHTML, wireSlider,
 } from "../ui.js";
 
-function newChat(bot, personaId) {
+// New chats are numbered per bot: Chat 1, Chat 2, … Renamed chats keep
+// their names and do not use up a number.
+function nextChatTitle(existing) {
+  const used = existing.map((c) => Number(/^Chat (\d+)$/.exec(c.title)?.[1])).filter(Number.isFinite);
+  return `Chat ${Math.max(existing.length, ...used, 0) + 1}`;
+}
+
+function newChat(bot, personaId, existing = []) {
   const openings = [bot.greeting, ...(bot.altGreetings ?? [])].filter((g) => g?.trim());
   return {
     id: uid(), botId: bot.id, personaId,
-    title: `Chat · ${new Date().toLocaleDateString([], { month: "short", day: "numeric" })}`,
-    autoTitle: true,
+    title: nextChatTitle(existing),
     bondStart: null, // null follows the default in Settings
     castIds: [],     // other bots in a group scene
     memory: null,    // { text, upTo, updatedAt, auto }
@@ -49,7 +55,7 @@ export async function render(main, [botId, chatId]) {
   let list = await chats.forBot(bot.id);
   let chat = (chatId && list.find((c) => c.id === chatId)) || (!chatId && list[0]) || null;
   if (!chat) {
-    chat = newChat(bot, activePersona?.id ?? null);
+    chat = newChat(bot, activePersona?.id ?? null, list);
     await chats.save(chat);
     list = await chats.forBot(bot.id);
   }
@@ -107,9 +113,13 @@ export async function render(main, [botId, chatId]) {
       return total + (Number.isFinite(delta) ? delta : 0);
     }, 0);
   }
+  // The bot's own kind of bond decides the level names and behaviour.
+  const bondKind = bot.bondKind === "custom" ? "" : (BOND_KINDS[bot.bondKind] ?? BOND_KINDS.affection).name;
+  const milestonesOn = bot.bondMilestones !== false;
   function bondFrom(base) {
     const value = Math.max(0, Math.min(100, base + bondEarned()));
-    return { value, label: bondTier(value).label };
+    const t = bondTier(value, bot);
+    return { value, label: t.label, behavior: t.behavior, index: t.index, kind: bondKind };
   }
   const bondNow = () => bondFrom(bondStart());
 
@@ -223,7 +233,7 @@ export async function render(main, [botId, chatId]) {
 
   $("#new-chat", main).addEventListener("click", async () => {
     if (busy) return;
-    const c = newChat(bot, persona()?.id ?? null);
+    const c = newChat(bot, persona()?.id ?? null, list);
     await chats.save(c);
     location.hash = `#/chat/${bot.id}/${c.id}`;
   });
@@ -235,7 +245,7 @@ export async function render(main, [botId, chatId]) {
     $("#bond-fill", main).style.width = `${value}%`;
     $("#bond", main).setAttribute("aria-label",
       `Bond with ${bot.name}: ${label}, ${value} of 100. Set where this chat starts.`);
-    $("#bond", main).dataset.tier = label.toLowerCase();
+    $("#bond", main).dataset.level = String(bondNow().index);
   }
 
   // Click the meter to say how warm the two of them already are before the
@@ -262,7 +272,7 @@ export async function render(main, [botId, chatId]) {
         chat.bondStart = Number($("#cb-start", dlg).value);
         await persist();
         paintBond();
-        toast(`${bot.name} starts this chat at ${bondTier(chat.bondStart).label}.`, "ok");
+        toast(`${bot.name} starts this chat at ${bondTier(chat.bondStart, bot).label}.`, "ok");
       },
     });
     const read = () => {
@@ -361,6 +371,9 @@ export async function render(main, [botId, chatId]) {
       info.push(`<span class="bond-chip ${meta.bond > 0 ? "up" : "down"}" title="Bond change">${meta.bond > 0 ? "+" : "−"}${Math.abs(meta.bond)} bond</span>`);
     }
     const isChecking = checking.has(m.id);
+    const milestone = bondOn && milestonesOn && meta.milestone
+      ? `<div class="milestone ${meta.milestone.up ? "up" : "down"}" role="note">
+          <span>Bond with ${esc(bot.name)}: ${esc(meta.milestone.from)} → ${esc(meta.milestone.to)}</span></div>` : "";
 
     return `<article class="msg ${m.role} ${isLastBot ? "is-last" : ""}" data-id="${m.id}" aria-label="${esc(name)}">
       ${av}
@@ -380,7 +393,7 @@ export async function render(main, [botId, chatId]) {
           ${info.length ? `<span class="msg-meta">${info.join(" · ")}</span>` : ""}
         </div>
       </div>
-    </article>`;
+    </article>${milestone}`;
   }
 
   const nearBottom = () => log.scrollHeight - log.scrollTop - log.clientHeight < 120;
@@ -467,7 +480,12 @@ export async function render(main, [botId, chatId]) {
     const speaker = speakerOf(target);
     const withBond = bondOn && speaker.id === bot.id;
     const directed = direction();
-    const fullNote = [directed, note].filter(Boolean).join(" ");
+    // After the bond changes level, the next reply is asked to show it.
+    const shift = withBond && milestonesOn && kind === "new" && chat.pendingMilestone ? chat.pendingMilestone : null;
+    const shiftNote = shift
+      ? `The bond has just moved ${shift.up ? "up" : "down"} from ${shift.from} to ${shift.to}. Let this change show clearly in this reply, in character, without naming it.`
+      : "";
+    const fullNote = [directed, note, shiftNote].filter(Boolean).join(" ");
 
     const [freshSettings, preset, loreEntries] = await Promise.all([getSettings(), getActivePreset(), loreForBot(speaker)]);
     const beforeBond = bondNow();
@@ -515,11 +533,19 @@ export async function render(main, [botId, chatId]) {
         lore: prompt.loreUsed, usage: res.usage, model: body.model,
         reasoning: res.reasoning, finish: res.finishReason,
         ...(withBond ? { bond: parsed.delta } : {}),
-        ...(fullNote ? { note: fullNote } : {}),
+        // Only the person's own direction or nudge earns the "directed" label.
+        ...(directed || note ? { note: [directed, note].filter(Boolean).join(" ") } : {}),
       };
       if (!parsed.text.trim()) throw new Error("The model sent back an empty reply. Try again, or check the model name on the Connection page.");
-      if (withBond && bondNow().label !== beforeBond.label) {
-        toast(`${bot.name}: ${beforeBond.label} → ${bondNow().label}`);
+      if (shift) chat.pendingMilestone = null;
+      if (withBond && bondNow().index !== beforeBond.index) {
+        const change = { from: beforeBond.label, to: bondNow().label, up: bondNow().index > beforeBond.index };
+        target.meta[si].milestone = change;
+        chat.pendingMilestone = change;
+        toast(`${bot.name}: ${change.from} \u2192 ${change.to}`);
+      } else if (withBond && kind === "swipe") {
+        // A new version that no longer crosses a level takes the milestone back.
+        chat.pendingMilestone = null;
       }
       window.dispatchEvent(new CustomEvent("api-status", { detail: true }));
       if (prompt.dropped > 0 && !chat.warnedTrim && !chat.memory?.text) {
@@ -700,7 +726,6 @@ export async function render(main, [botId, chatId]) {
       ...structuredClone(chat),
       id: uid(),
       title: `${chat.title.replace(/ \(branch\)$/, "")} (branch)`,
-      autoTitle: false,
       messages: structuredClone(chat.messages.slice(0, upTo)),
       // A summary of later messages would leak events that have not happened here.
       memory: chat.memory && (chat.memory.upTo ?? 0) <= upTo ? structuredClone(chat.memory) : null,
@@ -944,7 +969,6 @@ export async function render(main, [botId, chatId]) {
     }
     hideDraftBar();
     chat.messages.push({ id: uid(), role: "user", content: text, at: now() });
-    if (chat.autoTitle) { chat.title = text.replace(/\s+/g, " ").slice(0, 48) + (text.length > 48 ? "…" : ""); chat.autoTitle = false; paintHeader(); }
     input.value = "";
     fitInput();
     await persist();
@@ -1045,7 +1069,7 @@ export async function render(main, [botId, chatId]) {
   async function rename() {
     const title = await promptDialog({ title: "Rename chat", label: "Chat name", value: chat.title });
     if (!title) return;
-    chat.title = title; chat.autoTitle = false;
+    chat.title = title;
     await persist(); paintHeader();
   }
 

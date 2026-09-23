@@ -80,7 +80,7 @@ export async function render(main) {
             <span>Track a bond in chats<small>The bot rates each exchange, the meter in the chat header moves, and the bot is told where it stands. Turn it off per bot in the bot's Scene settings.</small></span></label>
           ${sliderHTML({
             id: "bond-start", label: "Bond at the start of a chat", min: 0, max: 100, step: 1,
-            value: settings.bond.start, hint: "0 is hostile, 100 is devoted. New chats begin here.",
+            value: settings.bond.start, hint: "0 is the lowest level of a bond, 100 the highest. What the levels are called depends on each bot's kind of bond. New chats begin here.",
           })}
         </div>
       </div>

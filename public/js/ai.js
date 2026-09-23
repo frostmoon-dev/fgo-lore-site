@@ -88,7 +88,8 @@ export async function draftBot({ idea, signal }) {
     '"description" (the core definition: who they are, history, how they think, how they talk, and 4 to 6 behaviour rules, written with {{char}} and {{user}}, 200 to 350 words, plain text with short sections); ' +
     '"personality" (a short trait list); "scenario" (where and how the first scene starts, 1 to 3 sentences, using {{user}}); ' +
     '"greeting" (the opening message in {{char}}\'s voice, 60 to 150 words, actions in *asterisks*); ' +
-    '"examples" (two short example exchanges, each starting with <START>, lines prefixed {{user}}: and {{char}}:). ' +
+    '"examples" (two short example exchanges, each starting with <START>, lines prefixed {{user}}: and {{char}}:); ' +
+    '"bondKind" (how a relationship with {{user}} would grow: one of affection, romance, rivalry, loyalty, fear). ' +
     "Give the character a specific voice, a contradiction, and a flaw. Avoid generic traits. Do not write for {{user}} beyond the examples.";
   const draft = parseJSON(await ask([{ role: "system", content: system }, { role: "user", content: `Idea: ${idea}` }], { maxTokens: 2200, temperature: 0.8, signal }));
   if (!draft || typeof draft !== "object" || Array.isArray(draft)) throw new Error("The model did not return a character.");
@@ -97,6 +98,7 @@ export async function draftBot({ idea, signal }) {
     name: str(draft.name), tagline: str(draft.tagline).slice(0, 140), tags: str(draft.tags),
     description: str(draft.description), personality: str(draft.personality), scenario: str(draft.scenario),
     greeting: str(draft.greeting), examples: str(draft.examples),
+    bondKind: ["affection", "romance", "rivalry", "loyalty", "fear"].includes(draft.bondKind) ? draft.bondKind : "",
   };
 }
 

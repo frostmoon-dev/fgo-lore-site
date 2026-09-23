@@ -722,8 +722,8 @@ body.in-chat .site-footer { display: none; }
 .bond-label { font-size: var(--t-sm); color: var(--muted); }
 .bond-bar { display: block; width: 72px; height: 6px; border-radius: var(--r-pill); background: var(--fill-strong); overflow: hidden; }
 .bond-fill { display: block; height: 100%; width: 0; background: var(--accent); border-radius: var(--r-pill); transition: width 400ms var(--ease); }
-.bond[data-tier="hostile"] .bond-fill { background: var(--danger); }
-.bond[data-tier="wary"] .bond-fill { background: var(--muted); }
+.bond[data-level="0"] .bond-fill { background: var(--danger); }
+.bond[data-level="1"] .bond-fill { background: var(--muted); }
 .bond-read { font-size: var(--t-ui); color: var(--ink); }
 .bond-chip { color: var(--muted); }
 .bond-chip.up { color: var(--ok); }
@@ -813,3 +813,15 @@ button.check-chip.bad {
 .sugg-item { display: grid; gap: var(--s3); padding: var(--s4); background: var(--surface); border-radius: var(--r-md); }
 .sugg-item .check { padding: 0; font-weight: 500; }
 #sugg .skeleton-line { width: 100%; }
+
+/* A bond level change, shown between messages. */
+.milestone { display: flex; align-items: center; gap: var(--s3); font-size: var(--t-sm); color: var(--muted); }
+.milestone::before, .milestone::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.milestone span { padding: var(--s1) var(--s3); border-radius: var(--r-pill); background: var(--fill); color: var(--ink); font-weight: 500; }
+.milestone.up span { background: var(--accent-soft); }
+
+/* Bond levels in the bot editor */
+.bond-levels { display: grid; gap: var(--s3); }
+.bond-level { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: var(--s3); align-items: start; }
+.bond-at { padding-top: var(--s2); font-size: var(--t-sm); font-variant-numeric: tabular-nums; color: var(--muted); text-align: right; }
+.bond-level textarea { min-height: 64px; }
