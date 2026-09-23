@@ -93,6 +93,21 @@ export async function listModels(conn) {
 
 // Sends a chat request. Calls onDelta as text streams in. Resolves with the
 // full reply; rejects with AbortError when stopped.
+import { recordUsage } from "./store.js";
+
+// Every finished request is counted. Providers that do not report token
+// counts get an estimate (about four characters per token), marked as such.
+function count(payload, result) {
+  const u = result.usage;
+  const est = (s) => Math.ceil(String(s ?? "").length / 4);
+  recordUsage({
+    model: payload.model,
+    prompt: Number(u?.prompt_tokens) || est(payload.messages?.map((m) => m.content).join("\n")),
+    completion: Number(u?.completion_tokens) || est(`${result.content}${result.reasoning ?? ""}`),
+    estimated: !(u?.prompt_tokens && u?.completion_tokens),
+  });
+}
+
 export async function chatCompletion(conn, body, { signal, onDelta = () => {} } = {}) {
   const payload = { ...body };
   if (conn.model) payload.model ??= conn.model;
@@ -113,6 +128,7 @@ export async function chatCompletion(conn, body, { signal, onDelta = () => {} } 
     };
     if (!result.content && data.error) throw new Error(data.error.message ?? String(data.error));
     onDelta(result);
+    count(payload, result);
     return result;
   }
 
@@ -142,5 +158,6 @@ export async function chatCompletion(conn, body, { signal, onDelta = () => {} } 
       onDelta(result);
     }
   }
+  count(payload, result);
   return result;
 }

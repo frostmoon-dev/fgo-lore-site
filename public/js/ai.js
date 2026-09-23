@@ -192,3 +192,29 @@ export async function nameChat({ bot, names, lines, signal }) {
   const out = await ask([{ role: "system", content: system }, { role: "user", content: clip(lines, 8000) }], { bot, maxTokens: 30, temperature: 0.8, signal });
   return out.split("\n")[0].replace(/^["'“”#\s]+|["'“”.\s]+$/g, "").slice(0, 60);
 }
+
+// ---------- Journal ----------
+
+export async function journalEntry({ bot, names, previous, lines, signal }) {
+  const system =
+    `You are ${names.char}, writing in your private journal after time spent with ${names.user}. ` +
+    `Write one entry in first person, in ${names.char}'s own voice, personality and way of speaking: what happened, ` +
+    `what you really think and feel about ${names.user} now, and anything you would never say aloud. ` +
+    "80 to 160 words. No date line, no heading, no sign-off. Stay consistent with your earlier entries.";
+  const user = `${previous?.trim() ? `Your last entry:\n${previous.trim()}\n\n` : ""}What happened since:\n\n${lines}`;
+  return ask([{ role: "system", content: system }, { role: "user", content: user }], { bot, maxTokens: 400, temperature: 0.8, signal });
+}
+
+// ---------- Surprise ----------
+
+export async function surpriseEvent({ bot, names, lines, scene, signal }) {
+  const system =
+    `Invent one surprising event for the next moment of a roleplay between ${names.user} and ${names.char}: ` +
+    "an arrival, an interruption, a discovery, a change in weather, a secret slipping out, an accident. " +
+    "It must fit the setting and the current scene, raise the stakes or add interest, and leave room for both characters to react. " +
+    `Do not decide what ${names.user} does. Answer with one or two short sentences describing the event only, written as an instruction, ` +
+    'for example "A messenger bursts in with news of a fire in the east wing."';
+  const user = `${scene?.trim() ? `The scene right now:\n${scene.trim()}\n\n` : ""}Recent chat:\n\n${lines}`;
+  const out = await ask([{ role: "system", content: system }, { role: "user", content: user }], { bot, maxTokens: 120, temperature: 1, signal });
+  return out.replace(/^["“]|["”]$/g, "").trim();
+}

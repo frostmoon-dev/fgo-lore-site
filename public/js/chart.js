@@ -98,3 +98,82 @@ export function wireBondChart(root, points) {
     if (e.key === "End") { e.preventDefault(); show(points.length - 1); }
   });
 }
+
+// ---------- Usage bars ----------
+// Tokens per day for the last N days: one series, so no legend; the card's
+// heading names it. Bars are thin with a rounded top; hover, tap or the
+// arrow keys show the exact numbers, and the table below has them all.
+// Drawn at roughly the width it is shown, so its text matches the page.
+const UW = 960;
+const UH = 220;
+const UP = { top: 16, right: 12, bottom: 28, left: 52 };
+
+const niceMax = (v) => {
+  if (v <= 0) return 1000;
+  const p = 10 ** Math.floor(Math.log10(v));
+  return [1, 2, 2.5, 5, 10].map((m) => m * p).find((n) => n >= v);
+};
+export const shortNumber = (n) => (n >= 1e6 ? `${(n / 1e6).toFixed(n >= 1e7 ? 0 : 1)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(n >= 1e4 ? 0 : 1)}k` : String(n));
+
+// days: [{ key, label, total, prompt, completion, requests }]
+export function usageChartHTML(days) {
+  const max = niceMax(Math.max(...days.map((d) => d.total)));
+  const band = (UW - UP.left - UP.right) / days.length;
+  const barW = Math.min(24, band * 0.6);
+  const py = (v) => UP.top + (1 - v / max) * (UH - UP.top - UP.bottom);
+  const base = py(0);
+  const ticks = [0, max / 2, max];
+  const step = Math.ceil(days.length / 7); // a date under every other bar, never crowding the last
+  return `<figure class="usage-chart">
+    <div class="bond-chart-plot">
+      <svg viewBox="0 0 ${UW} ${UH}" role="img" aria-label="Tokens used per day over the last ${days.length} days">
+        ${ticks.map((t) => `<line class="grid" x1="${UP.left}" x2="${UW - UP.right}" y1="${py(t)}" y2="${py(t)}"/>
+          <text class="axis" x="${UP.left - 8}" y="${py(t) + 4}" text-anchor="end">${shortNumber(t)}</text>`).join("")}
+        ${days.map((d, i) => {
+          const x = UP.left + band * i + (band - barW) / 2;
+          const h = Math.max(d.total ? 2 : 0, base - py(d.total));
+          const r = Math.min(4, h / 2, barW / 2);
+          // Rounded at the top, square at the baseline.
+          const path = h ? `M${x},${base}V${base - h + r}Q${x},${base - h} ${x + r},${base - h}H${x + barW - r}Q${x + barW},${base - h} ${x + barW},${base - h + r}V${base}Z` : "";
+          return `<path class="bar" d="${path}"/>
+            ${(i % step === 0 && days.length - 1 - i >= step) || i === days.length - 1 ? `<text class="axis" x="${x + barW / 2}" y="${UH - 8}" text-anchor="middle">${d.label}</text>` : ""}
+            <rect class="bar-hit" data-i="${i}" x="${UP.left + band * i}" y="${UP.top}" width="${band}" height="${UH - UP.top - UP.bottom}" tabindex="${i === days.length - 1 ? 0 : -1}"
+              aria-label="${d.label}: ${d.total.toLocaleString()} tokens"/>`;
+        }).join("")}
+      </svg>
+      <div class="chart-tip" role="status" hidden></div>
+    </div>
+  </figure>`;
+}
+
+export function wireUsageChart(root, days) {
+  const svg = root.querySelector("svg");
+  const tip = root.querySelector(".chart-tip");
+  const hits = [...root.querySelectorAll(".bar-hit")];
+  const show = (i) => {
+    const d = days[i];
+    hits.forEach((h, j) => h.classList.toggle("is-active", j === i));
+    tip.hidden = false;
+    tip.innerHTML = `<span><strong>${d.total.toLocaleString()}</strong> tokens</span><small>${d.label} · ${d.requests} request${d.requests === 1 ? "" : "s"} · ${d.prompt.toLocaleString()} in, ${d.completion.toLocaleString()} out</small>`;
+    const r = svg.getBoundingClientRect();
+    const box = hits[i].getBoundingClientRect();
+    const left = box.left - r.left + box.width / 2;
+    tip.style.top = "0px";
+    tip.style.left = left > r.width * 0.6 ? "" : `${left + 8}px`;
+    tip.style.right = left > r.width * 0.6 ? `${r.width - left + 8}px` : "";
+  };
+  const hide = () => { tip.hidden = true; hits.forEach((h) => h.classList.remove("is-active")); };
+  hits.forEach((h, i) => {
+    h.addEventListener("pointerenter", () => show(i));
+    h.addEventListener("pointerdown", () => show(i));
+    h.addEventListener("focus", () => show(i));
+    h.addEventListener("keydown", (e) => {
+      const next = e.key === "ArrowLeft" ? i - 1 : e.key === "ArrowRight" ? i + 1 : null;
+      if (next === null || !hits[next]) return;
+      e.preventDefault();
+      h.tabIndex = -1; hits[next].tabIndex = 0; hits[next].focus();
+    });
+  });
+  svg.addEventListener("pointerleave", (e) => { if (e.pointerType === "mouse") hide(); });
+  root.addEventListener("focusout", (e) => { if (!root.contains(e.relatedTarget)) hide(); });
+}

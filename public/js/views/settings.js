@@ -1,4 +1,6 @@
-import { getSettings, saveSettings, exportAll, importAll, wipeAll } from "../store.js";
+import { getSettings, saveSettings, exportAll, importAll, wipeAll, getUsage, clearUsage, dayKey } from "../store.js";
+import { usageChartHTML, wireUsageChart, shortNumber } from "../chart.js";
+import { installState, promptInstall, onInstallChange } from "../install.js";
 import {
   $, $$, esc, icon, toast, confirmDialog, download, pickFile,
   imagePicker, imagePickerHTML, sliderHTML, wireSlider, debounce,
@@ -67,6 +69,13 @@ export async function render(main) {
             <div class="msg-body"><p>The tea has gone cold. <em>She sets the cup down without drinking.</em> “You came back later than you said.”</p></div>
           </div>
         </div>
+      </div>
+
+      <div class="card">
+        <h2 class="card-title">Install as an app</h2>
+        <p class="lead">Put Shiru's Garden on your home screen or in your app list. It opens full screen, loads instantly,
+          and your bots and chats open even without internet. Replies still need your connection.</p>
+        <div id="install-box" aria-live="polite"></div>
       </div>
 
       <div class="card">
@@ -146,6 +155,8 @@ export async function render(main) {
         <h2 class="card-title">Chat</h2>
         <label class="check"><input type="checkbox" id="enter" ${settings.enterToSend ? "checked" : ""}>
           <span>Enter sends the message<small>Off: Enter adds a new line and Ctrl+Enter sends. Handy on phones.</small></span></label>
+        <label class="check"><input type="checkbox" id="journal-on" ${settings.journal.auto ? "checked" : ""}>
+          <span>Let bots keep a journal<small>When you leave a chat after ${settings.journal.every} or more new messages, the bot writes a short private diary entry about it. One request each time. Read entries from the chat's ⋯ menu.</small></span></label>
         <label class="check"><input type="checkbox" id="confirm-on" ${settings.confirm.enabled ? "checked" : ""}>
           <span>Ask before changing a chat<small>Before deleting a message, saving an edit, branching, or removing a character from a scene.</small></span></label>
         <label class="check"><input type="checkbox" id="recap-auto" ${settings.recap.auto ? "checked" : ""}>
@@ -163,6 +174,24 @@ export async function render(main) {
             <li><code>Ctrl+S</code> save in the bot editor</li>
           </ul>
         </details>
+      </div>
+
+      <h2 class="sub" id="usage-title">Usage</h2>
+      <div class="card" aria-labelledby="usage-title">
+        <p class="lead">Tokens sent to and received from your API by this browser: replies and every extra task, like memory and ideas.</p>
+        <div class="form-grid">
+          <div id="usage-body"></div>
+          <details class="more">
+            <summary>Prices, for a cost estimate</summary>
+            <div class="form-row">
+              <div class="field"><label for="price-in">Input, US$ per million tokens</label>
+                <input type="number" id="price-in" min="0" step="0.01" inputmode="decimal" value="${esc(settings.usage.priceIn)}" placeholder="e.g. 3"></div>
+              <div class="field"><label for="price-out">Output, US$ per million tokens</label>
+                <input type="number" id="price-out" min="0" step="0.01" inputmode="decimal" value="${esc(settings.usage.priceOut)}" placeholder="e.g. 15"></div>
+            </div>
+            <p class="hint">Find these on your provider's pricing page. The estimate uses one price for every model.</p>
+          </details>
+        </div>
       </div>
 
       <h2 class="sub">Your data</h2>
@@ -238,6 +267,99 @@ export async function render(main) {
   }, 500);
   $("#lang-mine", main).addEventListener("input", saveLangs);
   $("#lang-chat", main).addEventListener("input", saveLangs);
+  // ---- Usage ----
+  async function paintUsageStats() {
+    const usage = await getUsage();
+    const body = $("#usage-body", main);
+    const price = { in: Number(settings.usage.priceIn), out: Number(settings.usage.priceOut) };
+    const priced = price.in > 0 || price.out > 0;
+    const cost = (d) => (d.prompt * (price.in || 0) + d.completion * (price.out || 0)) / 1e6;
+    const money = (n) => (n < 0.01 && n > 0 ? "under $0.01" : `$${n.toFixed(2)}`);
+    const range = (n) => {
+      const out = { prompt: 0, completion: 0, requests: 0, estimated: 0, models: {} };
+      for (let i = 0; i < n; i++) {
+        const d = usage.days[dayKey(Date.now() - i * 86400000)];
+        if (!d) continue;
+        for (const k of ["prompt", "completion", "requests", "estimated"]) out[k] += d[k] ?? 0;
+        for (const [name, m] of Object.entries(d.models ?? {})) {
+          const t = (out.models[name] ??= { prompt: 0, completion: 0, requests: 0 });
+          t.prompt += m.prompt; t.completion += m.completion; t.requests += m.requests;
+        }
+      }
+      return out;
+    };
+    const today = range(1);
+    const week = range(7);
+    const month = range(30);
+    if (!month.requests) {
+      body.innerHTML = `<p class="note">${icon("info")}<span>Nothing used yet. Numbers appear here after your first chat reply.</span></p>`;
+      return;
+    }
+    const tile = (k, d) => `<div class="usage-tile"><span class="k">${k}</span>
+      <span class="v">${shortNumber(d.prompt + d.completion)}</span>
+      <span class="s">tokens · ${d.requests} request${d.requests === 1 ? "" : "s"}${priced ? ` · ${money(cost(d))}` : ""}</span></div>`;
+    const days = Array.from({ length: 14 }, (_, i) => {
+      const t = Date.now() - (13 - i) * 86400000;
+      const d = usage.days[dayKey(t)] ?? { prompt: 0, completion: 0, requests: 0 };
+      return {
+        label: new Date(t).toLocaleDateString([], { month: "short", day: "numeric" }),
+        prompt: d.prompt, completion: d.completion, requests: d.requests, total: d.prompt + d.completion,
+      };
+    });
+    const models = Object.entries(month.models).sort((a, b) => (b[1].prompt + b[1].completion) - (a[1].prompt + a[1].completion));
+    body.innerHTML = `
+      <div class="form-grid">
+        <div class="usage-tiles">${tile("Today", today)}${tile("Last 7 days", week)}${tile("Last 30 days", month)}</div>
+        <div><h3 class="field-label">Tokens per day, last 14 days</h3>${usageChartHTML(days)}</div>
+        <details class="more">
+          <summary>By model, last 30 days</summary>
+          <table class="usage-table">
+            <thead><tr><th scope="col">Model</th><th scope="col" class="num">Requests</th><th scope="col" class="num">In</th><th scope="col" class="num">Out</th>${priced ? '<th scope="col" class="num">Cost</th>' : ""}</tr></thead>
+            <tbody>${models.map(([name, m]) => `<tr><td>${esc(name)}</td><td class="num">${m.requests}</td>
+              <td class="num">${m.prompt.toLocaleString()}</td><td class="num">${m.completion.toLocaleString()}</td>${priced ? `<td class="num">${money(cost(m))}</td>` : ""}</tr>`).join("")}</tbody>
+          </table>
+        </details>
+        ${month.estimated ? `<p class="hint">${month.estimated} of ${month.requests} requests were estimated at about 4 characters per token, because the provider did not report exact counts.</p>` : ""}
+        <div><button class="btn btn-sm btn-quiet btn-danger" type="button" id="usage-clear">Clear usage history</button></div>
+      </div>`;
+    wireUsageChart($(".usage-chart", body), days);
+    $("#usage-clear", body).addEventListener("click", async () => {
+      const ok = await confirmDialog({ title: "Clear usage history?", body: "The token counts are removed from this browser. Your chats are not affected.", confirm: "Clear", danger: true });
+      if (!ok) return;
+      await clearUsage();
+      paintUsageStats();
+    });
+  }
+  paintUsageStats();
+  const savePrices = debounce(async () => {
+    settings.usage = (await saveSettings({ usage: { priceIn: $("#price-in", main).value, priceOut: $("#price-out", main).value } })).usage;
+    paintUsageStats();
+  }, 400);
+  $("#price-in", main).addEventListener("input", savePrices);
+  $("#price-out", main).addEventListener("input", savePrices);
+
+  // ---- Install ----
+  function paintInstall() {
+    const box = $("#install-box", main);
+    const state = installState();
+    box.innerHTML = {
+      installed: `<p class="note">${icon("check")}<span>Installed. You are using Shiru's Garden as an app.</span></p>`,
+      ready: `<button class="btn btn-primary" type="button" id="install">Install app</button>`,
+      ios: `<ol class="steps-list"><li>Tap the <strong>Share</strong> button in Safari's toolbar.</li>
+        <li>Choose <strong>Add to Home Screen</strong>.</li><li>Tap <strong>Add</strong>.</li></ol>`,
+      manual: `<p class="hint">Open your browser's menu and choose <strong>Install app</strong> or <strong>Add to Home screen</strong>.
+        If you do not see it, your browser may not support installing sites; Chrome and Edge do.</p>`,
+    }[state];
+    $("#install", box)?.addEventListener("click", async (e) => {
+      e.currentTarget.classList.add("is-loading");
+      const ok = await promptInstall();
+      toast(ok ? "Installing. Look for Shiru's Garden on your home screen or app list." : "Not installed. You can install any time from here.", ok ? "ok" : "info");
+      paintInstall();
+    });
+  }
+  paintInstall();
+  const stopInstall = onInstallChange(paintInstall);
+
   // ---- Mature content, behind an 18+ check ----
   const CONTENT_ABOUT = {
     off: "No instruction is added. The model follows its own defaults, usually suitable for general audiences.",
@@ -265,6 +387,7 @@ export async function render(main) {
     toast(level === "off" ? "Mature content is off." : `Content level: ${level === "mature" ? "Mature" : "Explicit"}.`, "ok");
   }));
 
+  $("#journal-on", main).addEventListener("change", (e) => saveSettings({ journal: { ...settings.journal, auto: e.target.checked } }).then(() => toast("Saved.", "ok")));
   $("#confirm-on", main).addEventListener("change", (e) => saveSettings({ confirm: { enabled: e.target.checked } }).then(() => toast("Saved.", "ok")));
   $("#recap-auto", main).addEventListener("change", (e) => saveSettings({ recap: { auto: e.target.checked } }).then(() => toast("Saved.", "ok")));
   $("#check-auto", main).addEventListener("change", (e) => saveSettings({ check: { auto: e.target.checked } }).then(() => toast("Saved.", "ok")));
@@ -308,4 +431,5 @@ export async function render(main) {
   });
 
   paintUsage();
+  return { cleanup: () => stopInstall() };
 }

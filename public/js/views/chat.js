@@ -1,18 +1,19 @@
 import {
   bots, chats, lore, personas, getSettings, getActiveConnection, getActivePreset,
-  getLorebooks, saveLorebooks, newLorebook, newLore, loreForBot, bondTier, bondLevels, BOND_KINDS, uid, now,
+  getLorebooks, saveLorebooks, newLorebook, newLore, loreForBot, bondTier, bondLevels, BOND_KINDS, moodsOf, uid, now,
 } from "../store.js";
-import { chatCompletion } from "../api.js";
+import { chatCompletion, listModels } from "../api.js";
 import {
-  buildPrompt, generationParams, currentText, applyMacros, readBond, stripBond, cleanImpersonation, contentLevel,
+  buildPrompt, generationParams, currentText, applyMacros, readBond, readMood, stripBond, cleanImpersonation, contentLevel,
 } from "../prompt.js";
 import {
   summarize, suggestLore, checkCharacter, transcript, suggestReplies, translate, updateScene, recap, storyFrom, nameChat,
+  journalEntry, surpriseEvent,
 } from "../ai.js";
 import { bondChartHTML, wireBondChart } from "../chart.js";
 import { renderMarkdown } from "../markdown.js";
 import {
-  $, $$, esc, icon, avatarHTML, toast, confirmDialog, openDialog, openMenu,
+  $, $$, esc, icon, avatarHTML, toast, confirmDialog, promptDialog, openDialog, openMenu,
   download, slug, timeAgo, clock, autosize, sliderHTML, wireSlider,
 } from "../ui.js";
 
@@ -65,6 +66,8 @@ export async function render(main, [botId, chatId, jumpTo]) {
     list = await chats.forBot(bot.id);
   }
   chat.castIds ??= [];
+  chat.journal ??= [];
+  let activeConn = await getActiveConnection();
   const lastVisit = chat.updatedAt ?? 0;
   history.replaceState(history.state, "", `#/chat/${bot.id}/${chat.id}`);
 
@@ -183,9 +186,10 @@ export async function render(main, [botId, chatId, jumpTo]) {
             <span class="bond-label" id="bond-label"></span>
             <span class="bond-bar"><span class="bond-fill" id="bond-fill"></span></span>
           </button>` : ""}
-          <button class="icon-btn hide-narrow" type="button" id="memory" aria-label="Memory" title="Memory">${icon("book")}</button>
-          <button class="icon-btn hide-narrow" type="button" id="scene" aria-label="Scene tracker" title="Scene tracker">${icon("map")}</button>
-          <button class="icon-btn hide-narrow" type="button" id="cast" aria-label="Characters in this chat" title="Characters in this chat">${icon("users")}</button>
+          <button class="model-chip hide-narrow" type="button" id="model-chip" aria-haspopup="menu" aria-expanded="false"></button>
+          <button class="icon-btn tool-btn hide-narrow" type="button" id="memory" aria-label="Memory" title="Memory">${icon("book")}<span class="tool-label">Memory</span></button>
+          <button class="icon-btn tool-btn hide-narrow" type="button" id="scene" aria-label="Scene tracker" title="Scene tracker">${icon("map")}<span class="tool-label">Scene</span></button>
+          <button class="icon-btn tool-btn hide-narrow" type="button" id="cast" aria-label="Characters in this chat" title="Characters in this chat">${icon("users")}<span class="tool-label">Characters</span></button>
           <button class="icon-btn" type="button" id="more" aria-label="More chat actions" aria-haspopup="menu" aria-expanded="false" title="More">${icon("dots")}</button>
         </div>
 
@@ -210,9 +214,10 @@ export async function render(main, [botId, chatId, jumpTo]) {
               <button class="btn btn-quiet btn-sm" type="button" id="draft-undo">Undo</button>
             </div>
             <div class="direct-bar" id="direct-bar" hidden>
-              <label for="direction" class="direct-label">Direction</label>
+              <label for="direction" class="direct-label" id="direct-label">Direction</label>
               <input type="text" id="direction" autocomplete="off"
                 placeholder="For the next reply only, e.g. time skip to nightfall" aria-describedby="direct-hint">
+              <button class="icon-btn" type="button" id="direct-reroll" aria-label="Another surprise" title="Another surprise" hidden>${icon("refresh")}</button>
               <button class="icon-btn" type="button" id="direct-clear" aria-label="Remove direction" title="Remove">${icon("x")}</button>
               <span class="sr-only" id="direct-hint">Sent to the model with the next reply, then cleared. It does not appear in the chat.</span>
             </div>
@@ -238,6 +243,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
               <label class="persona-pick" id="speaker-pick" hidden><span>Next to reply</span>
                 <select id="speaker"></select>
               </label>
+              <span class="activity" id="activity" role="status" hidden></span>
               <span id="composer-hint">${settings.enterToSend ? "Enter to send · Shift+Enter for a new line" : "Ctrl+Enter to send"}</span>
             </div>
           </div>
@@ -256,6 +262,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
 
   // ---------- Sidebar ----------
   function paintList() {
+    if (!$("#chat-list", main)) return; // the chat was left while a task finished
     $("#chat-list", main).innerHTML = list.map((c) => {
       const extra = [c.castIds?.length ? `group of ${c.castIds.length + 1}` : "", c.branchOf ? "branch" : ""].filter(Boolean);
       return `<li class="${c.id === chat.id ? "is-active" : ""}">
@@ -354,6 +361,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
     $("#chat-title", main).textContent = chat.title;
     const p = persona();
     $("#chat-sub", main).textContent = `with ${everyone().map((b) => b.name).join(", ")}${p ? ` · as ${p.name}` : ""}`;
+    paintModelChip();
     const level = contentLevel(settings, bot);
     const tag = $("#content-tag", main);
     tag.hidden = level === "off";
@@ -394,12 +402,17 @@ export async function render(main, [botId, chatId, jumpTo]) {
     return think + content + (streaming ? '<span class="caret" aria-hidden="true"></span>' : "");
   }
 
+  const meta0 = (m) => m.meta?.[m.swipeIndex ?? 0] ?? {};
+
   function messageHTML(m, i) {
     const isBot = m.role === "assistant";
     const p = persona();
     const speaker = speakerOf(m);
     const name = isBot ? speaker.name : userName();
-    const av = isBot ? (botById.has(speaker.id) ? botAvatar(speaker, 40) : avatarHTML(null, name, 40)) : avatarHTML(p?.avatar, name, 40);
+    const face = isBot && meta0(m).mood && speaker.expressions?.[meta0(m).mood];
+    const av = !isBot ? avatarHTML(p?.avatar, name, 40)
+      : face ? `<a class="avatar-link" href="#/bot/${speaker.id}" aria-label="Edit ${esc(speaker.name)}" title="${esc(speaker.name)}, ${esc(meta0(m).mood)}"><span class="expr-face"><img src="${esc(face)}" alt=""></span></a>`
+      : botById.has(speaker.id) ? botAvatar(speaker, 40) : avatarHTML(null, name, 40);
     const text = currentText(m);
     const isLastBot = isBot && i === lastAssistantIndex() && i === chat.messages.length - 1;
     const streaming = busy && isLastBot;
@@ -433,7 +446,8 @@ export async function render(main, [botId, chatId, jumpTo]) {
     if (meta.note) info.push(`<span class="chip" title="${esc(meta.note)}">directed</span>`);
     if (meta.lore?.length) info.push(meta.lore.map((t) => `<span class="chip" title="Lore used">${esc(t)}</span>`).join(""));
     if (meta.usage) info.push(`<span title="Tokens in / out">${meta.usage.prompt_tokens ?? "?"} → ${meta.usage.completion_tokens ?? "?"} tokens</span>`);
-    if (meta.finish === "length") info.push(`<span title="The reply hit the max reply tokens limit">cut off</span>`);
+    if (meta.finish === "length" && !isLastBot) info.push(`<span title="The reply hit the max reply tokens limit">cut off</span>`);
+    if (meta.mood) info.unshift(`<span class="chip mood-chip" title="${esc(name)}'s expression">${esc(meta.mood)}</span>`);
     const speakerBond = isBot && bondOnFor(speaker);
     if (speakerBond && Number.isFinite(meta.bond) && meta.bond !== 0) {
       info.push(`<span class="bond-chip ${meta.bond > 0 ? "up" : "down"}" title="Bond change">${meta.bond > 0 ? "+" : "−"}${Math.abs(meta.bond)} bond</span>`);
@@ -452,12 +466,15 @@ export async function render(main, [botId, chatId, jumpTo]) {
       ? `<div class="milestone ${meta.milestone.up ? "up" : "down"}" role="note">
           <span>Bond with ${esc(speaker.name)}: ${esc(meta.milestone.from)} → ${esc(meta.milestone.to)}</span></div>` : "";
 
-    return `<article class="msg ${m.role} ${isLastBot ? "is-last" : ""}" data-id="${m.id}" aria-label="${esc(name)}">
+    const cutOff = isLastBot && !busy && meta.finish === "length";
+    return `<article class="msg ${m.role} ${isLastBot ? "is-last" : ""}${face ? " has-face" : ""}" data-id="${m.id}" aria-label="${esc(name)}">
       ${av}
       <div style="min-width:0">
         <div class="msg-head"><span class="msg-name">${esc(name)}</span><time class="msg-time" datetime="${new Date(m.at).toISOString()}">${clock(m.at)}</time></div>
         <div class="msg-body">${bodyHTML(m, text, streaming)}</div>
         ${translation}
+        ${cutOff ? `<div class="cutoff-bar"><span>This reply was cut off by the length limit.</span>
+          <button class="btn btn-sm btn-primary" type="button" data-action="continue">Continue writing</button></div>` : ""}
         <div class="msg-foot">
           ${swipeNav}
           <span class="msg-tools">
@@ -516,12 +533,43 @@ export async function render(main, [botId, chatId, jumpTo]) {
   const directBar = $("#direct-bar", main);
   const directInput = $("#direction", main);
   const direction = () => (directBar.hidden ? "" : directInput.value.trim());
-  function setDirecting(open) {
+  function setDirecting(open, { surprise = false } = {}) {
     directBar.hidden = !open;
     $("#composer-more", main).classList.toggle("has-dot", open);
+    $("#direct-label", main).textContent = surprise ? "Surprise" : "Direction";
+    $("#direct-reroll", main).hidden = !surprise;
     if (open) directInput.focus();
     else { directInput.value = ""; }
   }
+
+  // ---------- Surprise me ----------
+  // A random event that fits the scene, placed in the direction bar so it
+  // can be read, edited or re-rolled before it shapes the next reply.
+  async function surprise() {
+    if (busy) return;
+    setDirecting(true, { surprise: true });
+    directInput.value = "";
+    directInput.placeholder = "Thinking of something…";
+    setActivity("surprise", "Thinking of a surprise…");
+    $("#direct-reroll", main).classList.add("is-loading");
+    try {
+      const text = await surpriseEvent({
+        bot, names: namesFor(), scene: chat.scene?.text ?? "",
+        lines: transcript(chat.messages.slice(-8), nameOf, namesFor()),
+      });
+      if (!text) throw new Error("No surprise came back. Try again.");
+      directInput.value = text;
+      input.focus();
+    } catch (err) {
+      toast(err.message, "error");
+      setDirecting(false);
+    } finally {
+      directInput.placeholder = "For the next reply only, e.g. time skip to nightfall";
+      setActivity("surprise", null);
+      $("#direct-reroll", main).classList.remove("is-loading");
+    }
+  }
+  $("#direct-reroll", main).addEventListener("click", surprise);
   $("#direct-clear", main).addEventListener("click", () => { setDirecting(false); input.focus(); });
   directInput.addEventListener("keydown", (e) => {
     if (e.key === "Escape") { e.stopPropagation(); setDirecting(false); input.focus(); }
@@ -539,7 +587,12 @@ export async function render(main, [botId, chatId, jumpTo]) {
     pendingError = null;
     let target;
     let prevIndex = 0;
-    if (kind === "swipe") {
+    let base = "";
+    if (kind === "continue") {
+      target = chat.messages.at(-1);
+      if (target?.role !== "assistant") return;
+      base = target.swipes[target.swipeIndex ?? 0] ?? "";
+    } else if (kind === "swipe") {
       target = chat.messages.at(-1);
       prevIndex = target.swipeIndex ?? 0;
       target.swipes.push("");
@@ -559,25 +612,31 @@ export async function render(main, [botId, chatId, jumpTo]) {
     const shiftNote = shift
       ? `The bond has just moved ${shift.up ? "up" : "down"} from ${shift.from} to ${shift.to}. Let this change show clearly in this reply, in character, without naming it.`
       : "";
-    const fullNote = [directed, note, shiftNote].filter(Boolean).join(" ");
+    const continueNote = kind === "continue"
+      ? "Your last reply was cut off. Continue it exactly where it stopped, mid-sentence if needed. Do not repeat or summarize anything already written; write only the rest."
+      : "";
+    const fullNote = [directed, note, shiftNote, continueNote].filter(Boolean).join(" ");
 
     const [freshSettings, preset, loreEntries] = await Promise.all([getSettings(), getActivePreset(), loreForBot(speaker)]);
     const beforeBond = bondFor(speaker);
     const prompt = buildPrompt({
       bot: speaker, persona: persona(), preset, settings: freshSettings, loreEntries,
-      history: withSpeakers(chat.messages.slice(0, chat.messages.indexOf(target))),
+      history: withSpeakers(chat.messages.slice(0, chat.messages.indexOf(target) + (kind === "continue" ? 1 : 0))),
       bond: withBond ? beforeBond : null,
       memory: chat.memory?.text ?? "", scene: chat.scene?.text ?? "", note: fullNote, cast: group() ? others(speaker) : [],
     });
     const body = {
-      model: speaker.model || conn.model || undefined,
+      model: chat.model || speaker.model || conn.model || undefined,
       messages: prompt.messages,
       stream: freshSettings.gen.stream,
       ...generationParams(freshSettings, speaker),
     };
+    // A continuation joins the cut-off text; add a space only where a new word starts.
+    const join = (more) => base + (/\S$/.test(base) && /^[A-Z"“*]/.test(more) ? " " : "") + more;
 
     paintLog();
     setBusy(true);
+    setActivity("reply", kind === "continue" ? `${speaker.name} is finishing the reply…` : `${speaker.name} is writing…`);
     controller = new AbortController();
     const node = () => $(`[data-id="${target.id}"] .msg-body`, logInner);
     let frame = 0;
@@ -594,22 +653,35 @@ export async function render(main, [botId, chatId, jumpTo]) {
       const res = await chatCompletion(conn, body, {
         signal: controller.signal,
         onDelta: (r) => {
-          target.swipes[si] = r.content;
-          target.meta[si].reasoning = r.reasoning;
+          target.swipes[si] = kind === "continue" ? join(r.content) : r.content;
+          if (kind !== "continue") target.meta[si].reasoning = r.reasoning;
           frame ||= requestAnimationFrame(paintStream);
         },
       });
+      const mood = readMood(res.content, moodsOf(speaker));
       const parsed = withBond ? readBond(res.content) : { text: stripBond(res.content), delta: 0 };
       // In a group scene models sometimes label their own line.
       if (group()) parsed.text = cleanImpersonation(parsed.text, speaker.name);
-      target.swipes[si] = parsed.text;
-      target.meta[si] = {
-        lore: prompt.loreUsed, usage: res.usage, model: body.model,
-        reasoning: res.reasoning, finish: res.finishReason,
-        ...(withBond ? { bond: parsed.delta } : {}),
-        // Only the person's own direction or nudge earns the "directed" label.
-        ...(directed || note ? { note: [directed, note].filter(Boolean).join(" ") } : {}),
-      };
+      if (kind === "continue") {
+        const before = target.meta[si] ?? {};
+        target.swipes[si] = join(parsed.text);
+        target.meta[si] = {
+          ...before, finish: res.finishReason, model: body.model,
+          usage: sumUsage(before.usage, res.usage),
+          ...(withBond ? { bond: (Number(before.bond) || 0) + parsed.delta } : {}),
+          ...(mood ? { mood } : {}),
+        };
+      } else {
+        target.swipes[si] = parsed.text;
+        target.meta[si] = {
+          lore: prompt.loreUsed, usage: res.usage, model: body.model,
+          reasoning: res.reasoning, finish: res.finishReason,
+          ...(withBond ? { bond: parsed.delta } : {}),
+          ...(mood ? { mood } : {}),
+          // Only the person's own direction or nudge earns the "directed" label.
+          ...(directed || note ? { note: [directed, note].filter(Boolean).join(" ") } : {}),
+        };
+      }
       if (!parsed.text.trim()) throw new Error("The model sent back an empty reply. Try again, or check the model name on the Connection page.");
       if (shift) delete chat.pendingMilestones[speaker.id];
       const afterBond = bondFor(speaker);
@@ -632,7 +704,9 @@ export async function render(main, [botId, chatId, jumpTo]) {
     } catch (err) {
       const aborted = err.name === "AbortError";
       const partial = target.swipes[si]?.trim();
-      if (!partial) {
+      if (kind === "continue") {
+        // Keep whatever was added before the stop; the reply was never empty.
+      } else if (!partial) {
         if (kind === "swipe") { target.swipes.pop(); target.meta.pop(); target.swipeIndex = prevIndex; }
         else chat.messages.pop();
       } else {
@@ -645,6 +719,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
     } finally {
       cancelAnimationFrame(frame);
       controller = null;
+      setActivity("reply", null);
       setBusy(false);
       await bots.touch(bot);
       if (!pendingError && target.swipes[si]) $("#announce", main).textContent = `${speaker.name}: ${target.swipes[si]}`;
@@ -670,6 +745,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
     const from = Math.min(chat.memory?.upTo ?? 0, upTo);
     if (from >= upTo && chat.memory?.text) { if (!quiet) toast("Memory already covers every message."); return false; }
     memoryBusy = true;
+    setActivity("memory", "Updating memory…");
     paintHeader();
     try {
       const text = await summarize({ bot, names: namesFor(), previous: chat.memory?.text ?? "", lines: memoryLines(from, upTo) });
@@ -683,6 +759,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
       return false;
     } finally {
       memoryBusy = false;
+      setActivity("memory", null);
       paintHeader();
     }
   }
@@ -753,6 +830,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
     const i = chat.messages.indexOf(m);
     const si = m.swipeIndex ?? 0;
     checking.add(m.id);
+    setActivity(`check-${m.id}`, "Checking character…");
     paintLog({ scroll: false });
     try {
       const result = await checkCharacter({
@@ -770,6 +848,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
       if (!quiet) toast(`Could not check. ${err.message}`, "error");
     } finally {
       checking.delete(m.id);
+      setActivity(`check-${m.id}`, null);
       paintLog({ scroll: false });
     }
   }
@@ -852,6 +931,201 @@ export async function render(main, [botId, chatId, jumpTo]) {
     }
   }
 
+  // ---------- Activity ----------
+  // One line under the message box says what is happening in the
+  // background, so nothing works silently.
+  const activity = new Map();
+  function setActivity(key, label) {
+    if (label) activity.set(key, label); else activity.delete(key);
+    const el = $("#activity", main);
+    if (!el) return;
+    const items = [...new Set(activity.values())];
+    el.hidden = !items.length;
+    el.innerHTML = items.length ? `<span class="spin" aria-hidden="true"></span>${esc(items.join(" · "))}` : "";
+    $("#composer-hint", main).hidden = items.length > 0;
+  }
+
+  const sumUsage = (a, b) => (a || b ? {
+    prompt_tokens: (a?.prompt_tokens ?? 0) + (b?.prompt_tokens ?? 0),
+    completion_tokens: (a?.completion_tokens ?? 0) + (b?.completion_tokens ?? 0),
+  } : undefined);
+
+  // ---------- Model ----------
+  // The model for this chat: its own override, else the bot's, else the connection's.
+  const currentModel = () => chat.model || bot.model || activeConn?.model || "no model set";
+  let modelList = null;
+  function recentModels() { try { return JSON.parse(localStorage.getItem("recentModels") || "[]"); } catch { return []; } }
+  function rememberModel(name) {
+    try { localStorage.setItem("recentModels", JSON.stringify([name, ...recentModels().filter((m) => m !== name)].slice(0, 5))); } catch {}
+  }
+  async function setChatModel(name) {
+    chat.model = name || null;
+    if (name) rememberModel(name);
+    await persist(); paintHeader();
+    toast(name ? `This chat now uses ${name}.` : `Back to the default model (${currentModel()}).`, "ok");
+  }
+  async function openModelMenu(anchor) {
+    if (!activeConn) { toast("Set up a connection first.", "error", { action: "Open", onAction: () => { location.hash = "#/connection"; } }); return; }
+    if (!modelList) {
+      anchor.classList.add("is-loading");
+      try { modelList = await listModels(activeConn); } catch { modelList = []; }
+      anchor.classList.remove("is-loading");
+    }
+    const def = bot.model || activeConn.model || "";
+    const inUse = currentModel();
+    const pick = (name) => ({ label: name, hint: name === inUse ? "In use" : "", onSelect: () => setChatModel(name === def ? null : name) });
+    const recent = recentModels().filter((m) => m !== def);
+    openMenu(anchor, [
+      { label: `Default: ${def || "none set"}`, hint: chat.model ? "From the bot or the connection" : "In use", onSelect: () => setChatModel(null) },
+      ...(recent.length ? ["-", ...recent.map(pick)] : []),
+      ...(modelList.length ? ["-", ...modelList.filter((m) => m !== def && !recent.includes(m)).slice(0, 40).map(pick)] : []),
+      "-",
+      { label: "Type a model name…", hint: modelList.length ? "" : "The model list could not be loaded", onSelect: async () => {
+        const name = await promptDialog({ title: "Model for this chat", label: "Model name", value: chat.model ?? "", confirm: "Use" });
+        if (name) setChatModel(name);
+      } },
+    ]);
+  }
+
+  function paintModelChip() {
+    const chip = $("#model-chip", main);
+    chip.innerHTML = `<span class="model-name">${esc(currentModel())}</span>${icon("left", "chev")}`;
+    chip.classList.toggle("is-custom", !!chat.model);
+    chip.setAttribute("aria-label", `Model: ${currentModel()}${chat.model ? ", chosen for this chat" : ""}. Change it.`);
+    chip.title = chat.model ? "Model chosen for this chat. Click to change." : "Model for this chat. Click to change.";
+  }
+
+  // ---------- Usage in this chat ----------
+  function openChatUsage() {
+    let prompt = 0; let completion = 0; let counted = 0; let missing = 0;
+    for (const m of chat.messages) {
+      if (m.role !== "assistant") continue;
+      for (const meta of m.meta ?? []) {
+        if (meta?.greeting) continue;
+        if (meta?.usage) { prompt += meta.usage.prompt_tokens ?? 0; completion += meta.usage.completion_tokens ?? 0; counted++; }
+        else missing++;
+      }
+    }
+    openDialog(`<div class="dialog-body">
+      <h2>Usage in this chat</h2>
+      <div class="usage-tiles">
+        <div class="usage-tile"><span class="k">Sent to the model</span><span class="v">${prompt.toLocaleString()}</span><span class="s">input tokens</span></div>
+        <div class="usage-tile"><span class="k">Written by the model</span><span class="v">${completion.toLocaleString()}</span><span class="s">output tokens</span></div>
+      </div>
+      <p class="hint">Counted from ${counted} repl${counted === 1 ? "y" : "ies"}, every version included.${missing ? ` ${missing} had no count from your provider and are left out.` : ""}
+        Extra tasks like memory and ideas are not included here. See all usage in <a href="#/settings">Settings</a>.</p>
+      <form method="dialog" class="dialog-actions"><button class="btn btn-primary">Close</button></form>
+    </div>`);
+  }
+
+  // ---------- Journal ----------
+  // The bot's private diary about you, one entry per stretch of chat.
+  const journalFrom = () => chat.journal.at(-1)?.upTo ?? 0;
+  async function writeJournal({ quiet = false } = {}) {
+    const from = Math.min(journalFrom(), chat.messages.length);
+    if (chat.messages.length - from < 2) { if (!quiet) toast("Not much has happened since the last entry."); return false; }
+    setActivity("journal", `${bot.name} is writing in their journal…`);
+    try {
+      const text = await journalEntry({
+        bot, names: namesFor(), previous: chat.journal.at(-1)?.text ?? "",
+        lines: transcript(chat.messages.slice(Math.max(from, chat.messages.length - 40)), nameOf, namesFor()),
+      });
+      if (!text) throw new Error("The model sent back an empty entry.");
+      chat.journal.push({ id: uid(), at: now(), text, upTo: chat.messages.length });
+      await persist();
+      return true;
+    } catch (err) {
+      if (!quiet) toast(`No journal entry. ${err.message}`, "error");
+      return false;
+    } finally {
+      setActivity("journal", null);
+    }
+  }
+
+  // After leaving the chat the page is gone, so this saves straight to the
+  // stored chat (read fresh, in case it changed or was deleted meanwhile).
+  async function journalInBackground() {
+    try {
+      const upTo = chat.messages.length;
+      const text = await journalEntry({
+        bot, names: namesFor(), previous: chat.journal.at(-1)?.text ?? "",
+        lines: transcript(chat.messages.slice(Math.max(journalFrom(), upTo - 40)), nameOf, namesFor()),
+      });
+      const fresh = text && await chats.get(chat.id);
+      if (!fresh) return;
+      fresh.journal = [...(fresh.journal ?? []), { id: uid(), at: now(), text, upTo }];
+      await chats.save(fresh);
+      toast(`${bot.name} wrote in their journal. Read it from the chat's ⋯ menu.`);
+    } catch { /* a missed entry is not worth an error message */ }
+  }
+
+  function openJournal() {
+    const paint = (dlg) => {
+      $("#jr-list", dlg).innerHTML = chat.journal.length
+        ? [...chat.journal].reverse().map((e) => `<article class="journal-entry">
+            <header><time datetime="${new Date(e.at).toISOString()}">${new Date(e.at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}</time>
+              <button class="link-btn" type="button" data-del="${e.id}">Delete</button></header>
+            <div class="prose">${renderMarkdown(e.text)}</div></article>`).join("")
+        : `<p class="note">${icon("info")}<span>No entries yet. ${esc(bot.name)} writes one when you leave after ${settings.journal?.every ?? 12} or more new messages, or press Write an entry now.</span></p>`;
+    };
+    const dlg = openDialog(`<div class="dialog-body">
+      <h2>${esc(bot.name)}'s journal</h2>
+      <p class="hint">What ${esc(bot.name)} writes privately about this chat, in their own voice. The model does not see these entries in the chat.</p>
+      <div id="jr-list" class="journal-list"></div>
+      <div class="dialog-actions">
+        <button class="btn btn-ghost" type="button" data-close>Close</button>
+        <button class="btn btn-primary" type="button" id="jr-write">Write an entry now</button>
+      </div></div>`, { wide: true });
+    paint(dlg);
+    $("[data-close]", dlg).addEventListener("click", () => dlg.close());
+    $("#jr-write", dlg).addEventListener("click", async (e) => {
+      const b = e.currentTarget;
+      b.classList.add("is-loading"); b.setAttribute("aria-busy", "true");
+      if (await writeJournal()) paint(dlg);
+      b.classList.remove("is-loading"); b.removeAttribute("aria-busy");
+    });
+    dlg.addEventListener("click", async (e) => {
+      const del = e.target.closest("[data-del]");
+      if (!del) return;
+      if (!(await askFirst({ title: "Delete this journal entry?", confirm: "Delete", danger: true }))) return;
+      chat.journal = chat.journal.filter((x) => x.id !== del.dataset.del);
+      await persist(); paint(dlg);
+    });
+  }
+
+  // ---------- Swipe between versions (touch) ----------
+  let swipe = null;
+  logInner.addEventListener("touchstart", (e) => {
+    const art = e.target.closest(".msg.assistant");
+    if (!art || busy || e.touches.length > 1 || e.target.closest("button, a, textarea, details")) return;
+    const m = chat.messages.find((x) => x.id === art.dataset.id);
+    if (!m?.swipes) return;
+    swipe = { art, m, x: e.touches[0].clientX, y: e.touches[0].clientY, dx: 0, axis: null };
+  }, { passive: true });
+  logInner.addEventListener("touchmove", (e) => {
+    if (!swipe) return;
+    const dx = e.touches[0].clientX - swipe.x;
+    const dy = e.touches[0].clientY - swipe.y;
+    if (!swipe.axis && Math.hypot(dx, dy) > 10) swipe.axis = Math.abs(dx) > Math.abs(dy) * 1.5 ? "x" : "y";
+    if (swipe.axis !== "x") return;
+    swipe.dx = dx;
+    swipe.art.style.transform = `translateX(${Math.max(-64, Math.min(64, dx / 2))}px)`;
+  }, { passive: true });
+  logInner.addEventListener("touchend", async () => {
+    if (!swipe) return;
+    const { art, m, dx, axis } = swipe;
+    swipe = null;
+    art.style.transform = "";
+    if (axis !== "x" || Math.abs(dx) < 72 || busy) return;
+    const idx = m.swipeIndex ?? 0;
+    const isLast = chat.messages.at(-1) === m;
+    if (dx > 0 && idx > 0) m.swipeIndex = idx - 1;
+    else if (dx < 0 && idx < m.swipes.length - 1) m.swipeIndex = idx + 1;
+    else if (dx < 0 && isLast) { generate("swipe"); return; }
+    else return;
+    await persist(); paintLog({ scroll: false });
+  });
+
   // ---------- Branches ----------
   async function branchFrom(i) {
     const ok = await askFirst({
@@ -883,6 +1157,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
   async function refreshScene({ quiet = false } = {}) {
     if (sceneBusy || !chat.messages.length) return false;
     sceneBusy = true;
+    setActivity("scene", "Updating the scene…");
     paintHeader();
     try {
       const text = await updateScene({
@@ -899,6 +1174,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
       return false;
     } finally {
       sceneBusy = false;
+      setActivity("scene", null);
       paintHeader();
     }
   }
@@ -1243,7 +1519,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
       memory: chat.memory?.text ?? "", scene: chat.scene?.text ?? "", cast: group() ? others(partner) : [],
     });
     const body = {
-      model: partner.model || conn.model || undefined,
+      model: chat.model || partner.model || conn.model || undefined,
       messages: prompt.messages,
       stream: freshSettings.gen.stream,
       ...generationParams(freshSettings, partner),
@@ -1363,6 +1639,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
     // On a phone the Ideas button lives here, to leave room for typing.
     ...(narrow.matches ? [{ label: "Ideas for what to say", hint: "Three options for your next move · Alt+S", onSelect: showIdeas }] : []),
     { label: directBar.hidden ? "Direct the next reply" : "Remove the direction", hint: "A hidden note for the next reply only · Alt+D", onSelect: () => setDirecting(directBar.hidden) },
+    { label: "Surprise me", hint: "A random twist for the next reply, to check first", onSelect: surprise },
     { label: `Translate my message into ${chatLanguage()}`, hint: "Write in any language, check, then send · Alt+T", onSelect: translateOutgoing },
   ], { align: "end" }));
   $("#draft-retry", main).addEventListener("click", () => impersonate({ retry: true }));
@@ -1445,6 +1722,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
       const isBot = m.role === "assistant";
       const hasTr = isBot ? m.meta?.[m.swipeIndex ?? 0]?.translation : m.translation;
       openMenu(btn, [
+        ...(isBot && i === chat.messages.length - 1 ? [{ label: "Continue this reply", hint: "Write more from where it ends", disabled: busy, onSelect: () => generate("continue") }] : []),
         { label: "Copy", onSelect: () => copyMessage(m) },
         { label: hasTr ? "Hide translation" : `Translate into ${myLanguage()}`, onSelect: () => (hasTr ? hideTranslation(m) : translateMessage(m)) },
         ...(isBot ? [{ label: "Check character", hint: "Does this stay true to the definition?", disabled: checking.has(m.id), onSelect: () => runCheck(m) }] : []),
@@ -1459,6 +1737,8 @@ export async function render(main, [botId, chatId, jumpTo]) {
       toast(m.pinned ? "Pinned. This moment is always sent to the model." : "Unpinned.");
     } else if (action === "hide-translation") {
       hideTranslation(m);
+    } else if (action === "continue") {
+      generate("continue");
     } else if (action === "check") {
       runCheck(m);
     } else if (action === "show-check") {
@@ -1508,6 +1788,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
     const speaker = speakerOf(m) ?? bot;
     const lang = myLanguage();
     translating.add(m.id);
+    setActivity(`tr-${m.id}`, "Translating…");
     paintLog({ scroll: false });
     try {
       const text = await translate({ text: stripBond(currentText(m)), to: lang, bot: speaker });
@@ -1520,6 +1801,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
       toast(`Could not translate. ${err.message}`, "error");
     } finally {
       translating.delete(m.id);
+      setActivity(`tr-${m.id}`, null);
       paintLog({ scroll: false });
     }
   }
@@ -1561,6 +1843,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
   $("#memory", main).addEventListener("click", openMemory);
   $("#cast", main).addEventListener("click", openCast);
   $("#scene", main).addEventListener("click", openScene);
+  $("#model-chip", main).addEventListener("click", (e) => openModelMenu(e.currentTarget));
 
   function rename() {
     const dlg = openDialog(`
@@ -1647,7 +1930,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
     openDialog(`<div class="dialog-body">
       <h2>What the model sees</h2>
       <p class="hint">The next request${group() ? `, answered by ${esc(speaker.name)}` : ""}${draft ? ", including your unsent message" : ""}. About <strong>${p.tokens.toLocaleString()}</strong> tokens
-        · model <code>${esc(speaker.model || conn?.model || "not set")}</code>
+        · model <code>${esc(chat.model || speaker.model || conn?.model || "not set")}</code>
         · ${Object.entries(params).map(([k, v]) => `${k} ${v}`).join(", ")}
         ${p.loreUsed.length ? `· lore: ${p.loreUsed.map(esc).join(", ")}` : ""}
         ${p.dropped ? `· <strong>${p.dropped} oldest messages left out</strong> to fit the context size` : ""}</p>
@@ -1659,17 +1942,20 @@ export async function render(main, [botId, chatId, jumpTo]) {
   // On a phone, Memory and Characters live in this menu instead of the bar.
   $("#more", main).addEventListener("click", (e) => openMenu(e.currentTarget, [
     ...(narrow.matches ? [
+      { label: "Model", hint: `${currentModel()}${chat.model ? " (this chat)" : ""}`, onSelect: () => openModelMenu($("#more", main)) },
       { label: "Memory", hint: chat.memory?.text ? "Summary of the story so far" : "Empty so far", onSelect: openMemory },
       { label: "Scene tracker", hint: chat.scene?.text ? "Where everyone is right now" : "Off so far", onSelect: openScene },
       { label: "Characters in this chat", hint: group() ? `${everyone().length} in the scene` : "Add bots for a group scene", onSelect: openCast },
       "-",
     ] : []),
     { label: `Pinned moments (${chat.messages.filter((m) => m.pinned).length})`, hint: "Always remembered by the model", onSelect: openPinned },
+    { label: `${bot.name}'s journal (${chat.journal.length})`, hint: "Private diary entries about you", onSelect: openJournal },
     { label: "Recap so far", hint: "A few lines on what has happened", onSelect: showRecap },
     { label: "Turn into a story", hint: "Rewrite the chat as prose", onSelect: openStory },
     { label: "Suggest lore from this chat", hint: "New entries from what happened", onSelect: openLoreSuggestions },
     "-",
     { label: "See the prompt", hint: "Exactly what the model gets next", onSelect: previewPrompt },
+    { label: "Usage in this chat", hint: "Tokens used by replies here", onSelect: openChatUsage },
     "-",
     { label: "Rename chat", onSelect: rename },
     { label: "Export chat", onSelect: exportChat },
@@ -1678,7 +1964,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
   ]));
 
   // ---------- Start ----------
-  const hasConnection = !!(await getActiveConnection());
+  const hasConnection = !!activeConn;
   $("#no-conn", main).hidden = hasConnection;
   paintHeader();
   paintList();
@@ -1692,6 +1978,9 @@ export async function render(main, [botId, chatId, jumpTo]) {
     cleanup: () => {
       controller?.abort();
       drafting?.abort();
+      // Leaving after a good stretch of chat: the bot writes in its journal.
+      const every = Math.max(4, Number(settings.journal?.every) || 12);
+      if (settings.journal?.auto !== false && activeConn && chat.messages.length - journalFrom() >= every) journalInBackground();
       document.removeEventListener("keydown", onGlobalKey);
       document.body.classList.remove("in-chat");
     },

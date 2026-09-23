@@ -1,4 +1,4 @@
-import { bots, newBot, getSettings, getLorebooks, loreForBot, BOND_KINDS, BOND_POINTS, bondLevels } from "../store.js";
+import { bots, newBot, getSettings, getLorebooks, loreForBot, BOND_KINDS, BOND_POINTS, bondLevels, EXPRESSIONS } from "../store.js";
 import { toCard, cardPng } from "../card.js";
 import { estimateTokens } from "../prompt.js";
 import { draftBot } from "../ai.js";
@@ -31,6 +31,7 @@ export async function render(main, [id]) {
   bot.bondLevels ??= null;
   bot.bondMilestones ??= true;
   bot.contentMode ??= "site";
+  bot.expressions ??= {};
   const settings = await getSettings();
   const books = await getLorebooks();
   let saved = JSON.stringify(bot);
@@ -83,6 +84,17 @@ export async function render(main, [id]) {
                 <input type="text" id="tagline" value="${esc(bot.tagline)}" maxlength="140" placeholder="One line shown on the bot's card" autocomplete="off">
               </div>
             </div>
+          </div>
+
+          <div class="card">
+            <h2 class="card-title">Expressions</h2>
+            <p class="lead">Optional. Upload a face for each mood, and chats show the one that matches each reply.
+              Leave any of them empty; the bot only uses the moods you fill in.</p>
+            <div class="expr-grid">${EXPRESSIONS.map((e) => `
+              <div class="expr-slot" id="expr-${e.key}">
+                <span class="field-label">${e.label}</span>
+                ${imagePickerHTML(`expr-file-${e.key}`, { label: "Upload", hint: "", cls: "expr-edit" })}
+              </div>`).join("")}</div>
           </div>
 
           <div class="card">
@@ -300,6 +312,19 @@ export async function render(main, [id]) {
     name: () => val("#name"),
     crop: { round: true, title: "Crop the bot's picture" },
   });
+  for (const e of EXPRESSIONS) {
+    imagePicker($(`#expr-${e.key}`, main), {
+      get: () => bot.expressions[e.key] ?? null,
+      set: (v) => {
+        if (v) bot.expressions[e.key] = v; else delete bot.expressions[e.key];
+        update();
+      },
+      crop: { aspect: 1, outW: 384, outH: 384, title: `${e.label} expression` },
+      preview: (url) => (url
+        ? `<span class="expr-thumb"><img src="${esc(url)}" alt="${e.label} expression"></span>`
+        : `<span class="expr-thumb is-empty" aria-hidden="true">${e.label}</span>`),
+    });
+  }
   imagePicker($("#background", main), {
     get: () => bot.background,
     set: (v) => { bot.background = v; update(); },

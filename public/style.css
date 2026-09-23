@@ -929,3 +929,91 @@ input[type="search"]::-webkit-search-cancel-button {
   border-radius: var(--r-pill); background: var(--accent-soft); color: var(--accent);
   font-size: var(--t-xs); font-weight: 600; letter-spacing: .02em;
 }
+
+/* Message box: the text always takes the spare room. On a phone it gets the
+   full width, and the buttons move to a row underneath it. */
+.composer-box textarea { flex: 1 1 auto; min-width: 0; }
+@media (max-width: 600px) {
+  .composer-box { flex-wrap: wrap; row-gap: 0; }
+  .composer-box textarea { flex: 1 0 100%; }
+  .composer-box .hide-narrow { display: none; }
+  .composer-box .send-btn { margin-left: auto; }
+}
+.steps-list { padding-left: 1.3em; display: grid; gap: var(--s1); }
+
+/* ---------- Usage ---------- */
+.usage-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: var(--s3); }
+.usage-tile { padding: var(--s3) var(--s4); background: var(--bg); border-radius: var(--r-md); display: grid; gap: 2px; }
+.usage-tile .k { font-size: var(--t-sm); color: var(--muted); }
+.usage-tile .v { font-family: var(--font-display); font-size: var(--t-xl); font-weight: 600; font-variant-numeric: tabular-nums; }
+.usage-tile .s { font-size: var(--t-sm); color: var(--muted); }
+.usage-chart svg { display: block; width: 100%; height: auto; }
+.usage-chart .grid { stroke: var(--line); stroke-width: 1; }
+.usage-chart .axis { fill: var(--muted); font-size: 13px; font-family: var(--font); }
+.usage-chart .bar { fill: var(--accent); }
+.usage-chart .bar-hit { fill: transparent; cursor: pointer; outline: none; }
+.usage-chart .bar-hit.is-active, .usage-chart .bar-hit:focus-visible { fill: color-mix(in srgb, var(--ink) 6%, transparent); }
+.usage-table { width: 100%; border-collapse: collapse; font-size: var(--t-sm); font-variant-numeric: tabular-nums; }
+.usage-table th, .usage-table td { text-align: left; padding: var(--s1) var(--s2); border-bottom: 1px solid var(--line); }
+.usage-table th { color: var(--muted); font-weight: 500; }
+.usage-table td.num, .usage-table th.num { text-align: right; }
+
+/* ---------- Expressions ---------- */
+.expr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(136px, 1fr)); gap: var(--s4); }
+.expr-slot { display: grid; gap: var(--s2); }
+.expr-edit { display: grid; gap: var(--s2); justify-items: start; }
+.expr-edit .actions { gap: var(--s1); }
+.expr-edit .pick-hint:empty { display: none; }
+.expr-thumb {
+  display: grid; place-items: center; width: 112px; aspect-ratio: 1; overflow: hidden;
+  border-radius: var(--r-md); background: var(--fill); color: var(--muted); font-size: var(--t-sm);
+}
+.expr-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.expr-thumb.is-empty { border: 1.5px dashed var(--line-strong); background: none; }
+/* In chat: the face that matches the reply. The latest reply shows it large. */
+.expr-face { display: block; width: 40px; height: 40px; border-radius: var(--r-sm); overflow: hidden; background: var(--fill); }
+.expr-face img { width: 100%; height: 100%; object-fit: cover; }
+.msg.has-face { grid-template-columns: 40px minmax(0, 1fr); }
+.msg.has-face.is-last { grid-template-columns: 96px minmax(0, 1fr); }
+.msg.is-last .expr-face { width: 96px; height: 96px; border-radius: var(--r-md); box-shadow: var(--shadow-1); }
+@media (max-width: 600px) { .msg.has-face.is-last { grid-template-columns: 72px minmax(0, 1fr); } .msg.is-last .expr-face { width: 72px; height: 72px; } }
+.mood-chip { text-transform: lowercase; }
+
+/* ---------- First-glance clarity ---------- */
+/* Header tools carry a word, not just an icon, where there is room. */
+.tool-label { display: none; }
+@media (min-width: 1180px) {
+  .chat-topbar .tool-btn { width: auto; gap: var(--s2); padding: 0 var(--s3); }
+  .chat-topbar .tool-btn .tool-label { display: inline; font-size: var(--t-sm); }
+  .chat-topbar .tool-btn.has-dot::after { top: 6px; right: 4px; }
+}
+/* Which model answers, always in view. */
+.model-chip {
+  display: inline-flex; align-items: center; gap: var(--s1); max-width: 220px; height: 32px; padding: 0 var(--s2) 0 var(--s3);
+  border: 1.5px solid var(--line-strong); border-radius: var(--r-pill); background: none; color: var(--muted);
+  font-size: var(--t-sm); cursor: pointer; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+.model-chip:hover { border-color: var(--ink); color: var(--ink); }
+.model-chip.is-custom { border-color: var(--accent); color: var(--accent); }
+.model-chip .model-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.model-chip .chev { width: 14px; height: 14px; flex: none; transform: rotate(-90deg); }
+.model-chip.is-loading { opacity: .6; pointer-events: none; }
+/* What is happening in the background. */
+.activity { display: inline-flex; align-items: center; gap: var(--s2); color: var(--ink); font-weight: 500; margin-left: auto; }
+.spin { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--accent); border-right-color: transparent; animation: spin .8s linear infinite; flex: none; }
+/* A cut-off reply says so, next to the fix. */
+.cutoff-bar {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--s2);
+  margin-top: var(--s2); padding: var(--s2) var(--s2) var(--s2) var(--s3);
+  background: var(--accent-soft); border-radius: var(--r-md); font-size: var(--t-sm);
+}
+.menu { max-height: min(62svh, 520px); overflow-y: auto; }
+
+/* Journal */
+.journal-list { display: grid; gap: var(--s3); max-height: 58svh; overflow-y: auto; }
+.journal-entry { padding: var(--s4); background: var(--surface); border-radius: var(--r-md); }
+.journal-entry header { display: flex; justify-content: space-between; gap: var(--s2); font-size: var(--t-sm); color: var(--muted); margin-bottom: var(--s2); }
+.journal-entry .prose { font-family: var(--font-display); font-style: italic; font-size: var(--t-md); }
+
+/* Swipe between versions on touch screens */
+.msg.assistant { transition: transform 180ms var(--ease); touch-action: pan-y; }

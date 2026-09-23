@@ -46,10 +46,27 @@ export const DEFAULT_SETTINGS = {
   // Mature content: "off", "mature" or "explicit". adult records the 18+
   // confirmation; without it the level is treated as off.
   content: { level: "off", adult: false },
+  // Prices in US dollars per million tokens, for the usage estimate. Empty = unknown.
+  usage: { priceIn: "", priceOut: "" },
+  // The bot writes a journal entry after this many new messages, when you leave the chat.
+  journal: { auto: true, every: 12 },
   chatBackground: null,
   backgroundDim: 0.86,
   enterToSend: true,
 };
+
+// ---------- Expressions ----------
+// Pictures of a bot's face for each mood. Replies end with a mood tag the
+// site reads to pick the picture.
+export const EXPRESSIONS = [
+  { key: "neutral", label: "Neutral" },
+  { key: "happy", label: "Happy" },
+  { key: "sad", label: "Sad" },
+  { key: "angry", label: "Angry" },
+  { key: "surprised", label: "Surprised" },
+  { key: "flustered", label: "Flustered" },
+];
+export const moodsOf = (bot) => EXPRESSIONS.map((e) => e.key).filter((k) => bot?.expressions?.[k]);
 
 // ---------- Bond ----------
 // Every bond has six levels at fixed points on the 0–100 meter. What the
@@ -228,7 +245,7 @@ function emit(what) { listeners.forEach((fn) => fn(what)); }
 
 function merge(base, extra) {
   const out = { ...base, ...extra };
-  for (const k of ["gen", "lore", "bond", "memory", "check", "translate", "recap", "confirm", "content"]) out[k] = { ...base[k], ...(extra?.[k] ?? {}) };
+  for (const k of ["gen", "lore", "bond", "memory", "check", "translate", "recap", "confirm", "content", "usage", "journal"]) out[k] = { ...base[k], ...(extra?.[k] ?? {}) };
   return out;
 }
 
@@ -258,6 +275,33 @@ export async function getActivePreset() {
   const [list, settings] = await Promise.all([getPresets(), getSettings()]);
   return list.find((p) => p.id === settings.presetId) ?? list[0];
 }
+
+// ---------- Usage ----------
+// Token counts per day and model. Writes are queued so two requests that
+// finish together do not overwrite each other's numbers.
+const USAGE_DAYS = 90;
+let usageQueue = Promise.resolve();
+export const dayKey = (t = Date.now()) => {
+  const d = new Date(t);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+export const getUsage = () => db.getKV("usage", { days: {} });
+export function recordUsage({ model, prompt, completion, estimated }) {
+  usageQueue = usageQueue.then(async () => {
+    const usage = await getUsage();
+    const key = dayKey();
+    const day = (usage.days[key] ??= { requests: 0, prompt: 0, completion: 0, estimated: 0, models: {} });
+    const m = (day.models[model || "unknown"] ??= { requests: 0, prompt: 0, completion: 0 });
+    for (const t of [day, m]) { t.requests += 1; t.prompt += prompt; t.completion += completion; }
+    if (estimated) day.estimated += 1;
+    const keep = Object.keys(usage.days).sort().slice(-USAGE_DAYS);
+    usage.days = Object.fromEntries(keep.map((k) => [k, usage.days[k]]));
+    await db.setKV("usage", usage);
+    emit("usage");
+  }).catch((err) => console.warn("Usage not recorded:", err.message));
+  return usageQueue;
+}
+export const clearUsage = async () => { await db.setKV("usage", { days: {} }); emit("usage"); };
 
 // ---------- Records ----------
 
