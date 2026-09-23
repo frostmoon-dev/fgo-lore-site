@@ -1921,11 +1921,32 @@ export async function render(main, [botId, chatId, jumpTo]) {
     if (!ok) { $("#edit-box", logInner)?.focus(); return; } // keep editing
     const si = m.swipeIndex ?? 0;
     const put = (text) => { if (m.swipes) m.swipes[si] = text; else m.content = text; };
-    put(value);
+    // A reply edited to end with <mood:happy> changes its face; the tag itself
+    // is not kept in the text, the same as when the model writes it.
+    const meta = m.role === "assistant" ? (m.meta ??= [])[si] ??= {} : null;
+    const moodBefore = meta?.mood;
+    let text = value;
+    let moodNote = "";
+    if (meta && /<mood:/i.test(value)) {
+      const speaker = speakerOf(m);
+      const allowed = moodsOf(speaker);
+      const tagged = /<mood:\s*([a-z]+)\s*>/gi.exec(value)?.[1]?.toLowerCase();
+      const mood = readMood(value, allowed);
+      text = value.replace(/\s*<mood:[^>]*>\s*/gi, "\n").trimEnd();
+      if (mood) meta.mood = mood;
+      else moodNote = allowed.length
+        ? ` ${speaker.name} has no ${tagged ?? "such"} picture. Moods with pictures: ${allowed.join(", ")}.`
+        : ` ${speaker.name} has no expression pictures yet. Add them in the bot editor.`;
+    }
+    put(text);
     editingId = null;
     await persist(); paintLog({ scroll: false });
-    toast("Message edited.", "info", {
-      action: "Undo", onAction: async () => { put(before); await persist(); paintLog({ scroll: false }); },
+    toast(`Message edited.${moodNote}`, moodNote ? "error" : "info", {
+      action: "Undo", onAction: async () => {
+        put(before);
+        if (meta) { if (moodBefore) meta.mood = moodBefore; else delete meta.mood; }
+        await persist(); paintLog({ scroll: false });
+      },
     });
   }
   logInner.addEventListener("keydown", (e) => {
