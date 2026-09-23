@@ -4,10 +4,17 @@
 import { getMeta, setMeta } from "./store.js";
 import { $, esc, icon, openDialog } from "./ui.js";
 
-export const APP_VERSION = "2026.09.23.2";
+export const APP_VERSION = "2026.09.23.3";
 
 // Newest first. Each item says what it is and where it lives.
 export const NEWS = [
+  {
+    version: "2026.09.23.3",
+    items: [
+      ["Moon Cell colours", "Violet and rose, after BB. Turn them on in Settings → Appearance → Colours, or type \"moon\" in the search box."],
+      ["Moon phases", "While something works in a chat, the line under the message box shows a small moon going through its phases."],
+    ],
+  },
   {
     version: "2026.09.23.2",
     items: [

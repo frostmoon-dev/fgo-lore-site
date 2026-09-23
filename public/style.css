@@ -95,6 +95,52 @@
   color-scheme: dark;
 }
 
+/* Moon Cell colours: violet ink and a rose accent, after BB (Moon Cancer).
+   Same roles as the default palette, so every component follows. */
+:root[data-palette="moon"] {
+  --bg: #f1edf5;
+  --surface: #faf8fc;
+  --raised: #ffffff;
+  --ink: #1e1828;
+  --muted: #655c72;
+  --line: #e4ddec;
+  --line-strong: #877d94;
+  --fill: #ebe5f2;
+  --fill-strong: #dfd6ea;
+  --primary: #2b1e3f;
+  --primary-hover: #3e2d58;
+  --on-primary: #faf8fc;
+  --accent: #a8234b;
+  --accent-hover: #8a1a3c;
+  --on-accent: #ffffff;
+  --accent-soft: #f5dde5;
+  --shadow-1: 0 1px 2px rgba(30, 24, 40, .06);
+  --shadow-2: 0 12px 32px rgba(30, 24, 40, .16);
+  --scrim: rgba(30, 24, 40, .45);
+}
+:root[data-palette="moon"][data-theme="dark"] {
+  --bg: #131019;
+  --surface: #1b1723;
+  --raised: #221d2c;
+  --ink: #efeaf6;
+  --muted: #a89fb6;
+  --line: #2c2638;
+  --line-strong: #776d88;
+  --fill: #29233a;
+  --fill-strong: #352d48;
+  --primary: #efeaf6;
+  --primary-hover: #ffffff;
+  --on-primary: #1e1828;
+  --accent: #f07ea2;
+  --accent-hover: #f59ab8;
+  --on-accent: #1a0f14;
+  --accent-soft: #3b1f2c;
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, .35);
+  --shadow-2: 0 12px 32px rgba(0, 0, 0, .55);
+  --scrim: rgba(8, 5, 12, .6);
+}
+
+
 /* Text size (Settings > Appearance). Applied before paint by theme-init.js. */
 html { font-size: 100%; }
 :root[data-text="sm"] { font-size: 93.75%; }
@@ -151,6 +197,10 @@ small { font-size: var(--t-sm); }
   color: var(--ink); text-decoration: none; white-space: nowrap;
 }
 .brand:hover { color: var(--ink); }
+.brand { display: inline-flex; align-items: center; gap: var(--s2); }
+.brand-mark { width: 24px; height: 24px; flex: none; }
+.brand-mark .moon { fill: var(--ink); }
+.brand-mark .star { fill: var(--accent); }
 
 /* Back and Home: one pill, always top left, only away from the home page. */
 .nav-pair {
@@ -1017,6 +1067,14 @@ input[type="search"]::-webkit-search-cancel-button {
 /* What is happening in the background. */
 .activity { display: inline-flex; align-items: center; gap: var(--s2); color: var(--ink); font-weight: 500; margin-left: auto; }
 .spin { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--accent); border-right-color: transparent; animation: spin .8s linear infinite; flex: none; }
+/* Working: a moon going through its phases. Still in reduced motion. */
+.moon-phase { position: relative; width: 12px; height: 12px; border-radius: 50%; overflow: hidden; background: var(--accent); flex: none; }
+.moon-phase::after {
+  content: ""; position: absolute; inset: 0; border-radius: 50%; background: var(--bg);
+  animation: moon-phase 1.6s var(--ease) infinite;
+}
+@keyframes moon-phase { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) { .moon-phase::after { animation: none; transform: translateX(40%); } }
 /* A cut-off reply says so, next to the fix. */
 .cutoff-bar {
   display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--s2);

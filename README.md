@@ -77,6 +77,8 @@ server-side storage of your key.
 - **Favourites**: star a bot on the home page to keep it at the front of the list.
 - **Rename in place**: click a chat's name in the chat header to rename it. The ⋯ menu's
   Rename still offers a suggested title.
+- **Moon Cell colours**: Settings → Appearance → Colours switches between Paper (warm cream
+  and clay, the default) and Moon Cell (violet and rose, after BB), in light and dark.
 - **Edit your persona from a chat**: the pencil beside "Speaking as" edits the persona's
   name and description. The change applies to every chat that uses that persona.
 - **Bonds in group scenes**: every character in a group chat has a bond of their own.

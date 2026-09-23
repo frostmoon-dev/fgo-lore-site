@@ -111,8 +111,12 @@ const themeBtn = $("#theme-toggle");
 function paintThemeButton() {
   const dark = document.documentElement.dataset.theme === "dark";
   themeBtn.setAttribute("aria-label", dark ? "Switch to light theme" : "Switch to dark theme");
-  $$('meta[name="theme-color"]').forEach((m) => m.setAttribute("content", dark ? "#161412" : "#f3efe8"));
+  // The browser bar matches the page, whichever theme and colours are on.
+  const bg = getComputedStyle(document.documentElement).getPropertyValue("--bg").trim();
+  $$('meta[name="theme-color"]').forEach((m) => { m.setAttribute("content", bg); m.removeAttribute("media"); });
 }
+// Settings changes the theme and colours too; follow them from one place.
+new MutationObserver(paintThemeButton).observe(document.documentElement, { attributeFilter: ["data-theme", "data-palette"] });
 themeBtn.addEventListener("click", () => {
   const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
   document.documentElement.dataset.theme = next;

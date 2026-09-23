@@ -6,6 +6,8 @@ try {
   root.dataset.theme = dark ? "dark" : "light";
   const text = localStorage.getItem("textSize");
   const chatText = localStorage.getItem("chatTextSize");
+  const palette = localStorage.getItem("palette");
+  if (palette) root.dataset.palette = palette;
   if (text) root.dataset.text = text;
   if (chatText) root.dataset.chatText = chatText;
 } catch {
