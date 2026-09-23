@@ -4,6 +4,17 @@ import {
   imagePicker, imagePickerHTML, sliderHTML, wireSlider, debounce,
 } from "../ui.js";
 
+const SIZES = [["sm", "Small"], ["md", "Default"], ["lg", "Large"], ["xl", "Largest"]];
+
+function readPref(key, fallback) {
+  try { return localStorage.getItem(key) ?? fallback; } catch { return fallback; }
+}
+
+// A row of radios drawn as one pill.
+function segmentedHTML(name, options, value) {
+  return `<div class="segmented">${options.map(([v, label]) => `<label><input type="radio" name="${name}" value="${v}" ${value === v ? "checked" : ""}><span>${label}</span></label>`).join("")}</div>`;
+}
+
 function bytes(n) {
   if (!n) return "0 KB";
   const units = ["B", "KB", "MB", "GB"];
@@ -13,8 +24,9 @@ function bytes(n) {
 
 export async function render(main) {
   const settings = await getSettings();
-  let themePref = "system";
-  try { themePref = localStorage.getItem("theme") ?? "system"; } catch {}
+  const themePref = readPref("theme", "system");
+  const textPref = readPref("textSize", "md");
+  const chatTextPref = readPref("chatTextSize", "md");
 
   main.innerHTML = `
     <div class="wrap page">
@@ -23,12 +35,26 @@ export async function render(main) {
 
       <div class="card">
         <h2 class="card-title">Appearance</h2>
-        <fieldset class="field">
-          <legend class="field-label">Theme</legend>
-          <div class="actions" role="radiogroup">
-            ${["system", "light", "dark"].map((t) => `<label class="check"><input type="radio" name="theme" value="${t}" ${themePref === t ? "checked" : ""}><span>${t[0].toUpperCase() + t.slice(1)}</span></label>`).join("")}
+        <p class="lead">Saved in this browser and applied straight away.</p>
+        <div class="form-grid">
+          <fieldset class="field">
+            <legend class="field-label">Theme</legend>
+            ${segmentedHTML("theme", [["system", "System"], ["light", "Light"], ["dark", "Dark"]], themePref)}
+          </fieldset>
+          <fieldset class="field">
+            <legend class="field-label">Text size</legend>
+            ${segmentedHTML("text-size", SIZES, textPref)}
+            <p class="hint">Menus, forms and headings across the site.</p>
+          </fieldset>
+          <fieldset class="field">
+            <legend class="field-label">Chat message size</legend>
+            ${segmentedHTML("chat-text-size", SIZES, chatTextPref)}
+            <p class="hint">Only the messages and the box you type in. Adds to the text size above.</p>
+          </fieldset>
+          <div class="text-preview" aria-hidden="true">
+            <div class="msg-body"><p>The tea has gone cold. <em>She sets the cup down without drinking.</em> “You came back later than you said.”</p></div>
           </div>
-        </fieldset>
+        </div>
       </div>
 
       <div class="card">
@@ -111,6 +137,15 @@ export async function render(main) {
     document.documentElement.dataset.theme = dark ? "dark" : "light";
     $("#theme-toggle").setAttribute("aria-label", dark ? "Switch to light theme" : "Switch to dark theme");
   }));
+  // Text sizes live in localStorage so theme-init.js can apply them before paint.
+  const sizePref = (name, storageKey, dataKey) => $$(`input[name="${name}"]`, main).forEach((r) => r.addEventListener("change", () => {
+    try { r.value === "md" ? localStorage.removeItem(storageKey) : localStorage.setItem(storageKey, r.value); } catch {}
+    if (r.value === "md") delete document.documentElement.dataset[dataKey];
+    else document.documentElement.dataset[dataKey] = r.value;
+  }));
+  sizePref("text-size", "textSize", "text");
+  sizePref("chat-text-size", "chatTextSize", "chatText");
+
   $("#enter", main).addEventListener("change", (e) => saveSettings({ enterToSend: e.target.checked }).then(() => toast("Saved.", "ok")));
 
   imagePicker($("#bg", main), {

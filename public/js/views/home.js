@@ -53,7 +53,7 @@ export async function render(main) {
             ${recent.map((c) => {
               const b = byId.get(c.botId);
               return `<li class="list-item">
-                ${avatarHTML(b.avatar, b.name, 36)}
+                <a class="avatar-link" href="#/bot/${b.id}" aria-label="Edit ${esc(b.name)}" title="Edit ${esc(b.name)}">${avatarHTML(b.avatar, b.name, 40)}</a>
                 <div class="grow">
                   <div class="title">${esc(b.name)}</div>
                   <div class="sub">${esc(currentText(c.messages.at(-1)).slice(0, 120))}</div>

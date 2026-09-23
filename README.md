@@ -27,6 +27,8 @@ server-side storage of your key.
 - **Lorebooks**: lore entries live in books. A book can be used by every bot, or linked
   to the bots you choose, so a Fate bot and a sci-fi bot never see each other's world.
   Entries still enter the prompt only when their keywords appear in recent messages.
+- **Text size**: choose a size for the whole site and, separately, for chat messages
+  (Settings > Appearance). Saved in this browser.
 - **Bond meter**: an optional relationship score per chat, shown in the chat header and
   told to the bot, so a conversation that goes badly makes the character colder.
 - **Chat**: streaming replies, stop, regenerate with swipes between versions, edit any
