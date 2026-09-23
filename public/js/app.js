@@ -16,6 +16,21 @@ const routes = [
   [/^\/settings$/, "settings", () => import("./views/settings.js")],
 ];
 
+// Where the Back button goes when there is no earlier page in this visit.
+const parents = [
+  [/^\/lore\/.+/, "#/lore"],
+  [/./, "#/"],
+];
+const parentOf = (path) => parents.find(([re]) => re.test(path))[1];
+
+// Every history entry made in this visit gets a depth, so Back knows
+// whether stepping back stays inside the site or would leave it.
+let depth = -1;
+function trackDepth() {
+  if (Number.isInteger(history.state?.depth)) depth = history.state.depth;
+  else { depth += 1; history.replaceState({ ...history.state, depth }, ""); }
+}
+
 const main = $("#main");
 let current = null;
 let currentHash = location.hash;
@@ -32,12 +47,14 @@ async function route() {
     if (!leave) { skipNext = true; location.hash = currentHash; return; }
   }
   currentHash = location.hash;
+  trackDepth();
   document.title = "Shiru’s Garden";
   current?.cleanup?.();
   current = null;
 
   const path = decodeURIComponent(location.hash.replace(/^#/, "")) || "/";
   const match = routes.map(([re, nav, load]) => ({ m: path.match(re), nav, load })).find((r) => r.m);
+  paintNavPair(path);
   $$("[data-nav]").forEach((a) => a.toggleAttribute("aria-current", false));
   document.body.classList.remove("in-chat");
 
@@ -47,17 +64,41 @@ async function route() {
     return;
   }
   $(`[data-nav="${match.nav}"]`)?.setAttribute("aria-current", "page");
+  main.innerHTML = "";
+  // Only show a placeholder when loading is slow enough to notice.
+  const slow = setTimeout(() => { main.innerHTML = skeletonHTML(match.nav); }, 120);
   try {
     const view = await match.load();
-    main.innerHTML = "";
     current = (await view.render(main, match.m.slice(1))) ?? null;
   } catch (err) {
     console.error(err);
     main.innerHTML = `<div class="wrap page"><div class="note bad">${esc(err.message)}</div></div>`;
   }
+  clearTimeout(slow);
+  main.firstElementChild?.classList.add("route-in");
   if (!path.startsWith("/chat")) window.scrollTo({ top: 0 });
   if (document.activeElement === document.body) main.focus({ preventScroll: true });
 }
+
+function skeletonHTML(nav) {
+  const cards = nav === "home"
+    ? `<div class="bot-grid" style="margin-top:var(--s6)">${'<span class="skeleton skeleton-card"></span>'.repeat(4)}</div>` : "";
+  return `<div class="wrap page" aria-busy="true" aria-label="Loading">
+    <span class="skeleton skeleton-title"></span><span class="skeleton skeleton-line"></span>${cards}</div>`;
+}
+
+// ---------- Back and Home ----------
+// Always in the same place so the header never shifts. Back is only
+// disabled on the home page when there is nowhere earlier to go.
+function paintNavPair(path) {
+  $("#nav-back").disabled = path === "/" && depth <= 0;
+  $("#nav-home").toggleAttribute("aria-current", path === "/");
+  if (path === "/") $("#nav-home").setAttribute("aria-current", "page");
+}
+$("#nav-back").addEventListener("click", () => {
+  if (depth > 0) history.back();
+  else location.hash = parentOf(decodeURIComponent(location.hash.replace(/^#/, "")) || "/");
+});
 
 window.addEventListener("beforeunload", (e) => { if (current?.isDirty?.()) e.preventDefault(); });
 
@@ -66,7 +107,7 @@ const themeBtn = $("#theme-toggle");
 function paintThemeButton() {
   const dark = document.documentElement.dataset.theme === "dark";
   themeBtn.setAttribute("aria-label", dark ? "Switch to light theme" : "Switch to dark theme");
-  $$('meta[name="theme-color"]').forEach((m) => m.setAttribute("content", dark ? "#151413" : "#f4f1ec"));
+  $$('meta[name="theme-color"]').forEach((m) => m.setAttribute("content", dark ? "#161412" : "#f3efe8"));
 }
 themeBtn.addEventListener("click", () => {
   const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";

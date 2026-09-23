@@ -27,8 +27,7 @@ function newChat(bot, personaId) {
 export async function render(main, [botId, chatId]) {
   const bot = await bots.get(botId);
   if (!bot) {
-    if (background) main.style.setProperty("--bg-dim", String(settings.backgroundDim ?? 0.86));
-  main.innerHTML = `<div class="wrap page"><div class="empty"><h2>Not found</h2>
+    main.innerHTML = `<div class="wrap page"><div class="empty"><h2>Not found</h2>
       <p>That bot may have been deleted.</p><div class="actions"><a class="btn btn-primary" href="#/">Back to bots</a></div></div></div>`;
     return;
   }
@@ -42,7 +41,7 @@ export async function render(main, [botId, chatId]) {
     await chats.save(chat);
     list = await chats.forBot(bot.id);
   }
-  history.replaceState(null, "", `#/chat/${bot.id}/${chat.id}`);
+  history.replaceState(history.state, "", `#/chat/${bot.id}/${chat.id}`);
 
   let busy = false;
   let controller = null;
@@ -51,6 +50,7 @@ export async function render(main, [botId, chatId]) {
 
   const persona = () => allPersonas.find((p) => p.id === chat.personaId) ?? activePersona;
   const background = bot.background ?? settings.chatBackground ?? null;
+  if (background) main.style.setProperty("--bg-dim", String(settings.backgroundDim ?? 0.86));
   const bondOn = settings.bond?.enabled !== false && bot.bondEnabled !== false;
 
   // Where this chat begins: its own setting, or the default from Settings.
@@ -72,12 +72,16 @@ export async function render(main, [botId, chatId]) {
   const bondNow = () => bondFrom(bondStart());
   const names = () => ({ char: bot.name, user: persona()?.name || "You" });
 
+  // The bot's picture always opens its editor.
+  const botAvatar = (size, extra = "") =>
+    `<a class="avatar-link${extra}" href="#/bot/${bot.id}" aria-label="Edit ${esc(bot.name)}" title="Edit ${esc(bot.name)}">${avatarHTML(bot.avatar, bot.name, size)}</a>`;
+
   main.innerHTML = `
     <div class="chat-layout">
       <aside class="chat-sidebar" id="sidebar" aria-label="Chats with ${esc(bot.name)}">
         <div class="chat-sidebar-head">
           <div class="chat-sidebar-bot">
-            ${avatarHTML(bot.avatar, bot.name, 44)}
+            ${botAvatar(48)}
             <div class="grow"><div class="name">${esc(bot.name)}</div>
               <a href="#/bot/${bot.id}" class="link-btn">Edit bot</a></div>
           </div>
@@ -85,7 +89,6 @@ export async function render(main, [botId, chatId]) {
         </div>
         <h2 class="sr-only">Chat history</h2>
         <ul class="chat-list" id="chat-list"></ul>
-        <div class="chat-sidebar-foot"><a href="#/" class="link-btn">All bots</a></div>
       </aside>
       <div class="scrim" id="scrim" hidden></div>
 
@@ -93,6 +96,7 @@ export async function render(main, [botId, chatId]) {
         ${background ? `<div class="chat-bg" style="background-image:url('${esc(background)}')" aria-hidden="true"></div>` : ""}
         <div class="chat-topbar">
           <button class="icon-btn only-mobile" type="button" id="open-sidebar" aria-label="Show chats" aria-controls="sidebar" aria-expanded="false">${icon("menu")}</button>
+          ${botAvatar(36, " only-mobile")}
           <div class="title"><span id="chat-title"></span><small id="chat-sub"></small></div>
           ${bondOn ? `<button class="bond" type="button" id="bond" title="Bond with ${esc(bot.name)} · set where it starts">
             <span class="bond-label" id="bond-label"></span>
@@ -243,7 +247,7 @@ export async function render(main, [botId, chatId]) {
     const isBot = m.role === "assistant";
     const p = persona();
     const name = isBot ? bot.name : (p?.name || "You");
-    const av = isBot ? avatarHTML(bot.avatar, bot.name, 36) : avatarHTML(p?.avatar, name, 36);
+    const av = isBot ? botAvatar(40) : avatarHTML(p?.avatar, name, 40);
     const text = currentText(m);
     const isLastBot = isBot && i === lastAssistantIndex() && i === chat.messages.length - 1;
     const streaming = busy && isLastBot;

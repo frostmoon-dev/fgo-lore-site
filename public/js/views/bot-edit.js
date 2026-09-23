@@ -257,7 +257,8 @@ export async function render(main, [id]) {
     await bots.save(bot);
     saved = JSON.stringify(bot);
     toast(`${bot.name} saved.`, "ok");
-    if (isNew) location.hash = `#/bot/${bot.id}`;
+    // Replace, so Back skips the empty "new bot" form.
+    if (isNew) location.replace(`#/bot/${bot.id}`);
     else { paintAlts(); update(); }
     return true;
   }

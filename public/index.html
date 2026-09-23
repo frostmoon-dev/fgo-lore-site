@@ -5,13 +5,23 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Shiru's Garden</title>
 <meta name="description" content="Write your own characters and talk to them through any OpenAI-compatible API or proxy.">
-<meta name="theme-color" content="#f4f1ec" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#151413" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f3efe8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#161412" media="(prefers-color-scheme: dark)">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Shiru's Garden">
+<meta property="og:title" content="Shiru's Garden">
+<meta property="og:description" content="Write your own characters and talk to them through any OpenAI-compatible API or proxy. Everything stays in your browser.">
+<meta property="og:image" content="og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Shiru's Garden: your characters, your API, your browser.">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <script src="js/theme-init.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 <script type="module" src="js/app.js"></script>
 </head>
@@ -20,6 +30,15 @@
 
 <header class="site-header">
   <div class="wrap header-inner">
+    <div class="nav-pair" id="nav-pair" role="group" aria-label="Page navigation">
+      <button class="icon-btn" type="button" id="nav-back" aria-label="Back" title="Back">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>
+      </button>
+      <span class="nav-pair-sep" aria-hidden="true"></span>
+      <a class="icon-btn" href="#/" id="nav-home" aria-label="Home: all bots" title="Home">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11 12 4l8 7M6 9.5V20h4.5v-5h3v5H18V9.5"/></svg>
+      </a>
+    </div>
     <a class="brand" href="#/">Shiru’s Garden</a>
     <nav class="main-nav" aria-label="Main">
       <ul>
