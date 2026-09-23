@@ -1,6 +1,7 @@
 import { bots, newBot, getSettings, getLorebooks, loreForBot } from "../store.js";
 import { toCard, cardPng } from "../card.js";
 import { estimateTokens } from "../prompt.js";
+import { draftBot } from "../ai.js";
 import {
   $, $$, esc, icon, imagePicker, imagePickerHTML, avatarHTML, toast, confirmDialog,
   download, slug, parseTags, autosize, sliderHTML, wireSlider,
@@ -38,6 +39,23 @@ export async function render(main, [id]) {
       </div>
       <form class="editor-layout" id="form" novalidate>
         <div class="form-grid">
+          <div class="card">
+            <details class="more" id="idea-box" ${isNew ? "open" : ""}>
+              <summary>Start from an idea</summary>
+              <div class="form-grid">
+                <p class="hint">Describe the character in a line or two. The model drafts the name, definition, scenario,
+                  first message and example dialogue for you to edit. Nothing is saved until you press Save bot.</p>
+                <div class="field">
+                  <label for="idea">Idea</label>
+                  <textarea id="idea" placeholder="A tired knight who guards a cursed library and hates visitors"></textarea>
+                </div>
+                <div class="actions">
+                  <button class="btn btn-primary" type="button" id="draft">Draft the bot</button>
+                  <span class="hint" id="draft-state" aria-live="polite"></span>
+                </div>
+              </div>
+            </details>
+          </div>
           <div class="card">
             <h2 class="card-title">Identity</h2>
             <p class="lead">How the bot appears in your library and in chat.</p>
@@ -212,9 +230,11 @@ export async function render(main, [id]) {
     $("#token-total", main).textContent = `About ${estimateTokens(perm).toLocaleString()} tokens of definition sent with every message.`;
   }
 
+  let paintAvatar = null;
   function update() {
     collect();
     paintPreview();
+    if (!bot.avatar) paintAvatar?.(); // the letter placeholder follows the name
     for (const el of $$("[data-count]", main)) el.textContent = `~${estimateTokens(bot[el.dataset.count]).toLocaleString()} tokens`;
     $("#tagline-count", main).textContent = `${bot.tagline.length}/140`;
     const dirty = isDirty();
@@ -225,7 +245,7 @@ export async function render(main, [id]) {
   let deleted = false;
   const isDirty = () => { if (deleted) return false; collect(); return JSON.stringify(bot) !== saved; };
 
-  imagePicker($("#avatar", main), {
+  paintAvatar = imagePicker($("#avatar", main), {
     get: () => bot.avatar,
     set: (v) => { bot.avatar = v; update(); },
     name: () => val("#name"),
@@ -264,6 +284,45 @@ export async function render(main, [id]) {
   }
 
   form.addEventListener("submit", (e) => { e.preventDefault(); save(); });
+
+  // ---- Draft from an idea ----
+  async function draftFromIdea() {
+    const idea = val("#idea").trim();
+    const btn = $("#draft", main);
+    const state = $("#draft-state", main);
+    if (!idea) { $("#idea", main).focus(); state.textContent = "Write an idea first."; return; }
+    collect();
+    if ([bot.description, bot.greeting, bot.scenario, bot.examples].some((v) => v.trim())) {
+      const ok = await confirmDialog({
+        title: "Replace what is written?",
+        body: "The draft fills the definition, scenario, first message and example dialogue, replacing what is there now. You can still leave without saving.",
+        confirm: "Replace with a draft",
+      });
+      if (!ok) return;
+    }
+    btn.classList.add("is-loading");
+    btn.setAttribute("aria-busy", "true");
+    state.textContent = "Drafting. This can take a little while.";
+    try {
+      const d = await draftBot({ idea });
+      const set = (id, v) => { if (v) { const el = $(`#${id}`, main); el.value = v; el.dispatchEvent(new Event("input", { bubbles: true })); } };
+      if (!val("#name").trim()) set("name", d.name);
+      for (const k of ["tagline", "tags", "description", "personality", "scenario", "greeting", "examples"]) set(k, d[k]);
+      state.textContent = "Draft ready. Read it through, change anything, then save.";
+      $("#name", main).scrollIntoView({ behavior: "smooth", block: "center" });
+      toast(`Drafted ${d.name || "a bot"}. Nothing is saved yet.`, "ok");
+    } catch (err) {
+      state.textContent = "";
+      toast(err.message, "error");
+    } finally {
+      btn.classList.remove("is-loading");
+      btn.removeAttribute("aria-busy");
+    }
+  }
+  $("#draft", main).addEventListener("click", draftFromIdea);
+  $("#idea", main).addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); draftFromIdea(); }
+  });
   const onKey = (e) => { if ((e.ctrlKey || e.metaKey) && e.key === "s") { e.preventDefault(); save(); } };
   document.addEventListener("keydown", onKey);
 

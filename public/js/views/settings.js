@@ -86,14 +86,30 @@ export async function render(main) {
       </div>
 
       <div class="card">
+        <h2 class="card-title">Memory</h2>
+        <p class="lead">Each chat keeps a running summary, so bots remember what happened after old messages fall out of the context size. You can read and edit it from the book button in a chat.</p>
+        <div class="form-grid">
+          <label class="check"><input type="checkbox" id="mem-enabled" ${settings.memory.enabled ? "checked" : ""}>
+            <span>Update memory automatically<small>Uses one extra request each time it updates.</small></span></label>
+          ${sliderHTML({
+            id: "mem-every", label: "Update after this many new messages", min: 6, max: 60, step: 2,
+            value: settings.memory.every, hint: "Lower keeps the summary fresher but costs more requests.",
+          })}
+        </div>
+      </div>
+
+      <div class="card">
         <h2 class="card-title">Chat</h2>
         <label class="check"><input type="checkbox" id="enter" ${settings.enterToSend ? "checked" : ""}>
           <span>Enter sends the message<small>Off: Enter adds a new line and Ctrl+Enter sends. Handy on phones.</small></span></label>
+        <label class="check"><input type="checkbox" id="check-auto" ${settings.check.auto ? "checked" : ""}>
+          <span>Check every reply for staying in character<small>Flags replies that break the bot's definition. Each check is a second request to your API, so it costs more.</small></span></label>
         <details class="more">
           <summary>Keyboard shortcuts</summary>
           <ul class="hint shortcut-list">
             <li><code>Enter</code> send · <code>Shift+Enter</code> new line</li>
             <li><code>Esc</code> stop the reply being written</li>
+            <li><code>Alt+W</code> write my reply · <code>Alt+D</code> direct the next reply</li>
             <li><code>Ctrl+Enter</code> save an edited message · <code>Esc</code> cancel editing</li>
             <li><code>Ctrl+S</code> save in the bot editor</li>
           </ul>
@@ -158,6 +174,13 @@ export async function render(main) {
   });
   const saveDim = debounce(() => saveSettings({ backgroundDim: Number($("#dim", main).value) }), 300);
   wireSlider(main, "dim", saveDim);
+  $("#mem-enabled", main).addEventListener("change", (e) => saveSettings({ memory: { ...settings.memory, enabled: e.target.checked } }).then((next) => { settings.memory = next.memory; toast("Saved.", "ok"); }));
+  const saveEvery = debounce(async () => {
+    const every = Math.min(60, Math.max(6, Number($("#mem-every", main).value) || 20));
+    settings.memory = (await saveSettings({ memory: { ...settings.memory, every } })).memory;
+  }, 300);
+  wireSlider(main, "mem-every", saveEvery);
+  $("#check-auto", main).addEventListener("change", (e) => saveSettings({ check: { auto: e.target.checked } }).then(() => toast("Saved.", "ok")));
   $("#bond-enabled", main).addEventListener("change", (e) => saveSettings({ bond: { ...settings.bond, enabled: e.target.checked } }).then(() => toast("Saved.", "ok")));
   const saveStart = debounce(() => saveSettings({ bond: { ...settings.bond, start: Number($("#bond-start", main).value) } }), 300);
   wireSlider(main, "bond-start", saveStart);

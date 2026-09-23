@@ -32,6 +32,10 @@ export const DEFAULT_SETTINGS = {
   },
   lore: { scanDepth: 4, maxEntries: 4 },
   bond: { enabled: true, start: 20 },
+  // Chat memory: a running summary, refreshed after this many new messages.
+  memory: { enabled: true, every: 20 },
+  // Check each reply against the bot's definition (costs a second request).
+  check: { auto: false },
   chatBackground: null,
   backgroundDim: 0.86,
   enterToSend: true,
@@ -146,7 +150,7 @@ function emit(what) { listeners.forEach((fn) => fn(what)); }
 
 function merge(base, extra) {
   const out = { ...base, ...extra };
-  for (const k of ["gen", "lore", "bond"]) out[k] = { ...base[k], ...(extra?.[k] ?? {}) };
+  for (const k of ["gen", "lore", "bond", "memory", "check"]) out[k] = { ...base[k], ...(extra?.[k] ?? {}) };
   return out;
 }
 

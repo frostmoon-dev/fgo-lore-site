@@ -18,6 +18,12 @@ const P = {
   info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/>',
   check: '<path d="m5 12 5 5 9-10"/>',
   x: '<path d="M6 6l12 12M18 6 6 18"/>',
+  dots: '<circle cx="5" cy="12" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/><circle cx="19" cy="12" r="1.2" fill="currentColor"/>',
+  book: '<path d="M5 5a2 2 0 0 1 2-2h12v15H7a2 2 0 0 0-2 2V5Z"/><path d="M5 20a2 2 0 0 0 2 1h12v-3"/><path d="M9 7h6M9 11h4"/>',
+  users: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.3A6.5 6.5 0 0 1 21.5 20"/>',
+  branch: '<circle cx="6" cy="5" r="2"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="7" r="2"/><path d="M6 7v10M18 9c0 5-7 3.5-11 8.5"/>',
+  shield: '<path d="M12 3 5 6v5c0 4.5 3 8 7 10 4-2 7-5.5 7-10V6l-7-3Z"/><path d="m9 12 2 2 4-4"/>',
+  megaphone: '<path d="M4 10v4h3l7 4V6l-7 4H4Z"/><path d="M17.5 9a4 4 0 0 1 0 6"/>',
   quill: '<path d="M20 4C12 4 7 9 5 20"/><path d="M8.5 13H14c3 0 5-3 6-9"/>',
   scroll: '<path d="M6 4h11a3 3 0 0 1 0 6h-1v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1h10M6 4a2 2 0 0 0-2 2v11M17 10H8"/>',
 };
@@ -256,6 +262,71 @@ export function imagePickerHTML(id, { label = "Upload picture", hint = "Drag and
       </div>
       <p class="hint pick-hint">${hint}</p>
     </div>`;
+}
+
+// ---------- Menus ----------
+// A small popup list of actions under a button. Arrow keys move, Esc closes
+// and returns focus to the button. items: { label, hint, onSelect, danger,
+// disabled } or "-" for a divider.
+
+let openMenuEl = null;
+export function closeMenu() {
+  if (!openMenuEl) return;
+  const { el, anchor, cleanup } = openMenuEl;
+  openMenuEl = null;
+  cleanup();
+  el.remove();
+  anchor.setAttribute("aria-expanded", "false");
+}
+
+export function openMenu(anchor, items, { align = "end" } = {}) {
+  if (openMenuEl?.anchor === anchor) { closeMenu(); return; }
+  closeMenu();
+  const el = html(`<div class="menu" role="menu">${items.map((it, i) => (it === "-"
+    ? '<div class="menu-sep" role="separator"></div>'
+    : `<button type="button" role="menuitem" class="menu-item${it.danger ? " danger" : ""}" data-i="${i}" ${it.disabled ? "disabled" : ""}>
+        <span>${esc(it.label)}</span>${it.hint ? `<small>${esc(it.hint)}</small>` : ""}</button>`)).join("")}</div>`);
+  document.body.append(el);
+
+  const r = anchor.getBoundingClientRect();
+  const m = el.getBoundingClientRect();
+  const below = r.bottom + 4 + m.height <= innerHeight - 8;
+  el.style.top = `${below ? r.bottom + 4 : Math.max(8, r.top - 4 - m.height)}px`;
+  const left = align === "end" ? r.right - m.width : r.left;
+  el.style.left = `${Math.min(innerWidth - m.width - 8, Math.max(8, left))}px`;
+
+  const buttons = $$(".menu-item:not(:disabled)", el);
+  const focusAt = (i) => buttons[(i + buttons.length) % buttons.length]?.focus();
+  el.addEventListener("keydown", (e) => {
+    const i = buttons.indexOf(document.activeElement);
+    if (e.key === "ArrowDown") { e.preventDefault(); focusAt(i + 1); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); focusAt(i - 1); }
+    else if (e.key === "Home") { e.preventDefault(); focusAt(0); }
+    else if (e.key === "End") { e.preventDefault(); focusAt(-1); }
+    else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); closeMenu(); anchor.focus(); }
+    else if (e.key === "Tab") closeMenu();
+  });
+  el.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-i]");
+    if (!b) return;
+    closeMenu();
+    items[Number(b.dataset.i)].onSelect?.();
+  });
+  const outside = (e) => { if (!el.contains(e.target) && !anchor.contains(e.target)) closeMenu(); };
+  const away = () => closeMenu();
+  document.addEventListener("pointerdown", outside, true);
+  window.addEventListener("resize", away);
+  window.addEventListener("hashchange", away);
+  openMenuEl = {
+    el, anchor,
+    cleanup: () => {
+      document.removeEventListener("pointerdown", outside, true);
+      window.removeEventListener("resize", away);
+      window.removeEventListener("hashchange", away);
+    },
+  };
+  anchor.setAttribute("aria-expanded", "true");
+  focusAt(0);
 }
 
 // ---------- Toasts ----------

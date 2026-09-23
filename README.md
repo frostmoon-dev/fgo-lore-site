@@ -33,6 +33,23 @@ server-side storage of your key.
   answering the bot's latest reply. Type a keyword or rough line first and it becomes a full
   message in your voice. The draft lands in the message box for you to edit, retry or undo;
   nothing is sent until you press Send. Its prompt is editable on the Prompt page.
+- **Memory**: each chat keeps a running summary of what happened, refreshed automatically
+  every few messages (Settings), sent with every reply so bots remember events that have
+  fallen out of the context. Read and edit it from the book button in a chat.
+- **Scene director**: the megaphone button (Alt+D) adds a hidden direction for the next
+  reply only, such as "time skip to nightfall". It never appears in the chat.
+- **Reply nudges**: the Regenerate button offers Shorter, Longer, More emotion, More action
+  and More dialogue for a new version.
+- **Group scenes**: add other bots to a chat from the people button. Pick who replies next,
+  or leave it on Auto (the character you name, otherwise whoever has been quiet longest).
+  Press Send with an empty box to let the next character carry the scene on.
+- **Branches**: start a new chat from any message to try another path; the original stays.
+- **Lore suggestions**: from a chat's ⋯ menu, the model proposes lore entries for lasting
+  facts that came up. Edit, untick, and save them to a lorebook.
+- **Character check**: the shield button on a reply checks it against the bot's definition
+  and can write a new version that fixes what it found. Can run on every reply (Settings).
+- **Start from an idea**: in the bot editor, describe a character in a line and the model
+  drafts every field for you to edit before saving.
 - **Bond meter**: an optional relationship score per chat, shown in the chat header and
   told to the bot, so a conversation that goes badly makes the character colder.
 - **Chat**: streaming replies, stop, regenerate with swipes between versions, edit any

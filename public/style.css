@@ -536,7 +536,7 @@ body.in-chat .site-footer { display: none; }
 .only-mobile { display: none; }
 
 .chat-log { flex: 1; overflow-y: auto; padding: var(--s6) var(--s5) var(--s4); }
-.chat-log-inner { max-width: var(--measure); margin: 0 auto; display: grid; gap: var(--s6); }
+.chat-log-inner { max-width: var(--measure); margin: 0 auto; display: grid; gap: var(--s4); }
 .msg { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: var(--s3); }
 .msg .avatar { --size: 40px; }
 .msg-head { display: flex; align-items: baseline; gap: var(--s2); margin-bottom: var(--s1); }
@@ -592,6 +592,7 @@ body.in-chat .site-footer { display: none; }
 .composer-foot { display: flex; flex-wrap: wrap; gap: var(--s3); justify-content: space-between; align-items: center; margin-top: var(--s2); padding: 0 var(--s2); font-size: var(--t-sm); color: var(--muted); }
 .composer-foot select { width: auto; height: 32px; font-size: var(--t-sm); padding-left: var(--s3); padding-right: var(--s6); background-position: calc(100% - 12px) center; }
 .persona-pick { display: inline-flex; align-items: center; gap: var(--s2); }
+.persona-pick > span { white-space: nowrap; }
 /* Write my reply: sits beside Send, quieter than it. */
 .composer-tool { width: 40px; height: 40px; }
 .composer-tool.is-active { background: var(--fill); color: var(--ink); }
@@ -742,3 +743,73 @@ body.in-chat .site-footer { display: none; }
 @keyframes route-in { from { opacity: 0; } }
 .nav-pair .icon-btn:disabled { color: var(--line-strong); background: none; }
 .nav-pair .icon-btn[aria-current="page"] { background: var(--raised); box-shadow: var(--shadow-1); }
+
+/* ---------- Menus ---------- */
+.menu {
+  position: fixed; z-index: 80; min-width: 200px; max-width: min(320px, calc(100vw - 16px));
+  padding: var(--s1); background: var(--raised); border-radius: var(--r-md); box-shadow: var(--shadow-2);
+  animation: fade-in 140ms var(--ease) both;
+}
+.menu-item {
+  display: flex; flex-direction: column; align-items: flex-start; width: 100%; gap: 2px;
+  padding: var(--s2) var(--s3); border: 0; border-radius: var(--r-sm); background: none;
+  color: var(--ink); font-size: var(--t-ui); text-align: left; cursor: pointer;
+}
+.menu-item small { color: var(--muted); font-size: var(--t-xs); }
+.menu-item:hover, .menu-item:focus-visible { background: var(--fill); outline: none; }
+.menu-item.danger { color: var(--danger); }
+.menu-item:disabled { color: var(--line-strong); cursor: not-allowed; background: none; }
+.menu-sep { height: 1px; margin: var(--s1) var(--s2); background: var(--line); }
+
+/* ---------- Chat tools ---------- */
+/* A small dot marks a tool that holds something (memory saved, cast added). */
+.icon-btn.has-dot { position: relative; }
+.icon-btn.has-dot::after {
+  content: ""; position: absolute; top: 7px; right: 7px; width: 6px; height: 6px;
+  border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 2px var(--bg);
+}
+/* Busy icon button: the icon gives way to a spinner, the size stays. */
+.icon-btn.is-loading { position: relative; color: transparent; pointer-events: none; }
+.icon-btn.is-loading svg { visibility: hidden; }
+.icon-btn.is-loading::before {
+  content: ""; position: absolute; inset: 0; margin: auto; width: 16px; height: 16px; border-radius: 50%;
+  border: 2px solid var(--muted); border-right-color: transparent; animation: spin .7s linear infinite;
+}
+.btn-quiet.is-loading::after { border-color: var(--muted); border-right-color: transparent; }
+
+.direct-bar {
+  display: flex; align-items: center; gap: var(--s2); margin-bottom: var(--s2); min-height: 40px;
+  padding: var(--s1) var(--s1) var(--s1) var(--s4); background: var(--accent-soft); border-radius: var(--r-pill);
+  animation: fade-in 180ms var(--ease) both;
+}
+.direct-label { font-size: var(--t-sm); font-weight: 600; color: var(--accent); flex: none; }
+.direct-bar input[type="text"] {
+  flex: 1; min-width: 0; height: 32px; padding: 0 var(--s2); border: 0; background: none; font-size: var(--t-ui);
+}
+.direct-bar input[type="text"]:focus-visible { box-shadow: none; }
+.direct-bar .icon-btn { width: 32px; height: 32px; }
+
+.check-chip { font-size: var(--t-sm); }
+.check-chip.ok { color: var(--ok); }
+button.check-chip.bad {
+  background: none; border: 0; padding: 0; color: var(--danger); cursor: pointer;
+  text-decoration: underline; text-underline-offset: 3px;
+}
+.issue-list { padding-left: 1.2em; display: grid; gap: var(--s1); }
+
+/* Cast picker */
+.cast-list { display: grid; gap: var(--s1); max-height: 50svh; overflow-y: auto; }
+.cast-row {
+  display: flex; align-items: center; gap: var(--s3); padding: var(--s2) var(--s3);
+  border-radius: var(--r-md); cursor: pointer;
+}
+.cast-row:hover { background: var(--fill); }
+.cast-row .grow { flex: 1; min-width: 0; display: grid; }
+.cast-row .t { font-weight: 500; }
+.cast-row small { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Lore suggestions */
+.sugg-list { display: grid; gap: var(--s3); max-height: 56svh; overflow-y: auto; padding-right: var(--s1); }
+.sugg-item { display: grid; gap: var(--s3); padding: var(--s4); background: var(--surface); border-radius: var(--r-md); }
+.sugg-item .check { padding: 0; font-weight: 500; }
+#sugg .skeleton-line { width: 100%; }
