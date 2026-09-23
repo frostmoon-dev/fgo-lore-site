@@ -13,6 +13,8 @@ try {
   if (chatText) root.dataset.chatText = chatText;
   const chatFont = localStorage.getItem("chatFont");
   if (chatFont) root.dataset.chatFont = chatFont;
+  const chatPic = localStorage.getItem("chatPic");
+  if (chatPic) root.dataset.chatPic = chatPic;
 } catch {
   root.dataset.theme = "light";
   root.dataset.palette = "moon";

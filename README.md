@@ -81,7 +81,8 @@ server-side storage of your key.
   clay), in light and dark. Settings → Appearance → Colours.
 - **BB**: a built-in Moon Cancer bot, written from `bots/BB.md`.
 - **Chat look**: ⋯ → Chat look in a chat sets the bot's background, the dim amount, the font
-  (Rounded, Book or Plain) and the message size, live. The font is also in Settings → Appearance.
+  (Rounded, Book or Plain), the message size and the picture size (Small, Medium, Large), live.
+  The font and picture size are also in Settings → Appearance.
 - **Edit your persona from a chat**: the pencil beside "Speaking as" edits the persona's
   name and description. The change applies to every chat that uses that persona.
 - **Bonds in group scenes**: every character in a group chat has a bond of their own.
@@ -100,7 +101,7 @@ server-side storage of your key.
   writing**, which finishes it in the same message. Also in any last reply's ⋯ menu.
 - **Expressions**: upload a face per mood (neutral, happy, sad, angry, surprised,
   flustered) in the bot editor. Replies end with a hidden mood tag, and the chat shows
-  the matching face, large on the latest reply. Only the moods you fill in are used; a reply
+  the matching face in place of the bot's picture. Only the moods you fill in are used; a reply
   without a mood shows the Neutral face if there is one.
   Kept in backups; not included in exported character cards.
 - **Journal**: bots write a short private diary entry about the chat when you leave after

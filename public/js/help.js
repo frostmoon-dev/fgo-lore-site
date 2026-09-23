@@ -11,8 +11,8 @@ export const NEWS = [
   {
     version: "2026.09.24",
     items: [
-      ["Chat look", "In a chat, ⋯ → Chat look changes the bot's background, how dim it is, the font and the message size."],
-      ["Bigger faces", "Pictures in chats are larger. A bot with a Neutral expression shows it whenever a reply has no mood."],
+      ["Chat look", "In a chat, ⋯ → Chat look changes the bot's background, how dim it is, the font, the message size and the picture size."],
+      ["Bigger faces", "Every picture in a chat is the same large size, faces included. A bot with a Neutral expression shows it whenever a reply has no mood."],
       ["Straight crops", "Cropping no longer squeezes pictures on short screens. Re-crop any that came out stretched."],
       ["Moods from edits", "Editing a reply to end with <mood:happy> changes its expression picture."],
     ],

@@ -616,12 +616,18 @@ body.in-chat .site-footer { display: none; }
 
 .chat-log { flex: 1; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; padding: var(--s6) var(--s5) var(--s4); }
 .chat-log-inner { max-width: var(--measure); margin: 0 auto; display: grid; gap: var(--s4); }
-.msg { display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: var(--s3); }
+/* One picture size for everyone in a chat, faces included. */
+.msg { --pic: 96px; display: grid; grid-template-columns: var(--pic) minmax(0, 1fr); gap: var(--s4); }
+.msg > .avatar, .msg > .avatar-link > .avatar { --size: var(--pic) !important; }
+/* Picture size (Chat look, or Settings → Appearance). */
+:root[data-chat-pic="md"] .msg { --pic: 72px; }
+:root[data-chat-pic="sm"] .msg { --pic: 48px; gap: var(--s3); }
 /* A hairline keeps pictures crisp against any background. */
 .msg > .avatar, .msg > .avatar-link > .avatar, .msg .expr-face { box-shadow: 0 0 0 1px var(--line); }
 @media (max-width: 600px) {
-  .msg { grid-template-columns: 40px minmax(0, 1fr); }
-  .msg > .avatar, .msg > .avatar-link > .avatar { --size: 40px !important; }
+  .msg { --pic: 56px; gap: var(--s3); }
+  :root[data-chat-pic="md"] .msg { --pic: 48px; }
+  :root[data-chat-pic="sm"] .msg { --pic: 40px; }
 }
 .msg-head { display: flex; align-items: baseline; gap: var(--s2); margin-bottom: var(--s1); }
 .msg-name { font-size: var(--t-ui); font-weight: 600; }
@@ -1072,12 +1078,9 @@ input[type="search"]::-webkit-search-cancel-button {
 .expr-thumb img { width: 100%; height: 100%; object-fit: cover; }
 .expr-thumb.is-empty { border: 1.5px dashed var(--line-strong); background: none; }
 /* In chat: the face that matches the reply. The latest reply shows it large. */
-.expr-face { display: block; width: 48px; height: 48px; border-radius: 50%; overflow: hidden; background: var(--fill); }
+.expr-face { display: block; width: var(--pic); height: var(--pic); border-radius: 50%; overflow: hidden; background: var(--fill); }
 .expr-face img { width: 100%; height: 100%; object-fit: cover; }
-.msg.has-face { grid-template-columns: 48px minmax(0, 1fr); }
-.msg.has-face.is-last { grid-template-columns: 96px minmax(0, 1fr); }
-.msg.is-last .expr-face { width: 96px; height: 96px; box-shadow: 0 0 0 1px var(--line), var(--shadow-1); }
-@media (max-width: 600px) { .msg.has-face:not(.is-last) { grid-template-columns: 40px minmax(0, 1fr); } .msg.has-face:not(.is-last) .expr-face { width: 40px; height: 40px; } .msg.has-face.is-last { grid-template-columns: 72px minmax(0, 1fr); } .msg.is-last .expr-face { width: 72px; height: 72px; } }
+
 .mood-chip { text-transform: lowercase; }
 
 /* ---------- First-glance clarity ---------- */
