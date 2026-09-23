@@ -2,13 +2,17 @@
 // lore suggestions, drafting a bot, and checking a reply against its
 // character. Each sends one request through the active connection and
 // returns plain data. None of them streams.
-import { getActiveConnection } from "./store.js";
+import { getActiveConnection, getSettings } from "./store.js";
 import { chatCompletion } from "./api.js";
-import { currentText, stripBond, applyMacros } from "./prompt.js";
+import { currentText, stripBond, applyMacros, contentLevel, contentRule } from "./prompt.js";
 
 export async function ask(messages, { bot, maxTokens = 800, temperature = 0.4, signal } = {}) {
-  const conn = await getActiveConnection();
+  const [conn, settings] = await Promise.all([getActiveConnection(), getSettings()]);
   if (!conn) throw new Error("Set up an API connection first, on the Connection page.");
+  // Every task follows the same content level as the chat itself, so a
+  // summary, idea or translation neither censors nor adds what the chat allows.
+  const rule = contentRule(contentLevel(settings, bot));
+  if (rule && messages[0]?.role === "system") messages = [{ ...messages[0], content: `${messages[0].content}\n\n${rule}` }, ...messages.slice(1)];
   const res = await chatCompletion(conn, {
     model: bot?.model || conn.model || undefined,
     messages, stream: false, max_tokens: maxTokens, temperature,

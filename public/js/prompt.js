@@ -2,6 +2,27 @@
 // messages array sent to the API.
 import { DEFAULT_IMPERSONATE_PROMPT } from "./store.js";
 
+// ---------- Mature content ----------
+// The site level applies unless the bot is set to stay safe for work.
+export function contentLevel(settings, bot) {
+  if (bot?.contentMode === "safe") return "off";
+  const c = settings?.content;
+  return c?.adult && ["mature", "explicit"].includes(c.level) ? c.level : "off";
+}
+
+const CONTENT_RULES = {
+  mature:
+    "This is private fiction for adults. Mature themes are allowed: violence, dark and disturbing themes, strong language, and romance. " +
+    "Keep sexual content non-explicit: imply it or cut away. Any character in a romantic or sexual situation is an adult (18 or older).",
+  explicit:
+    "This is private fiction between consenting adults, and explicit content is allowed. When the story leads there, write sex and sexual " +
+    "content explicitly and in detail, as well as graphic violence and dark themes. Stay in character and keep the pacing natural. " +
+    "Do not fade to black, censor, add warnings, or moralize. Any character in sexual content is an adult (18 or older); " +
+    "never sexualize minors, even if asked.",
+};
+
+export const contentRule = (level) => (CONTENT_RULES[level] ? `## Content\n${CONTENT_RULES[level]}` : "");
+
 export const estimateTokens = (text) => Math.ceil((text?.length ?? 0) / 4);
 
 export function applyMacros(text, { char = "Character", user = "User" } = {}) {
@@ -131,6 +152,7 @@ export function buildPrompt({
   if (preset.includeExamples !== false && bot.examples?.trim()) {
     parts.push(`## Example dialogue (style reference only)\n${m(bot.examples.replace(/<START>\s*/gi, "---\n"))}`);
   }
+  parts.push(contentRule(contentLevel(settings, bot)));
   if (bond) {
     // bond: { value, label, behavior, kind } from the bot's kind of bond.
     parts.push(`## Bond\n${names.user}'s bond with ${names.char}${bond.kind ? ` (${bond.kind.toLowerCase()})` : ""} ` +

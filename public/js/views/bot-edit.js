@@ -7,6 +7,8 @@ import {
   download, slug, parseTags, autosize, sliderHTML, wireSlider,
 } from "../ui.js";
 
+const CONTENT_NAMES = { off: "Off", mature: "Mature", explicit: "Explicit" };
+
 const TEXT_FIELDS = [
   { key: "description", label: "Definition", rows: "tall", required: true,
     hint: "Who they are, how they think, how they talk, and their rules. This is the core of the bot. Use <code>{{char}}</code> and <code>{{user}}</code>." },
@@ -28,6 +30,7 @@ export async function render(main, [id]) {
   bot.bondKind ??= "affection";
   bot.bondLevels ??= null;
   bot.bondMilestones ??= true;
+  bot.contentMode ??= "site";
   const settings = await getSettings();
   const books = await getLorebooks();
   let saved = JSON.stringify(bot);
@@ -123,6 +126,14 @@ export async function render(main, [id]) {
                     <span>${esc(bk.name)}${bk.global ? "<small>Used with every bot.</small>" : (bk.description ? `<small>${esc(bk.description)}</small>` : "")}</span>
                   </label>`).join("")}</div>
               </fieldset>
+              <div class="field">
+                <label for="content-mode">Mature content</label>
+                <select id="content-mode" aria-describedby="content-mode-hint">
+                  <option value="site" ${bot.contentMode !== "safe" ? "selected" : ""}>Follow the site setting (${CONTENT_NAMES[settings.content?.adult ? settings.content.level : "off"] ?? "Off"})</option>
+                  <option value="safe" ${bot.contentMode === "safe" ? "selected" : ""}>Always safe for work</option>
+                </select>
+                <p class="hint" id="content-mode-hint">Set the site level in <a href="#/settings">Settings</a>. Safe for work keeps this bot's chats clean whatever the site allows.</p>
+              </div>
               <label class="check"><input type="checkbox" id="bond-on" ${bot.bondEnabled === false ? "" : "checked"}>
                 <span>Track the bond with this bot<small>Shows a bond meter in the chat header and lets it shape how the bot treats you.</small></span></label>
               <div class="bond-setup form-grid" id="bond-setup">
@@ -251,6 +262,7 @@ export async function render(main, [id]) {
       ? BOND_POINTS.map((_, i) => ({ label: val(`#bl-label-${i}`).trim(), behavior: val(`#bl-behavior-${i}`).trim() }))
       : null;
     bot.bondMilestones = $("#bond-milestones", main).checked;
+    bot.contentMode = val("#content-mode");
     bot.gen = {};
     for (const k of ["temperature", "max_tokens"]) {
       const v = val(`#g-${k}`);

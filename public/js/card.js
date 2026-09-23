@@ -90,6 +90,7 @@ function fromCard(json) {
     model: ext.model ?? "",
     gen: ext.gen ?? {},
     avatar: ext.avatar ?? null,
+    ...(ext.contentMode === "safe" ? { contentMode: "safe" } : {}),
     ...(ext.bondKind ? { bondKind: ext.bondKind, bondLevels: ext.bondLevels ?? null, bondMilestones: ext.bondMilestones !== false } : {}),
   });
   const lore = (d.character_book?.entries ?? []).map((e, i) =>
@@ -149,7 +150,7 @@ export function toCard(bot, loreEntries = []) {
       } : undefined,
       extensions: { shirus_garden: {
         tagline: bot.tagline, model: bot.model, gen: bot.gen,
-        bondKind: bot.bondKind, bondLevels: bot.bondLevels, bondMilestones: bot.bondMilestones,
+        bondKind: bot.bondKind, bondLevels: bot.bondLevels, bondMilestones: bot.bondMilestones, contentMode: bot.contentMode,
       } },
     },
   };
