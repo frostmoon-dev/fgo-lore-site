@@ -170,7 +170,7 @@ export async function render(main) {
 
   $("#backup-now", main)?.addEventListener("click", async (e) => {
     const card = e.currentTarget.closest("section");
-    download(`shirus-garden-backup-${new Date().toISOString().slice(0, 10)}.json`, await exportAll({ includeKeys: false }));
+    download(`moonpaper-backup-${new Date().toISOString().slice(0, 10)}.json`, await exportAll({ includeKeys: false }));
     await markBackedUp();
     card.remove();
     toast("Backup downloaded. API keys were left out; keep the file somewhere safe.", "ok");

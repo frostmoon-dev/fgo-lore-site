@@ -404,6 +404,7 @@ export async function seed() {
 
 // ---------- Backup ----------
 
+// Kept from the site's first name (Shiru's Garden) so every backup, old or new, uses one format.
 export const BACKUP_FORMAT = "shirus-garden-backup";
 // The old name is still accepted, so earlier backups restore.
 const BACKUP_FORMATS = [BACKUP_FORMAT, "lore-archive-backup"];

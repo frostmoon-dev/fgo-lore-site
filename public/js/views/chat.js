@@ -212,7 +212,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
         <div class="chat-topbar">
           <button class="icon-btn only-mobile" type="button" id="open-sidebar" aria-label="Show chats" aria-controls="sidebar" aria-expanded="false">${icon("menu")}</button>
           ${botAvatar(bot, 36, " only-mobile")}
-          <div class="title"><span id="chat-title"></span> <span class="content-tag" id="content-tag" hidden></span><small id="chat-sub"></small></div>
+          <div class="title"><span class="title-line"><button class="title-edit" type="button" id="chat-title" title="Rename this chat"></button><input type="text" class="title-input" id="title-input" aria-label="Chat name" maxlength="80" autocomplete="off" hidden><span class="content-tag" id="content-tag" hidden></span></span><small id="chat-sub"></small></div>
           ${bondOn ? `<button class="bond" type="button" id="bond" title="Bond with ${esc(bot.name)} · set where it starts">
             <span class="bond-label" id="bond-label"></span>
             <span class="bond-bar"><span class="bond-fill" id="bond-fill"></span></span>
@@ -268,9 +268,12 @@ export async function render(main, [botId, chatId, jumpTo]) {
               <button class="send-btn" type="submit" id="send" aria-label="Send message">${icon("send")}</button>
             </div>
             <div class="composer-foot">
+              <span class="persona-group">
               <label class="persona-pick"><span>Speaking as</span>
                 <select id="persona">${allPersonas.map((p) => `<option value="${p.id}">${esc(p.name || "Unnamed")}</option>`).join("")}</select>
               </label>
+              <button class="icon-btn persona-edit" type="button" id="persona-edit" aria-label="Edit this persona" title="Edit this persona" ${allPersonas.length ? "" : "hidden"}>${icon("edit")}</button>
+              </span>
               <label class="persona-pick" id="speaker-pick" hidden><span>Next to reply</span>
                 <select id="speaker"></select>
               </label>
@@ -389,7 +392,8 @@ export async function render(main, [botId, chatId, jumpTo]) {
   }
 
   function paintHeader() {
-    $("#chat-title", main).textContent = chat.title;
+    $("#chat-title", main).innerHTML = `<span>${esc(chat.title)}</span>${icon("edit")}`;
+    $("#chat-title", main).setAttribute("aria-label", `Chat name: ${chat.title}. Rename`);
     const p = persona();
     $("#chat-sub", main).textContent = `with ${everyone().map((b) => b.name).join(", ")}${p ? ` · as ${p.name}` : ""}`;
     paintModelChip();
@@ -399,7 +403,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
     tag.textContent = level === "explicit" ? "18+ explicit" : "18+";
     tag.title = level === "explicit" ? "Explicit content is on for this chat (Settings)" : "Mature content is on for this chat (Settings)";
     $("#persona", main).value = p?.id ?? "";
-    document.title = `${bot.name} · Shiru’s Garden`;
+    document.title = `${bot.name} · MoonPaper`;
     // Speaker picker only matters when more than one bot can answer.
     const pick = $("#speaker-pick", main);
     const select = $("#speaker", main);
@@ -1935,6 +1939,69 @@ export async function render(main, [botId, chatId, jumpTo]) {
     await persist(); paintHeader(); paintLog({ scroll: false });
   });
 
+  // Rename in place: click the name, type, Enter saves, Esc cancels.
+  const titleBtn = $("#chat-title", main);
+  const titleInput = $("#title-input", main);
+  function startRename() {
+    if (!titleInput.hidden) return;
+    titleInput.value = chat.title;
+    titleBtn.hidden = true;
+    titleInput.hidden = false;
+    titleInput.focus(); titleInput.select();
+  }
+  async function endRename(save) {
+    if (titleInput.hidden) return;
+    const title = titleInput.value.trim();
+    titleInput.hidden = true;
+    titleBtn.hidden = false;
+    if (save && title && title !== chat.title) {
+      chat.title = title;
+      await persist(); paintHeader();
+      toast(`Renamed to “${title}”.`);
+    }
+    titleBtn.focus();
+  }
+  titleBtn.addEventListener("click", startRename);
+  titleInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); endRename(true); }
+    if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); endRename(false); }
+  });
+  titleInput.addEventListener("blur", () => endRename(true));
+
+  // Edit who you are without leaving the chat. The persona is shared, so
+  // the dialog says which other chats it changes.
+  function editPersona() {
+    const p = persona();
+    if (!p) return;
+    const dlg = openDialog(`
+      <form method="dialog" class="dialog-body">
+        <h2>Edit persona</h2>
+        <div class="field"><label for="pe-name">Name</label>
+          <input type="text" id="pe-name" value="${esc(p.name)}" maxlength="60" autocomplete="off"></div>
+        <div class="field"><label for="pe-desc">Description</label>
+          <textarea id="pe-desc" class="tall" placeholder="Appearance, personality, background, how others see you…">${esc(p.description ?? "")}</textarea>
+          <p class="hint">Bots read this to know who you are. It changes ${esc(p.name || "this persona")} in every chat that uses it. Picture and more on the <a href="#/personas">Personas</a> page.</p></div>
+        <div class="dialog-actions">
+          <button class="btn btn-ghost" value="cancel" formnovalidate>Cancel</button>
+          <button class="btn btn-primary" value="ok">Save</button>
+        </div>
+      </form>`, {
+      onClose: async (v) => {
+        if (v !== "ok") return;
+        p.name = $("#pe-name", dlg).value.trim() || p.name;
+        p.description = $("#pe-desc", dlg).value.trim();
+        await personas.save(p);
+        const opt = $(`#persona option[value="${CSS.escape(p.id)}"]`, main);
+        if (opt) opt.textContent = p.name || "Unnamed";
+        paintHeader(); paintLog({ scroll: false });
+        toast(`${p.name} saved. The next reply uses the new description.`);
+      },
+    });
+    $("#pe-desc", dlg).focus();
+    $("a", dlg).addEventListener("click", () => dlg.close("cancel"));
+  }
+  $("#persona-edit", main).addEventListener("click", editPersona);
+
   if (bondOn) $("#bond", main).addEventListener("click", openBonds);
   $("#memory", main).addEventListener("click", openMemory);
   $("#cast", main).addEventListener("click", openCast);
@@ -2094,6 +2161,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
       c("See the prompt", previewPrompt, "debug context"),
       c("Usage in this chat", openChatUsage, "tokens cost"),
       c("Rename chat", rename, "title"),
+      c("Edit my persona", editPersona, "who i am description me user"),
       c("Export chat", exportChat, "download save"),
       c("Delete chat", deleteChat, "remove"),
     ];

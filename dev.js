@@ -58,5 +58,5 @@ http.createServer(async (req, res) => {
   }
 }).listen(PORT, "127.0.0.1", () => {
   // 127.0.0.1 = only your own computer can open the site.
-  console.log(`Shiru’s Garden running at http://localhost:${PORT}`);
+  console.log(`MoonPaper running at http://localhost:${PORT}`);
 });

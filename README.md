@@ -1,4 +1,4 @@
-# Shiru’s Garden
+# MoonPaper
 
 A roleplay chat site for your own characters. Write bots, give them pictures, set up a
 world of lore, choose who you are, and talk to them through any OpenAI-compatible API
@@ -75,6 +75,10 @@ server-side storage of your key.
 - **Persona per bot**: each bot remembers who you last were with it, and new chats with it
   start as that persona.
 - **Favourites**: star a bot on the home page to keep it at the front of the list.
+- **Rename in place**: click a chat's name in the chat header to rename it. The ⋯ menu's
+  Rename still offers a suggested title.
+- **Edit your persona from a chat**: the pencil beside "Speaking as" edits the persona's
+  name and description. The change applies to every chat that uses that persona.
 - **Bonds in group scenes**: every character in a group chat has a bond of their own.
   The bond meter opens all of them, with a chart of how each moved over the chat.
 - **Rewind**: from a message's ⋯ menu, delete every message after it and continue from

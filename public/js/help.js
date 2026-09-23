@@ -4,10 +4,18 @@
 import { getMeta, setMeta } from "./store.js";
 import { $, esc, icon, openDialog } from "./ui.js";
 
-export const APP_VERSION = "2026.09.23";
+export const APP_VERSION = "2026.09.23.2";
 
 // Newest first. Each item says what it is and where it lives.
 export const NEWS = [
+  {
+    version: "2026.09.23.2",
+    items: [
+      ["A new name: MoonPaper", "Same site, same data. Only the name and icon changed."],
+      ["Rename in the header", "Click a chat's name at the top to rename it. Enter saves, Esc cancels."],
+      ["Edit your persona in a chat", "The pencil beside \"Speaking as\" edits who you are without leaving the chat."],
+    ],
+  },
   {
     version: "2026.09.23",
     items: [
@@ -22,7 +30,7 @@ export const NEWS = [
 ];
 
 const STEPS = [
-  { icon: "book", title: "Welcome to Shiru's Garden",
+  { icon: "book", title: "Welcome to MoonPaper",
     body: "Write your own characters and talk to them through your own AI connection. Bots, chats and keys stay in this browser; nothing is uploaded." },
   { icon: "info", title: "1. Connect your AI",
     body: "Add your API key or proxy on the Connection page. The dot at the top turns green when replies are working.",
@@ -75,7 +83,7 @@ export function showTour() {
 export function showWhatsNew() {
   openDialog(`<div class="dialog-body">
     <h2>What's new</h2>
-    ${NEWS.map((n) => `<ul class="news-list">${n.items.map(([t, d]) => `<li><strong>${esc(t)}</strong><span>${esc(d)}</span></li>`).join("")}</ul>`).join("")}
+    ${NEWS.map((n, i) => `${i === 1 ? `<h3 class="news-earlier">Earlier</h3>` : ""}<ul class="news-list">${n.items.map(([t, d]) => `<li><strong>${esc(t)}</strong><span>${esc(d)}</span></li>`).join("")}</ul>`).join("")}
     <form method="dialog" class="dialog-actions"><button class="btn btn-primary">Close</button></form>
   </div>`, { onClose: () => setMeta({ whatsNewSeen: APP_VERSION }) });
 }
