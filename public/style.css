@@ -929,3 +929,13 @@ input[type="search"]::-webkit-search-cancel-button {
   border-radius: var(--r-pill); background: var(--accent-soft); color: var(--accent);
   font-size: var(--t-xs); font-weight: 600; letter-spacing: .02em;
 }
+
+/* Message box: the text always takes the spare room. On a phone it gets the
+   full width, and the buttons move to a row underneath it. */
+.composer-box textarea { flex: 1 1 auto; min-width: 0; }
+@media (max-width: 600px) {
+  .composer-box { flex-wrap: wrap; row-gap: 0; }
+  .composer-box textarea { flex: 1 0 100%; }
+  .composer-box .hide-narrow { display: none; }
+  .composer-box .send-btn { margin-left: auto; }
+}
