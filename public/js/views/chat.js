@@ -10,8 +10,12 @@ import {
 } from "../prompt.js";
 import {
   summarize, suggestLore, checkCharacter, transcript, suggestReplies, translate, updateScene, recap, storyFrom, nameChat,
-  journalEntry, surpriseEvent,
+  journalEntry, surpriseEvent, writeChapter,
 } from "../ai.js";
+import {
+  memoryContext, liveChapters, windowStart as memoryWindowStart, autoChapters, pendingChapters,
+  chaptersToFold, recall, recallDocs, parseChapter, cachedTokens, trimMemory, KEEP_RECENT,
+} from "../memory.js";
 import { bondChartHTML, wireBondChart } from "../chart.js";
 import { renderMarkdown } from "../markdown.js";
 import {
@@ -412,9 +416,10 @@ export async function render(main, [botId, chatId, jumpTo]) {
     select.title = "Auto picks the character your message names, otherwise whoever has been quiet longest.";
     input.placeholder = placeholderText();
     const mem = $("#memory", main);
-    mem.classList.toggle("has-dot", !!chat.memory?.text?.trim());
+    const remembered = !!(chat.memory?.text?.trim() || chat.memory?.facts?.trim() || liveChapters(chat).length);
+    mem.classList.toggle("has-dot", remembered);
     mem.classList.toggle("is-loading", memoryBusy);
-    mem.setAttribute("aria-label", memoryBusy ? "Memory, updating" : chat.memory?.text ? "Memory" : "Memory, empty");
+    mem.setAttribute("aria-label", memoryBusy ? "Memory, updating" : remembered ? "Memory" : "Memory, empty");
     $("#cast", main).classList.toggle("has-dot", group());
     const sc = $("#scene", main);
     sc.classList.toggle("has-dot", !!chat.scene?.text?.trim());
@@ -481,7 +486,10 @@ export async function render(main, [botId, chatId, jumpTo]) {
     }
     if (meta.note) info.push(`<span class="chip" title="${esc(meta.note)}">directed</span>`);
     if (meta.lore?.length) info.push(meta.lore.map((t) => `<span class="chip" title="Lore used">${esc(t)}</span>`).join(""));
-    if (meta.usage) info.push(`<span title="Tokens in / out">${meta.usage.prompt_tokens ?? "?"} → ${meta.usage.completion_tokens ?? "?"} tokens</span>`);
+    if (meta.usage) {
+      const cached = cachedTokens(meta.usage);
+      info.push(`<span title="Tokens in / out${cached ? "; reused from the provider's cache" : ""}">${meta.usage.prompt_tokens ?? "?"} → ${meta.usage.completion_tokens ?? "?"} tokens${cached ? ` · ${cached} cached` : ""}</span>`);
+    }
     if (meta.finish === "length" && !isLastBot) info.push(`<span title="The reply hit the max reply tokens limit">cut off</span>`);
     if (meta.mood) info.unshift(`<span class="chip mood-chip" title="${esc(name)}'s expression">${esc(meta.mood)}</span>`);
     const speakerBond = isBot && bondOnFor(speaker);
@@ -667,11 +675,11 @@ export async function render(main, [botId, chatId, jumpTo]) {
 
     const [freshSettings, preset, loreEntries] = await Promise.all([getSettings(), getActivePreset(), loreForBot(speaker)]);
     const beforeBond = bondFor(speaker);
+    const hist = withSpeakers(chat.messages.slice(0, chat.messages.indexOf(target) + (kind === "continue" ? 1 : 0)));
     const prompt = buildPrompt({
-      bot: speaker, persona: persona(), preset, settings: freshSettings, loreEntries,
-      history: withSpeakers(chat.messages.slice(0, chat.messages.indexOf(target) + (kind === "continue" ? 1 : 0))),
+      bot: speaker, persona: persona(), preset, settings: freshSettings, loreEntries, history: hist,
       bond: withBond ? beforeBond : null,
-      memory: chat.memory?.text ?? "", scene: chat.scene?.text ?? "", note: fullNote, cast: group() ? others(speaker) : [],
+      ...memoryArgs(hist), scene: chat.scene?.text ?? "", note: fullNote, cast: group() ? others(speaker) : [],
     });
     const body = {
       model: chat.model || speaker.model || conn.model || undefined,
@@ -743,7 +751,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
         delete chat.pendingMilestones[speaker.id];
       }
       window.dispatchEvent(new CustomEvent("api-status", { detail: true }));
-      if (prompt.dropped > 0 && !chat.warnedTrim && !chat.memory?.text) {
+      if (prompt.dropped > 0 && !chat.warnedTrim && !chat.memory?.text && !liveChapters(chat).length) {
         chat.warnedTrim = true;
         toast(`The chat is longer than the context size, so the oldest ${prompt.dropped} messages were left out. Memory keeps a summary of them.`);
       }
@@ -787,19 +795,53 @@ export async function render(main, [botId, chatId, jumpTo]) {
     return transcript(chat.messages.slice(from, to), nameOf, namesFor());
   }
 
-  async function updateMemory({ quiet = false } = {}) {
+  // What buildPrompt needs from the layered memory, for a given history.
+  function memoryArgs(hist) {
+    const ctx = memoryContext(chat);
+    // Recall looks for old moments that share names or rarer words with
+    // the last two messages.
+    const query = hist.slice(-2).map((m) => stripBond(currentText(m))).join("\n");
+    const recalled = recall(recallDocs(chat, { nameOf, textOf: (m) => stripBond(currentText(m)), start: ctx.windowStart }), query);
+    return { memory: ctx.story, facts: ctx.facts, chapters: ctx.chapters, windowStart: ctx.windowStart, recalled };
+  }
+
+  const memoryEvery = (s = settings) => Math.max(4, Number(s.memory?.every) || 20);
+
+  // Writes chapters for messages that have left the recent part, then folds
+  // old chapters into the story once enough have piled up. `all` also
+  // covers the newest messages (Update now).
+  async function updateMemory({ quiet = false, all = false, every = memoryEvery() } = {}) {
     if (memoryBusy) return false;
-    const upTo = chat.messages.length;
-    const from = Math.min(chat.memory?.upTo ?? 0, upTo);
-    if (from >= upTo && chat.memory?.text) { if (!quiet) toast("Memory already covers every message."); return false; }
+    chat.chapters = liveChapters(chat);
+    const ranges = all ? pendingChapters(chat, every, { all: true }) : autoChapters(chat, every);
+    if (!ranges.length && !chaptersToFold(chat).length) {
+      if (!quiet) toast("Memory already covers every message.");
+      return false;
+    }
     memoryBusy = true;
     setActivity("memory", "Updating memory…");
     paintHeader();
     try {
-      const text = await summarize({ bot, names: namesFor(), previous: chat.memory?.text ?? "", lines: memoryLines(from, upTo) });
-      if (!text) throw new Error("The model sent back an empty summary.");
-      chat.memory = { auto: chat.memory?.auto ?? true, text, upTo, updatedAt: now() };
-      await persist();
+      for (const r of ranges) {
+        const { chapter, facts } = parseChapter(await writeChapter({
+          bot, names: namesFor(), facts: chat.memory?.facts ?? "", lines: memoryLines(r.from, r.to),
+        }));
+        if (!chapter) throw new Error("The model sent back an empty chapter.");
+        const nextFacts = facts || chat.memory?.facts || "";
+        chat.chapters.push({ id: uid(), from: r.from, to: r.to, text: chapter, factsAfter: nextFacts, at: now() });
+        chat.memory = { auto: true, text: "", folded: 0, ...chat.memory, facts: nextFacts, updatedAt: now() };
+        await persist();
+      }
+      const fold = chaptersToFold(chat);
+      if (fold.length) {
+        const text = await summarize({
+          bot, names: namesFor(), previous: chat.memory?.text ?? "",
+          lines: fold.map((c) => `Messages ${c.from + 1}–${c.to}:\n${c.text}`).join("\n\n"),
+        });
+        if (!text) throw new Error("The model sent back an empty summary.");
+        chat.memory = { ...chat.memory, text, folded: Math.min(chat.memory?.folded ?? 0, chat.chapters.length) + fold.length, updatedAt: now() };
+        await persist();
+      }
       if (!quiet) toast("Memory updated.", "ok");
       return true;
     } catch (err) {
@@ -814,23 +856,42 @@ export async function render(main, [botId, chatId, jumpTo]) {
 
   function maybeRemember(s) {
     if (s.memory?.enabled === false || chat.memory?.auto === false) return;
-    const every = Math.max(4, Number(s.memory?.every) || 20);
-    if (chat.messages.length - (chat.memory?.upTo ?? 0) >= every) updateMemory({ quiet: true });
+    const every = memoryEvery(s);
+    if (autoChapters(chat, every).length || chaptersToFold(chat).length) updateMemory({ quiet: true, every });
   }
 
   function openMemory() {
-    const mem = chat.memory ?? { text: "", upTo: 0, auto: true };
+    const mem = chat.memory ?? { text: "", facts: "", auto: true };
+    const live = liveChapters(chat);
+    const folded = Math.min(mem.folded ?? 0, live.length);
+    const start = memoryWindowStart(chat);
+    const chapterHTML = (c, i) => `
+      <details class="more chapter"${i >= folded ? " open" : ""}>
+        <summary>Messages ${c.from + 1}–${c.to} <span class="count">${i < folded ? "folded into the story" : "sent with every reply"}</span></summary>
+        <label class="sr-only" for="ch-${c.id}">Chapter for messages ${c.from + 1} to ${c.to}</label>
+        <textarea id="ch-${c.id}" data-chapter="${c.id}">${esc(c.text)}</textarea>
+      </details>`;
     const dlg = openDialog(`
-      <form method="dialog" class="dialog-body">
+      <form method="dialog" class="dialog-body memory-dialog">
         <h2>Memory</h2>
-        <p class="hint">A running summary of this chat, sent with every reply so ${esc(bot.name)} remembers what happened
-          even after old messages fall out of the context. Edit it freely.</p>
+        <p class="hint">How ${esc(bot.name)} remembers a long chat without sending all of it. The newest messages (at least ${KEEP_RECENT})
+          go word for word. Older ones become short chapters; older chapters fold into the story so far; lasting facts stay in their own list.
+          Old moments come back on their own when the chat mentions them again. Edit anything here.</p>
+        <p class="memory-status" id="mem-status"></p>
         <div class="field">
-          <label for="mem-text">Story so far <span class="count" id="mem-status"></span></label>
-          <textarea id="mem-text" class="tall" placeholder="Nothing yet. Press Update now, or keep chatting and it fills in on its own.">${esc(mem.text ?? "")}</textarea>
+          <label for="mem-facts">Key facts <span class="count">always sent</span></label>
+          <textarea id="mem-facts" placeholder="Names, promises, secrets, injuries, what people own… Filled in with each chapter.">${esc(mem.facts ?? "")}</textarea>
+        </div>
+        <div class="field">
+          <label for="mem-text">Story so far <span class="count">always sent</span></label>
+          <textarea id="mem-text" placeholder="Older chapters are folded in here once a few have piled up.">${esc(mem.text ?? "")}</textarea>
+        </div>
+        <div class="field">
+          <span class="field-label">Chapters <span class="count">${live.length ? `${live.length} so far` : "none yet"}</span></span>
+          <div class="chapters">${live.length ? live.map(chapterHTML).reverse().join("") : `<p class="hint">The first chapter is written after ${memoryEvery() + KEEP_RECENT} messages, or press Update now.</p>`}</div>
         </div>
         <label class="check"><input type="checkbox" id="mem-auto" ${mem.auto !== false ? "checked" : ""}>
-          <span>Update automatically<small>After every ${settings.memory?.every ?? 20} new messages. Change the number in Settings.</small></span></label>
+          <span>Update automatically<small>A chapter every ${memoryEvery()} messages. Change the number in Settings.</small></span></label>
         <div class="dialog-actions">
           <button class="btn btn-quiet push" type="button" id="mem-now">Update now</button>
           <button class="btn btn-ghost" value="cancel" formnovalidate>Cancel</button>
@@ -840,34 +901,35 @@ export async function render(main, [botId, chatId, jumpTo]) {
       wide: true,
       onClose: async (v) => {
         if (v !== "ok") return;
-        const text = $("#mem-text", dlg).value.trim();
-        chat.memory = { ...(chat.memory ?? { upTo: 0 }), text, auto: $("#mem-auto", dlg).checked, updatedAt: now() };
+        for (const ta of $$("[data-chapter]", dlg)) {
+          const c = (chat.chapters ?? []).find((x) => x.id === ta.dataset.chapter);
+          if (c && ta.value.trim()) c.text = ta.value.trim();
+        }
+        chat.memory = {
+          folded: 0, ...(chat.memory ?? {}),
+          text: $("#mem-text", dlg).value.trim(), facts: $("#mem-facts", dlg).value.trim(),
+          auto: $("#mem-auto", dlg).checked, updatedAt: now(),
+        };
         await persist(); paintHeader();
         toast("Memory saved.", "ok");
       },
     });
-    const ta = $("#mem-text", dlg);
-    autosize(ta);
-    const status = () => {
-      const m = chat.memory;
-      $("#mem-status", dlg).textContent = m?.text
-        ? `covers ${Math.min(m.upTo ?? 0, chat.messages.length)} of ${chat.messages.length} messages · ${timeAgo(m.updatedAt)}`
-        : "empty";
-    };
-    status();
+    $$("textarea", dlg).forEach((ta) => autosize(ta));
+    $("#mem-status", dlg).textContent = chat.messages.length
+      ? `${start ? `Messages 1–${start} are remembered through ${[live.length && "chapters", mem.text?.trim() && "the story so far"].filter(Boolean).join(" and ") || "memory"}. ` : ""}` +
+        `The latest ${chat.messages.length - start} message${chat.messages.length - start === 1 ? " is" : "s are"} sent word for word.` +
+        `${mem.updatedAt ? ` Updated ${timeAgo(mem.updatedAt)}.` : ""}`
+      : "";
     $("#mem-now", dlg).addEventListener("click", async (e) => {
       const b = e.currentTarget;
-      // Keep any edits made in the box as the starting point.
-      chat.memory = { ...(chat.memory ?? { upTo: 0, auto: true }), text: ta.value.trim() };
+      // Keep edits made in the boxes as the starting point.
+      chat.memory = { folded: 0, auto: true, ...(chat.memory ?? {}), text: $("#mem-text", dlg).value.trim(), facts: $("#mem-facts", dlg).value.trim() };
       b.classList.add("is-loading");
       b.setAttribute("aria-busy", "true");
-      ta.readOnly = true;
-      if (await updateMemory({ quiet: true })) ta.value = chat.memory.text;
+      const done = await updateMemory({ all: true });
       b.classList.remove("is-loading");
       b.removeAttribute("aria-busy");
-      ta.readOnly = false;
-      ta.dispatchEvent(new Event("input"));
-      status();
+      if (done) { dlg.close("cancel"); openMemory(); }
     });
   }
 
@@ -926,7 +988,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
   // Deletes everything after message i. Memory and the scene would still
   // describe what was removed, so the dialog offers to rebuild them.
   function askRewind(later) {
-    const stale = !!(chat.memory?.text || chat.scene?.text);
+    const stale = !!(chat.memory?.text || chat.memory?.facts || liveChapters(chat).length || chat.scene?.text);
     if (settings.confirm?.enabled === false) return Promise.resolve({ ok: true, refresh: stale });
     return new Promise((resolve) => {
       const dlg = openDialog(`
@@ -953,14 +1015,19 @@ export async function render(main, [botId, chatId, jumpTo]) {
     const saved = {
       removed: chat.messages.slice(upTo),
       memory: structuredClone(chat.memory ?? null),
+      chapters: structuredClone(chat.chapters ?? []),
       scene: structuredClone(chat.scene ?? null),
       pending: structuredClone(chat.pendingMilestones ?? {}),
     };
     chat.messages = chat.messages.slice(0, upTo);
     chat.pendingMilestones = {};
     pendingError = null;
-    const memoryStale = (chat.memory?.upTo ?? 0) > upTo;
-    if (memoryStale) chat.memory = { ...chat.memory, upTo: Math.min(chat.memory.upTo, upTo) };
+    // Chapters past the cut go; facts go back to how they stood after the
+    // last chapter that stays.
+    const trimmed = trimMemory(chat, upTo);
+    const memoryStale = trimmed.changed;
+    chat.chapters = trimmed.chapters;
+    chat.memory = trimmed.memory;
     await persist();
     paintLog();
     toast(`Rewound. ${later} message${later === 1 ? "" : "s"} removed.`, "info", {
@@ -968,13 +1035,14 @@ export async function render(main, [botId, chatId, jumpTo]) {
       onAction: async () => {
         chat.messages = [...chat.messages, ...saved.removed];
         chat.memory = saved.memory;
+        chat.chapters = saved.chapters;
         chat.scene = saved.scene;
         chat.pendingMilestones = saved.pending;
         await persist(); paintLog(); paintHeader();
       },
     });
     if (refresh) {
-      if (memoryStale && chat.memory?.text) { chat.memory = { ...chat.memory, text: "", upTo: 0 }; updateMemory({ quiet: true }); }
+      if (memoryStale) updateMemory({ quiet: true });
       if (chat.scene?.text) { chat.scene = { ...chat.scene, text: "" }; refreshScene({ quiet: true }); }
     }
   }
@@ -1045,12 +1113,12 @@ export async function render(main, [botId, chatId, jumpTo]) {
 
   // ---------- Usage in this chat ----------
   function openChatUsage() {
-    let prompt = 0; let completion = 0; let counted = 0; let missing = 0;
+    let prompt = 0; let completion = 0; let cached = 0; let counted = 0; let missing = 0;
     for (const m of chat.messages) {
       if (m.role !== "assistant") continue;
       for (const meta of m.meta ?? []) {
         if (meta?.greeting) continue;
-        if (meta?.usage) { prompt += meta.usage.prompt_tokens ?? 0; completion += meta.usage.completion_tokens ?? 0; counted++; }
+        if (meta?.usage) { prompt += meta.usage.prompt_tokens ?? 0; completion += meta.usage.completion_tokens ?? 0; cached += cachedTokens(meta.usage); counted++; }
         else missing++;
       }
     }
@@ -1059,6 +1127,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
       <div class="usage-tiles">
         <div class="usage-tile"><span class="k">Sent to the model</span><span class="v">${prompt.toLocaleString()}</span><span class="s">input tokens</span></div>
         <div class="usage-tile"><span class="k">Written by the model</span><span class="v">${completion.toLocaleString()}</span><span class="s">output tokens</span></div>
+        ${cached ? `<div class="usage-tile"><span class="k">Reused from cache</span><span class="v">${Math.round((cached / Math.max(1, prompt)) * 100)}%</span><span class="s">${cached.toLocaleString()} input tokens</span></div>` : ""}
       </div>
       <p class="hint">Counted from ${counted} repl${counted === 1 ? "y" : "ies"}, every version included.${missing ? ` ${missing} had no count from your provider and are left out.` : ""}
         Extra tasks like memory and ideas are not included here. See all usage in <a href="#/settings">Settings</a>.</p>
@@ -1188,8 +1257,8 @@ export async function render(main, [botId, chatId, jumpTo]) {
       id: uid(),
       title: `${chat.title.replace(/ \(branch\)$/, "")} (branch)`,
       messages: structuredClone(chat.messages.slice(0, upTo)),
-      // A summary of later messages would leak events that have not happened here.
-      memory: chat.memory && (chat.memory.upTo ?? 0) <= upTo ? structuredClone(chat.memory) : null,
+      // Memory of later messages would leak events that have not happened here.
+      ...(({ chapters, memory }) => ({ chapters: structuredClone(chapters), memory: structuredClone(memory) }))(trimMemory(chat, upTo)),
       branchOf: { chatId: chat.id, messageId: chat.messages[i].id },
       warnedTrim: false,
       createdAt: now(),
@@ -1317,7 +1386,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
     body.innerHTML = '<span class="skeleton skeleton-line"></span><span class="skeleton skeleton-line"></span>';
     try {
       const text = await recap({
-        bot, names: namesFor(), memory: chat.memory?.text ?? "",
+        bot, names: namesFor(), memory: [chat.memory?.text, ...memoryContext(chat).chapters].filter(Boolean).join("\n\n"),
         lines: transcript(chat.messages.slice(-16), nameOf, namesFor()),
       });
       if (!text) throw new Error("The model sent back an empty recap.");
@@ -1561,10 +1630,11 @@ export async function render(main, [botId, chatId, jumpTo]) {
     const partner = last ? speakerOf(last) : bot;
 
     const [freshSettings, preset, loreEntries] = await Promise.all([getSettings(), getActivePreset(), loreForBot(partner)]);
+    const hist = withSpeakers(chat.messages);
     const prompt = buildPrompt({
       bot: partner, persona: persona(), preset, settings: freshSettings, loreEntries,
-      history: withSpeakers(chat.messages), mode: "impersonate", hint,
-      memory: chat.memory?.text ?? "", scene: chat.scene?.text ?? "", cast: group() ? others(partner) : [],
+      history: hist, mode: "impersonate", hint,
+      ...memoryArgs(hist), scene: chat.scene?.text ?? "", cast: group() ? others(partner) : [],
     });
     const body = {
       model: chat.model || partner.model || conn.model || undefined,
@@ -2191,7 +2261,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
     const p = buildPrompt({
       bot: speaker, persona: persona(), preset, settings: s, history: withSpeakers(hist), loreEntries: entries,
       bond: bondOnFor(speaker) ? bondFor(speaker) : null,
-      memory: chat.memory?.text ?? "", scene: chat.scene?.text ?? "", note: direction(), cast: group() ? others(speaker) : [],
+      ...memoryArgs(hist), scene: chat.scene?.text ?? "", note: direction(), cast: group() ? others(speaker) : [],
     });
     const params = generationParams(s, speaker);
     openDialog(`<div class="dialog-body">
@@ -2210,7 +2280,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
   $("#more", main).addEventListener("click", (e) => openMenu(e.currentTarget, [
     ...(narrow.matches ? [
       { label: "Model", hint: `${currentModel()}${chat.model ? " (this chat)" : ""}`, onSelect: () => openModelMenu($("#more", main)) },
-      { label: "Memory", hint: chat.memory?.text ? "Summary of the story so far" : "Empty so far", onSelect: openMemory },
+      { label: "Memory", hint: chat.memory?.text || liveChapters(chat).length ? "Chapters, key facts and the story so far" : "Empty so far", onSelect: openMemory },
       { label: "Scene tracker", hint: chat.scene?.text ? "Where everyone is right now" : "Off so far", onSelect: openScene },
       { label: "Characters in this chat", hint: group() ? `${everyone().length} in the scene` : "Add bots for a group scene", onSelect: openCast },
       "-",

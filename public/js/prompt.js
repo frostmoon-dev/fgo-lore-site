@@ -93,7 +93,9 @@ export function cleanImpersonation(text, userName) {
 
 // mode "impersonate" writes {{user}}'s next message instead of {{char}}'s.
 // hint is what the person typed: a keyword or rough line to expand.
-// memory is the chat's running summary. note is a one-reply instruction
+// memory is the story so far; facts, chapters and recalled come from the
+// layered chat memory (memory.js), and windowStart is where the word-for-word
+// part of history begins. note is a one-reply instruction
 // (a scene direction or a nudge like "shorter"). cast is the other bots in
 // a group scene; history messages then carry the botId of who spoke.
 // scene is the tracked state of the scene right now. Pinned messages in
@@ -101,6 +103,7 @@ export function cleanImpersonation(text, userName) {
 export function buildPrompt({
   bot, persona, preset, settings, history, loreEntries = [], bond = null,
   mode = "reply", hint = "", memory = "", note = "", cast = [], scene = "",
+  facts = "", chapters = [], recalled = [], windowStart = 0,
 }) {
   const asUser = mode === "impersonate";
   if (asUser) bond = null;
@@ -113,7 +116,10 @@ export function buildPrompt({
 
   // In a group scene, every line is labelled with its speaker, and other
   // characters' lines reach this bot as user turns it can react to.
-  let clean = history
+  // Older messages are covered by the layered memory; only the recent part
+  // is sent word for word. The newest message is always kept.
+  const recentHistory = history.slice(Math.max(0, Math.min(windowStart, history.length - 1)));
+  let clean = recentHistory
     .filter((x) => (x.role === "user" || x.role === "assistant") && !x.error)
     .map((x) => {
       const content = stripBond(currentText(x));
@@ -134,6 +140,14 @@ export function buildPrompt({
   const scan = clean.slice(-settings.lore.scanDepth).map((x) => x.content).join("\n");
   const matched = matchLore(loreEntries, scan, settings.lore.maxEntries);
 
+  const constantLore = matched.filter((e) => e.constant);
+  const triggeredLore = matched.filter((e) => !e.constant);
+
+  // Stable first, changing last. The system message holds what rarely changes
+  // (instructions, characters, persona, examples, memory); the recent chat
+  // follows; what can change every turn (scene, lore that matched, recalled
+  // moments, bond) comes after it. Providers that cache repeated prompts can
+  // then reuse the whole front of each request.
   const parts = [asUser
     ? m(preset.impersonate?.trim() || DEFAULT_IMPERSONATE_PROMPT)
     : m(override(bot.systemPrompt, preset.main))];
@@ -144,31 +158,46 @@ export function buildPrompt({
       `### ${c.name}\n${m(clip([c.description, c.personality && `Personality: ${c.personality}`].filter(Boolean).join("\n\n"), 1600))}`).join("\n\n"));
   }
   if (preset.includeScenario !== false && bot.scenario?.trim()) parts.push(`## Scenario\n${m(bot.scenario)}`);
-  if (memory?.trim()) parts.push(`## Story so far (memory of earlier events)\n${m(memory)}`);
-  const pinned = history.filter((x) => x.pinned && (x.role === "user" || x.role === "assistant")).slice(-10);
-  if (pinned.length) {
-    parts.push(`## Key moments (pinned by ${names.user}; always remember these)\n` +
-      pinned.map((x) => `- ${nameOf(x)}: ${m(clip(stripBond(currentText(x)).replace(/\s+/g, " "), 600))}`).join("\n"));
-  }
-  if (scene?.trim()) parts.push(`## The scene right now (keep these details consistent)\n${m(scene)}`);
   // Impersonation always needs the persona: it is who the model is writing as.
   if ((asUser || preset.includePersona !== false) && persona?.description?.trim()) parts.push(`## ${names.user}\n${m(persona.description)}`);
-  if (matched.length) {
+  if (constantLore.length) {
     parts.push("## World lore (use when relevant, never recite)\n\n" +
-      matched.map((e) => `### ${e.title}\n${m(e.content)}`).join("\n\n"));
+      constantLore.map((e) => `### ${e.title}\n${m(e.content)}`).join("\n\n"));
   }
   if (preset.includeExamples !== false && bot.examples?.trim()) {
     parts.push(`## Example dialogue (style reference only)\n${m(bot.examples.replace(/<START>\s*/gi, "---\n"))}`);
   }
   parts.push(contentRule(contentLevel(settings, bot)));
+  if (memory?.trim()) parts.push(`## Story so far (memory of earlier events)\n${m(memory)}`);
+  if (facts?.trim()) parts.push(`## Key facts (always true unless the story changes them)\n${m(facts)}`);
+  if (chapters.length) {
+    parts.push("## Recent chapters (what happened just before the messages below)\n\n" +
+      chapters.map((c, i) => `### Chapter ${i + 1}\n${m(c)}`).join("\n\n"));
+  }
+  const pinned = history.filter((x) => x.pinned && (x.role === "user" || x.role === "assistant")).slice(-10);
+  if (pinned.length) {
+    parts.push(`## Key moments (pinned by ${names.user}; always remember these)\n` +
+      pinned.map((x) => `- ${nameOf(x)}: ${m(clip(stripBond(currentText(x)).replace(/\s+/g, " "), 600))}`).join("\n"));
+  }
+  const system = parts.filter(Boolean).join("\n\n");
+
+  const late = [];
+  if (scene?.trim()) late.push(`## The scene right now (keep these details consistent)\n${m(scene)}`);
+  if (triggeredLore.length) {
+    late.push("## Lore that matters now (use when relevant, never recite)\n\n" +
+      triggeredLore.map((e) => `### ${e.title}\n${m(e.content)}`).join("\n\n"));
+  }
+  if (recalled.length) {
+    late.push("## Recalled from earlier in this chat (use only if it fits)\n" +
+      recalled.map((r) => `- ${r.label}: ${m(r.text)}`).join("\n"));
+  }
   if (bond) {
     // bond: { value, label, behavior, kind } from the bot's kind of bond.
-    parts.push(`## Bond\n${names.user}'s bond with ${names.char}${bond.kind ? ` (${bond.kind.toLowerCase()})` : ""} ` +
+    late.push(`## Bond\n${names.user}'s bond with ${names.char}${bond.kind ? ` (${bond.kind.toLowerCase()})` : ""} ` +
       `is ${bond.value} out of 100: ${bond.label}.\n` +
       (bond.behavior ? `At this level: ${m(bond.behavior)}\n` : "") +
       "Let it show in how you act, without naming the level. Bonds move slowly; what happens in the story moves them.");
   }
-  const system = parts.filter(Boolean).join("\n\n");
   let post = asUser ? impersonateInstruction(names, hint) : m(override(bot.postHistory, preset.postHistory));
   if (group && !asUser) {
     post = [post, `This is a group scene. Write only ${names.char}'s next reply. Do not write lines or actions for ${names.user} ` +
@@ -185,16 +214,21 @@ export function buildPrompt({
       "as a tag like <bond:+1>, from -5 to +5. Use 0 when little changed. Never mention the tag, the number or the bond itself in the story."]
       .filter(Boolean).join("\n\n");
   }
+  post = [...late, post].filter(Boolean).join("\n\n");
 
-  // Keep the newest messages that fit. Always keep the latest one.
+  // If the recent part is still too long, drop its oldest messages in blocks
+  // of TRIM_STEP rather than one per turn, so the front of the request stays
+  // the same for several turns. Always keep the latest message.
   const budget = settings.gen.contextTokens * 4 - system.length - post.length;
-  let used = 0;
-  const kept = [];
-  for (let i = clean.length - 1; i >= 0; i--) {
-    used += clean[i].content.length;
-    if (used > budget && kept.length > 0) break;
-    kept.unshift(clean[i]);
+  const total = clean.reduce((n, x) => n + x.content.length, 0);
+  let start = 0;
+  let size = total;
+  while (size > budget && start < clean.length - 1) {
+    const next = Math.min(clean.length - 1, start + TRIM_STEP);
+    for (let i = start; i < next; i++) size -= clean[i].content.length;
+    start = next;
   }
+  const kept = clean.slice(start);
 
   // Most APIs need at least one user turn; this lets a bot open the scene itself.
   if (!kept.length && asUser) kept.push({ role: "user", content: m("[The roleplay has not started yet.]") });
@@ -206,11 +240,13 @@ export function buildPrompt({
     messages,
     loreUsed: matched.map((e) => e.title),
     dropped: clean.length - kept.length,
+    windowStart: Math.max(0, Math.min(windowStart, history.length - 1)),
     tokens: estimateTokens(messages.map((x) => x.content).join("")),
   };
 }
 
 const clip = (s, n) => (s.length > n ? `${s.slice(0, n)}…` : s);
+const TRIM_STEP = 10;
 
 function impersonateInstruction(names, hint) {
   const draft = String(hint ?? "").trim();

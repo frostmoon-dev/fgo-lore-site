@@ -33,9 +33,16 @@ server-side storage of your key.
   answering the bot's latest reply. Type a keyword or rough line first and it becomes a full
   message in your voice. The draft lands in the message box for you to edit, retry or undo;
   nothing is sent until you press Send. Its prompt is editable on the Prompt page.
-- **Memory**: each chat keeps a running summary of what happened, refreshed automatically
-  every few messages (Settings), sent with every reply so bots remember events that have
-  fallen out of the context. Read and edit it from the book button in a chat.
+- **Memory in layers** (`public/js/memory.js`): the newest messages (at least 12) are sent
+  word for word; older ones become short chapters (one per 20 messages by default, set in
+  Settings); once a few pile up, the oldest chapters fold into a story so far; lasting facts
+  (names, promises, secrets, injuries, possessions) live in their own list, updated with each
+  chapter; and old moments come back by keyword when the chat mentions them again. The
+  prompt puts what rarely changes first and what changes every turn after the chat, and drops
+  old messages in blocks of ten, so providers that cache repeated prompts can reuse most of
+  each request. In a 200-message test chat this cut a reply's input from about 7,800 to about
+  2,100 tokens. Read and edit it all from the book button in a chat; the usage numbers show
+  how much the provider reused from its cache.
 - **Scene director**: the megaphone button (Alt+D) adds a hidden direction for the next
   reply only, such as "time skip to nightfall". It never appears in the chat.
 - **Reply nudges**: the Regenerate button offers Shorter, Longer, More emotion, More action

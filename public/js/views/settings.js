@@ -154,13 +154,13 @@ export async function render(main) {
 
       <div class="card" id="set-memory">
         <h2 class="card-title">Memory</h2>
-        <p class="lead">Each chat keeps a running summary, so bots remember what happened after old messages fall out of the context size. You can read and edit it from the book button in a chat.</p>
+        <p class="lead">Long chats are remembered in layers: the newest messages word for word, older ones as short chapters, the oldest folded into a story so far, and lasting facts in their own list. Each reply sends far fewer tokens than the whole chat, and old moments come back when they are mentioned again. Read and edit it all from the book button in a chat.</p>
         <div class="form-grid">
           <label class="check"><input type="checkbox" id="mem-enabled" ${settings.memory.enabled ? "checked" : ""}>
-            <span>Update memory automatically<small>Uses one extra request each time it updates.</small></span></label>
+            <span>Update memory automatically<small>Uses one extra request per chapter, and one now and then to fold old chapters.</small></span></label>
           ${sliderHTML({
-            id: "mem-every", label: "Update after this many new messages", min: 6, max: 60, step: 2,
-            value: settings.memory.every, hint: "Lower keeps the summary fresher but costs more requests.",
+            id: "mem-every", label: "Messages per chapter", min: 6, max: 60, step: 2,
+            value: settings.memory.every, hint: "Smaller chapters keep more detail but cost more requests.",
           })}
         </div>
       </div>
@@ -315,11 +315,11 @@ export async function render(main) {
     const cost = (d) => (d.prompt * (price.in || 0) + d.completion * (price.out || 0)) / 1e6;
     const money = (n) => (n < 0.01 && n > 0 ? "under $0.01" : `$${n.toFixed(2)}`);
     const range = (n) => {
-      const out = { prompt: 0, completion: 0, requests: 0, estimated: 0, models: {} };
+      const out = { prompt: 0, completion: 0, requests: 0, estimated: 0, cached: 0, models: {} };
       for (let i = 0; i < n; i++) {
         const d = usage.days[dayKey(Date.now() - i * 86400000)];
         if (!d) continue;
-        for (const k of ["prompt", "completion", "requests", "estimated"]) out[k] += d[k] ?? 0;
+        for (const k of ["prompt", "completion", "requests", "estimated", "cached"]) out[k] += d[k] ?? 0;
         for (const [name, m] of Object.entries(d.models ?? {})) {
           const t = (out.models[name] ??= { prompt: 0, completion: 0, requests: 0 });
           t.prompt += m.prompt; t.completion += m.completion; t.requests += m.requests;
@@ -358,6 +358,7 @@ export async function render(main) {
               <td class="num">${m.prompt.toLocaleString()}</td><td class="num">${m.completion.toLocaleString()}</td>${priced ? `<td class="num">${money(cost(m))}</td>` : ""}</tr>`).join("")}</tbody>
           </table>
         </details>
+        ${month.cached ? `<p class="hint">${Math.round((month.cached / Math.max(1, month.prompt)) * 100)}% of input tokens in the last 30 days (${month.cached.toLocaleString()}) were reused from your provider's cache, which most providers charge less for.</p>` : ""}
         ${month.estimated ? `<p class="hint">${month.estimated} of ${month.requests} requests were estimated at about 4 characters per token, because the provider did not report exact counts.</p>` : ""}
         <div><button class="btn btn-sm btn-quiet btn-danger" type="button" id="usage-clear">Clear usage history</button></div>
       </div>`;
