@@ -3,7 +3,7 @@ import {
   loreForBot, bondTier, uid, now,
 } from "../store.js";
 import { chatCompletion } from "../api.js";
-import { buildPrompt, generationParams, currentText, applyMacros, readBond, stripBond } from "../prompt.js";
+import { buildPrompt, generationParams, currentText, applyMacros, readBond, stripBond, cleanImpersonation } from "../prompt.js";
 import { renderMarkdown } from "../markdown.js";
 import {
   $, $$, esc, icon, avatarHTML, toast, confirmDialog, promptDialog, openDialog,
@@ -118,9 +118,16 @@ export async function render(main, [botId, chatId]) {
             <div class="note bad" id="no-conn" hidden>
               ${icon("info")}<span>No API connection yet. <a href="#/connection">Set one up</a> to start talking.</span>
             </div>
+            <div class="draft-bar" id="draft-bar" hidden>
+              <span class="grow" id="draft-status" aria-live="polite"></span>
+              <button class="btn btn-quiet btn-sm" type="button" id="draft-retry">Try again</button>
+              <button class="btn btn-quiet btn-sm" type="button" id="draft-undo">Undo</button>
+            </div>
             <div class="composer-box">
               <label for="input" class="sr-only">Message ${esc(bot.name)}</label>
               <textarea id="input" rows="1" placeholder="Message ${esc(bot.name)}…" enterkeyhint="send"></textarea>
+              <button class="icon-btn composer-tool" type="button" id="impersonate"
+                aria-label="Write my reply. Uses what you typed as the idea." title="Write my reply (Alt+W)">${icon("quill")}</button>
               <button class="send-btn" type="submit" id="send" aria-label="Send message">${icon("send")}</button>
             </div>
             <div class="composer-foot">
@@ -333,6 +340,7 @@ export async function render(main, [botId, chatId]) {
     sendBtn.innerHTML = icon(on ? "stop" : "send");
     sendBtn.setAttribute("aria-label", on ? "Stop generating" : "Send message");
     logInner.setAttribute("aria-busy", String(on));
+    $("#impersonate", main).disabled = on;
   }
 
   // ---------- Generation ----------
@@ -435,7 +443,103 @@ export async function render(main, [botId, chatId]) {
     }
   }
 
+  // ---------- Write my reply (impersonation) ----------
+  // The model writes {{user}}'s next message into the box. Nothing is sent
+  // until the person reviews it and presses Send.
+  let drafting = null;    // AbortController while a draft is being written
+  let draftSource = null; // what was in the box before, for Undo and Try again
+  const draftBar = $("#draft-bar", main);
+  const draftBtn = $("#impersonate", main);
+
+  function showDraftBar(text, { tools = true } = {}) {
+    draftBar.hidden = false;
+    $("#draft-status", main).textContent = text;
+    $("#draft-retry", main).hidden = !tools;
+    $("#draft-undo", main).hidden = !tools;
+  }
+  function hideDraftBar() { draftBar.hidden = true; draftSource = null; }
+
+  function setDrafting(on) {
+    draftBtn.innerHTML = icon(on ? "stop" : "quill");
+    draftBtn.setAttribute("aria-label", on ? "Stop writing" : "Write my reply. Uses what you typed as the idea.");
+    draftBtn.classList.toggle("is-active", on);
+    input.readOnly = on;
+    sendBtn.disabled = on;
+  }
+
+  async function impersonate({ retry = false } = {}) {
+    if (drafting) { drafting.abort(); return; }
+    if (busy) return;
+    const conn = await getActiveConnection();
+    if (!conn) {
+      toast("Set up an API connection first.", "error", { action: "Open", onAction: () => { location.hash = "#/connection"; } });
+      return;
+    }
+    const hint = retry ? draftSource ?? "" : input.value.trim();
+    draftSource = hint;
+    const who = persona()?.name || "You";
+
+    const [freshSettings, preset, loreEntries] = await Promise.all([getSettings(), getActivePreset(), loreForBot(bot)]);
+    const prompt = buildPrompt({
+      bot, persona: persona(), preset, settings: freshSettings, loreEntries,
+      history: chat.messages, mode: "impersonate", hint,
+    });
+    const body = {
+      model: bot.model || conn.model || undefined,
+      messages: prompt.messages,
+      stream: freshSettings.gen.stream,
+      ...generationParams(freshSettings, bot),
+    };
+
+    drafting = new AbortController();
+    setDrafting(true);
+    showDraftBar(hint ? `Writing “${hint.length > 40 ? hint.slice(0, 40) + "…" : hint}” as ${who}…` : `Writing ${who}'s reply…`, { tools: false });
+    input.value = "";
+    fitInput();
+
+    let text = "";
+    try {
+      const res = await chatCompletion(conn, body, {
+        signal: drafting.signal,
+        onDelta: (r) => { input.value = cleanImpersonation(r.content, who); fitInput(); },
+      });
+      text = cleanImpersonation(res.content, who);
+      if (!text) throw new Error("The model sent back an empty draft. Try again, or check the model on the Connection page.");
+      window.dispatchEvent(new CustomEvent("api-status", { detail: true }));
+    } catch (err) {
+      text = input.value.trim();
+      if (err.name !== "AbortError") {
+        toast(err.message, "error");
+        window.dispatchEvent(new CustomEvent("api-status", { detail: false }));
+      }
+    } finally {
+      drafting = null;
+      setDrafting(false);
+    }
+
+    if (text) {
+      input.value = text;
+      showDraftBar(`Written as ${who}. Edit it if you like, then send.`);
+    } else {
+      input.value = hint;
+      hideDraftBar();
+    }
+    fitInput();
+    input.focus();
+    input.setSelectionRange(input.value.length, input.value.length);
+  }
+
+  draftBtn.addEventListener("click", () => impersonate());
+  $("#draft-retry", main).addEventListener("click", () => impersonate({ retry: true }));
+  $("#draft-undo", main).addEventListener("click", () => {
+    input.value = draftSource ?? "";
+    hideDraftBar();
+    fitInput();
+    input.focus();
+  });
+
   async function send() {
+    if (drafting) return;
     if (busy) { controller?.abort(); return; }
     const text = input.value.trim();
     if (!text) {
@@ -444,6 +548,7 @@ export async function render(main, [botId, chatId]) {
       else input.focus();
       return;
     }
+    hideDraftBar();
     chat.messages.push({ id: uid(), role: "user", content: text, at: now() });
     if (chat.autoTitle) { chat.title = text.replace(/\s+/g, " ").slice(0, 48) + (text.length > 48 ? "…" : ""); chat.autoTitle = false; paintHeader(); }
     input.value = "";
@@ -454,10 +559,14 @@ export async function render(main, [botId, chatId]) {
 
   $("#composer", main).addEventListener("submit", (e) => { e.preventDefault(); send(); });
   input.addEventListener("keydown", (e) => {
+    if (e.altKey && e.code === "KeyW") { e.preventDefault(); impersonate(); return; }
     const submit = settings.enterToSend ? e.key === "Enter" && !e.shiftKey && !e.isComposing : e.key === "Enter" && (e.ctrlKey || e.metaKey);
     if (submit) { e.preventDefault(); send(); }
   });
-  const onGlobalKey = (e) => { if (e.key === "Escape" && busy) controller?.abort(); };
+  const onGlobalKey = (e) => {
+    if (e.key === "Escape" && busy) controller?.abort();
+    if (e.key === "Escape" && drafting) drafting.abort();
+  };
   document.addEventListener("keydown", onGlobalKey);
 
   // ---------- Message actions ----------
@@ -589,6 +698,7 @@ export async function render(main, [botId, chatId]) {
   return {
     cleanup: () => {
       controller?.abort();
+      drafting?.abort();
       document.removeEventListener("keydown", onGlobalKey);
       document.body.classList.remove("in-chat");
     },

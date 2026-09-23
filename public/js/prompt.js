@@ -1,5 +1,6 @@
 // Turns a bot, persona, prompt preset, lore and chat history into the
 // messages array sent to the API.
+import { DEFAULT_IMPERSONATE_PROMPT } from "./store.js";
 
 export const estimateTokens = (text) => Math.ceil((text?.length ?? 0) / 4);
 
@@ -53,7 +54,19 @@ export function readBond(text) {
 
 export const stripBond = (text) => String(text ?? "").replace(BOND_TAG, "").replace(/\n{3,}$/, "\n").trimEnd();
 
-export function buildPrompt({ bot, persona, preset, settings, history, loreEntries = [], bond = null }) {
+// Cleans a message the model wrote for {{user}}: drops a "Name:" label
+// (plain or bold) or a bond tag it copied from the history.
+export function cleanImpersonation(text, userName) {
+  let t = stripBond(text).trim();
+  if (userName) t = t.replace(new RegExp(`^\\**\\s*${escapeRegex(userName)}\\s*\\**\\s*:\\s*\\**\\s*`, "i"), "");
+  return t.trim();
+}
+
+// mode "impersonate" writes {{user}}'s next message instead of {{char}}'s.
+// hint is what the person typed: a keyword or rough line to expand.
+export function buildPrompt({ bot, persona, preset, settings, history, loreEntries = [], bond = null, mode = "reply", hint = "" }) {
+  const asUser = mode === "impersonate";
+  if (asUser) bond = null;
   const names = { char: bot.name || "Character", user: persona?.name || "User" };
   const m = (t) => applyMacros(t, names).trim();
 
@@ -65,11 +78,14 @@ export function buildPrompt({ bot, persona, preset, settings, history, loreEntri
   const scan = clean.slice(-settings.lore.scanDepth).map((x) => x.content).join("\n");
   const matched = matchLore(loreEntries, scan, settings.lore.maxEntries);
 
-  const parts = [m(override(bot.systemPrompt, preset.main))];
+  const parts = [asUser
+    ? m(preset.impersonate?.trim() || DEFAULT_IMPERSONATE_PROMPT)
+    : m(override(bot.systemPrompt, preset.main))];
   const about = [bot.description, bot.personality && `Personality: ${bot.personality}`].filter(Boolean).join("\n\n");
   if (about) parts.push(`## ${names.char}\n${m(about)}`);
   if (preset.includeScenario !== false && bot.scenario?.trim()) parts.push(`## Scenario\n${m(bot.scenario)}`);
-  if (preset.includePersona !== false && persona?.description?.trim()) parts.push(`## ${names.user}\n${m(persona.description)}`);
+  // Impersonation always needs the persona: it is who the model is writing as.
+  if ((asUser || preset.includePersona !== false) && persona?.description?.trim()) parts.push(`## ${names.user}\n${m(persona.description)}`);
   if (matched.length) {
     parts.push("## World lore (use when relevant, never recite)\n\n" +
       matched.map((e) => `### ${e.title}\n${m(e.content)}`).join("\n\n"));
@@ -82,7 +98,7 @@ export function buildPrompt({ bot, persona, preset, settings, history, loreEntri
       "Let it show in how warm, guarded or hostile you are. Bonds move slowly, and rudeness or lies push them down.");
   }
   const system = parts.filter(Boolean).join("\n\n");
-  let post = m(override(bot.postHistory, preset.postHistory));
+  let post = asUser ? impersonateInstruction(names, hint) : m(override(bot.postHistory, preset.postHistory));
   if (bond) {
     post = [post, "After your reply, on its own last line, rate how this exchange went for the bond " +
       "as a tag like <bond:+1>, from -5 to +5. Use 0 when little changed. Never mention the tag, the number or the bond itself in the story."]
@@ -100,6 +116,7 @@ export function buildPrompt({ bot, persona, preset, settings, history, loreEntri
   }
 
   // Most APIs need at least one user turn; this lets a bot open the scene itself.
+  if (!kept.length && asUser) kept.push({ role: "user", content: m("[The roleplay has not started yet.]") });
   if (!kept.length) kept.push({ role: "user", content: m("[Begin the roleplay. Write {{char}}'s opening message.]") });
   const messages = [{ role: "system", content: system }, ...kept];
   if (post) messages.push({ role: "system", content: post });
@@ -110,6 +127,16 @@ export function buildPrompt({ bot, persona, preset, settings, history, loreEntri
     dropped: clean.length - kept.length,
     tokens: estimateTokens(messages.map((x) => x.content).join("")),
   };
+}
+
+function impersonateInstruction(names, hint) {
+  const draft = String(hint ?? "").trim();
+  const base = `Now write ${names.user}'s next message, replying to ${names.char}'s latest message.`;
+  if (!draft) return base;
+  return `${base}\n\n${names.user} has jotted down what they want to say:\n"""\n${draft}\n"""\n` +
+    "This may be a keyword, a fragment or a rough line. Work out what they mean and write it as a complete message " +
+    `in ${names.user}'s voice. Keep their intent, and anything they wrote as dialogue or action. ` +
+    "Do not add major decisions or events they did not suggest.";
 }
 
 // Settings sent to the API. A bot's own values win over the global ones.

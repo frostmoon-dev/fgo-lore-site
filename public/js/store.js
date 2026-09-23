@@ -10,6 +10,13 @@ export const DEFAULT_MAIN_PROMPT =
   "Stay in character at all times. Be vivid and specific, move the scene forward, and react to what {{user}} actually said.\n" +
   "Never speak, think, or act for {{user}}. Never mention being an AI.";
 
+// Used when you ask the model to write your next message for you.
+export const DEFAULT_IMPERSONATE_PROMPT =
+  "Write {{user}}'s next message in a fictional roleplay with {{char}}. You are {{user}} now, not {{char}}.\n" +
+  "Stay true to {{user}}'s personality, voice and history as described below. React to what {{char}} last said and did.\n" +
+  "Write only {{user}}'s own words, thoughts and actions. Never write {{char}}'s dialogue or decide how {{char}} responds.\n" +
+  "Match the length and style of {{user}}'s earlier messages. Reply with the message text only: no name label, no notes.";
+
 export const DEFAULT_SETTINGS = {
   personaId: null,
   connectionId: null,
@@ -49,6 +56,7 @@ export const DEFAULT_PRESET = {
   name: "Default",
   main: DEFAULT_MAIN_PROMPT,
   postHistory: "",
+  impersonate: DEFAULT_IMPERSONATE_PROMPT,
   includeExamples: true,
   includeScenario: true,
   includePersona: true,

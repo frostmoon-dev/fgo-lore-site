@@ -591,6 +591,16 @@ body.in-chat .site-footer { display: none; }
 .composer-foot { display: flex; flex-wrap: wrap; gap: var(--s3); justify-content: space-between; align-items: center; margin-top: var(--s2); padding: 0 var(--s2); font-size: var(--t-sm); color: var(--muted); }
 .composer-foot select { width: auto; height: 32px; font-size: var(--t-sm); padding-left: var(--s3); padding-right: var(--s6); background-position: calc(100% - 12px) center; }
 .persona-pick { display: inline-flex; align-items: center; gap: var(--s2); }
+/* Write my reply: sits beside Send, quieter than it. */
+.composer-tool { width: 40px; height: 40px; }
+.composer-tool.is-active { background: var(--fill); color: var(--ink); }
+.draft-bar {
+  display: flex; align-items: center; gap: var(--s2); margin-bottom: var(--s2); min-height: 40px;
+  padding: var(--s1) var(--s1) var(--s1) var(--s4); background: var(--fill); border-radius: var(--r-pill);
+  font-size: var(--t-sm); color: var(--ink); animation: fade-in 180ms var(--ease) both;
+}
+.draft-bar .grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.composer-box textarea[readonly] { color: var(--muted); }
 
 @media (max-width: 860px) {
   .chat-layout { grid-template-columns: 1fr; }

@@ -1,6 +1,6 @@
 import {
   getPresets, savePresets, getSettings, saveSettings, bots, personas, loreForBot, bondTier,
-  DEFAULT_PRESET, DEFAULT_MAIN_PROMPT, uid,
+  DEFAULT_PRESET, DEFAULT_MAIN_PROMPT, DEFAULT_IMPERSONATE_PROMPT, uid,
 } from "../store.js";
 import { buildPrompt, generationParams, estimateTokens } from "../prompt.js";
 import {
@@ -55,6 +55,13 @@ export async function render(main) {
             <textarea id="post-history" class="mono" placeholder="e.g. Reply in 2–4 paragraphs. Write {{char}}'s actions in *asterisks*." aria-describedby="post-hint"></textarea>
             <p class="hint" id="post-hint">Sent last, after the chat history. Models follow it most closely, so use it for style and length rules.</p>
           </div>
+          <div class="field">
+            <label for="impersonate-prompt">Write my reply prompt <span class="count" id="imp-count"></span></label>
+            <textarea id="impersonate-prompt" class="mono" aria-describedby="imp-hint"></textarea>
+            <p class="hint" id="imp-hint">Used by the pen button in a chat, which writes your next message for you to review.
+              Your persona's description is always sent with it.
+              <button type="button" class="link-btn" id="reset-imp">Reset to default</button></p>
+          </div>
           <fieldset class="field">
             <legend class="field-label">Include in the prompt</legend>
             <label class="check"><input type="checkbox" id="inc-scenario"><span>Scenario<small>The bot's scenario field.</small></span></label>
@@ -105,13 +112,15 @@ export async function render(main) {
   const mainTa = $("#main-prompt", main);
   const postTa = $("#post-history", main);
   const state = $("#state", main);
-  const fits = [autosize(mainTa), autosize(postTa)];
+  const impTa = $("#impersonate-prompt", main);
+  const fits = [autosize(mainTa), autosize(postTa), autosize(impTa)];
   const flash = () => { state.classList.remove("dirty"); state.textContent = "Saved"; };
 
   function paintPresets() {
     $("#preset", main).innerHTML = presets.map((p) => `<option value="${p.id}" ${p.id === preset.id ? "selected" : ""}>${esc(p.name)}</option>`).join("");
     mainTa.value = preset.main;
     postTa.value = preset.postHistory;
+    impTa.value = preset.impersonate ?? DEFAULT_IMPERSONATE_PROMPT;
     $("#inc-scenario", main).checked = preset.includeScenario !== false;
     $("#inc-persona", main).checked = preset.includePersona !== false;
     $("#inc-examples", main).checked = preset.includeExamples !== false;
@@ -122,12 +131,14 @@ export async function render(main) {
   function counts() {
     $("#main-count", main).textContent = `~${estimateTokens(mainTa.value)} tokens`;
     $("#post-count", main).textContent = `~${estimateTokens(postTa.value)} tokens`;
+    $("#imp-count", main).textContent = `~${estimateTokens(impTa.value)} tokens`;
   }
 
   const savePreset = debounce(async () => { await savePresets(presets); flash(); }, 350);
   $("#preset-form", main).addEventListener("input", () => {
     preset.main = mainTa.value;
     preset.postHistory = postTa.value;
+    preset.impersonate = impTa.value;
     preset.includeScenario = $("#inc-scenario", main).checked;
     preset.includePersona = $("#inc-persona", main).checked;
     preset.includeExamples = $("#inc-examples", main).checked;
@@ -145,6 +156,10 @@ export async function render(main) {
     settings = await saveSettings({ presetId: preset.id });
     paintPresets();
   }
+  $("#reset-imp", main).addEventListener("click", () => {
+    impTa.value = DEFAULT_IMPERSONATE_PROMPT;
+    impTa.dispatchEvent(new Event("input", { bubbles: true }));
+  });
   $("#preset", main).addEventListener("change", (e) => selectPreset(e.target.value));
   $("#p-new", main).addEventListener("click", async () => {
     const name = await promptDialog({ title: "New preset", label: "Preset name", value: "", confirm: "Create" });
