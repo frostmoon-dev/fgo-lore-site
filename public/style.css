@@ -1248,3 +1248,6 @@ dialog.palette-dialog { width: min(600px, calc(100vw - 32px)); margin-top: 12vh;
 .chapters .chapter:first-child { border-top: 0; padding-top: 0; }
 .chapters .chapter summary { display: flex; justify-content: space-between; gap: var(--s3); font-weight: 500; }
 .chapters .chapter textarea { margin-top: var(--s2); }
+
+/* A long chat draws its latest messages; older ones load on request. */
+.earlier { display: flex; flex-direction: column; align-items: center; gap: var(--s1); padding-bottom: var(--s4); text-align: center; }

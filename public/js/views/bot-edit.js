@@ -211,6 +211,8 @@ export async function render(main, [id]) {
                 <div class="form-row">
                   ${sliderHTML({ id: "g-temperature", label: "Temperature", min: 0, max: 2, step: 0.05, value: bot.gen.temperature ?? "", allowBlank: true, hint: `Empty = global (${settings.gen.temperature})` })}
                   ${sliderHTML({ id: "g-max_tokens", label: "Max reply tokens", min: 50, max: 4000, step: 50, value: bot.gen.max_tokens ?? "", allowBlank: true, hint: `Empty = global (${settings.gen.max_tokens})` })}
+                  ${sliderHTML({ id: "g-top_k", label: "Top K", min: 1, max: 200, step: 1, value: bot.gen.top_k ?? "", allowBlank: true, hint: `Empty = global (${settings.gen.top_k || "not sent"})` })}
+                  ${sliderHTML({ id: "g-repetition_penalty", label: "Repetition penalty", min: 1, max: 2, step: 0.01, value: bot.gen.repetition_penalty ?? "", allowBlank: true, hint: `Empty = global (${settings.gen.repetition_penalty || "not sent"})` })}
                 </div>
                 <div class="field">
                   <label for="creatorNotes">Creator notes</label>
@@ -282,7 +284,7 @@ export async function render(main, [id]) {
     bot.bondMilestones = $("#bond-milestones", main).checked;
     bot.contentMode = val("#content-mode");
     bot.gen = {};
-    for (const k of ["temperature", "max_tokens"]) {
+    for (const k of ["temperature", "max_tokens", "top_k", "repetition_penalty"]) {
       const v = val(`#g-${k}`);
       if (v !== "") bot.gen[k] = Number(v);
     }
@@ -427,6 +429,8 @@ export async function render(main, [id]) {
   $$("textarea", main).forEach(autosize);
   wireSlider(main, "g-temperature", update);
   wireSlider(main, "g-max_tokens", update);
+  wireSlider(main, "g-top_k", update);
+  wireSlider(main, "g-repetition_penalty", update);
   form.addEventListener("input", update);
   paintAlts();
   update();

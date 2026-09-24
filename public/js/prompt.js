@@ -261,7 +261,9 @@ function impersonateInstruction(names, hint) {
 // Settings sent to the API. A bot's own values win over the global ones.
 export function generationParams(settings, bot) {
   const out = {};
-  for (const k of ["temperature", "top_p", "max_tokens", "frequency_penalty", "presence_penalty"]) {
+  // top_k and repetition_penalty are not part of the OpenAI format; many
+  // providers accept them. They are only sent when set.
+  for (const k of ["temperature", "top_p", "top_k", "max_tokens", "frequency_penalty", "presence_penalty", "repetition_penalty"]) {
     const v = bot?.gen?.[k] ?? settings.gen[k];
     if (v !== "" && v !== null && v !== undefined && !Number.isNaN(Number(v))) out[k] = Number(v);
   }

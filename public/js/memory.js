@@ -95,44 +95,92 @@ function terms(text) {
   return out;
 }
 
-// docs: [{ label, text }]. Returns up to `limit` of them, best first.
-export function recall(docs, query, { limit = 2, clipTo = 420 } = {}) {
-  const q = terms(query);
-  if (!q.size || !docs.length) return [];
-  const docTerms = docs.map((d) => terms(d.text));
-  const df = new Map();
-  for (const t of docTerms) for (const w of t.keys()) df.set(w, (df.get(w) ?? 0) + 1);
-  const n = docs.length;
-  return docs
-    .map((d, i) => {
-      let score = 0; let hits = 0; let named = false;
-      for (const [w, weight] of q) {
-        if (!docTerms[i].has(w)) continue;
-        hits++;
-        score += Math.log(1 + n / df.get(w)) * weight;
-        if (weight > 1 || docTerms[i].get(w) > 1) named = true;
-      }
-      return { d, score, hits, named };
-    })
-    // One shared name is enough; otherwise two ordinary words.
-    .filter((x) => x.hits >= 2 || (x.named && x.hits >= 1))
-    .sort((a, b) => b.score - a.score)
-    .slice(0, limit)
-    .map(({ d }) => ({ label: d.label, text: d.text.length > clipTo ? `${d.text.slice(0, clipTo)}…` : d.text }));
+// An inverted index: for each word, the documents that contain it. Search
+// then only looks at documents sharing a word with the query, instead of
+// reading every old message each turn. Documents are only ever appended.
+function createIndex() { return { size: 0, postings: new Map(), refs: [] }; }
+function addDoc(ix, ref, text) {
+  const id = ix.size++;
+  ix.refs.push(ref);
+  for (const w of terms(text).keys()) {
+    const p = ix.postings.get(w);
+    if (p) p.push(id); else ix.postings.set(w, [id]);
+  }
 }
 
-// Old material the prompt no longer carries: folded chapters, and messages
-// before the recent part that are not pinned (pinned ones are always sent).
-export function recallDocs(chat, { nameOf, textOf, start = windowStart(chat) }) {
+// Scores documents across indexes by the rarer words they share with the
+// query; names in the query count double. Words found in over a quarter of
+// a large chat ("senpai", a character's name) say nothing, so they are skipped.
+function search(indexes, query, { limit = 2, skip = () => false } = {}) {
+  const q = terms(query);
+  const n = indexes.reduce((sum, ix) => sum + ix.size, 0);
+  if (!q.size || !n) return [];
+  const found = new Map(); // "index:doc" → { score, hits, named }
+  for (const [w, weight] of q) {
+    const lists = indexes.map((ix) => ix.postings.get(w) ?? []);
+    const df = lists.reduce((sum, l) => sum + l.length, 0);
+    if (!df || (n >= 200 && df > n / 4)) continue;
+    const idf = Math.log(1 + n / df) * weight;
+    lists.forEach((list, k) => {
+      for (const id of list) {
+        const key = `${k}:${id}`;
+        const f = found.get(key) ?? { k, id, score: 0, hits: 0, named: false };
+        f.score += idf; f.hits += 1; f.named ||= weight > 1;
+        found.set(key, f);
+      }
+    });
+  }
+  return [...found.values()]
+    // One shared name is enough; otherwise two ordinary words.
+    .filter((f) => (f.hits >= 2 || f.named) && !skip(indexes[f.k].refs[f.id]))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit)
+    .map((f) => indexes[f.k].refs[f.id]);
+}
+
+const clipText = (text, n) => (text.length > n ? `${text.slice(0, n)}…` : text);
+
+// docs: [{ label, text }]. Returns up to `limit` of them, best first.
+export function recall(docs, query, { limit = 2, clipTo = 420 } = {}) {
+  const ix = createIndex();
+  docs.forEach((d) => addDoc(ix, d, d.text));
+  return search([ix], query, { limit }).map((d) => ({ label: d.label, text: clipText(d.text, clipTo) }));
+}
+
+// One index per open chat, kept between turns and extended with messages as
+// they leave the recent part. Rebuilt when the indexed messages change under
+// it (a rewind, or another chat).
+const indexes = new Map();
+export function recallFor(chat, { query, nameOf, textOf, start = windowStart(chat), limit = 2, clipTo = 420 }) {
+  let entry = indexes.get(chat.id);
+  const stale = !entry || entry.messages.size > chat.messages.length ||
+    (entry.messages.size && chat.messages[entry.messages.size - 1]?.id !== entry.lastId) ||
+    entry.chapters.size > (chat.chapters ?? []).length ||
+    (entry.chapters.size && chat.chapters[entry.chapters.size - 1]?.id !== entry.lastChapter);
+  if (stale) {
+    entry = { messages: createIndex(), chapters: createIndex(), lastId: null, lastChapter: null };
+    indexes.set(chat.id, entry);
+  }
+  for (let i = entry.messages.size; i < start; i++) {
+    const m = chat.messages[i];
+    const ok = m.role === "user" || m.role === "assistant";
+    addDoc(entry.messages, i, ok ? textOf(m) : "");
+    entry.lastId = m.id;
+  }
+  // Only folded chapters: the others are already in the prompt.
   const live = liveChapters(chat);
   const folded = live.slice(0, Math.min(chat.memory?.folded ?? 0, live.length));
-  return [
-    ...folded.map((c) => ({ label: `Earlier chapter (messages ${c.from + 1}–${c.to})`, text: c.text })),
-    ...chat.messages.slice(0, start)
-      .map((m, i) => ({ m, i }))
-      .filter(({ m }) => !m.pinned && (m.role === "user" || m.role === "assistant") && textOf(m).trim())
-      .map(({ m, i }) => ({ label: `Message ${i + 1}, ${nameOf(m)}`, text: textOf(m).replace(/\s+/g, " ").trim() })),
-  ];
+  for (let i = entry.chapters.size; i < folded.length; i++) {
+    addDoc(entry.chapters, folded[i], folded[i].text);
+    entry.lastChapter = folded[i].id;
+  }
+  // Pinned messages are always in the prompt already.
+  const hits = search([entry.chapters, entry.messages], query, {
+    limit, skip: (ref) => typeof ref === "number" && (ref >= start || chat.messages[ref]?.pinned),
+  });
+  return hits.map((ref) => (typeof ref === "number"
+    ? { label: `Message ${ref + 1}, ${nameOf(chat.messages[ref])}`, text: clipText(textOf(chat.messages[ref]).replace(/\s+/g, " ").trim(), clipTo) }
+    : { label: `Earlier chapter (messages ${ref.from + 1}–${ref.to})`, text: clipText(ref.text, clipTo) }));
 }
 
 // ---------- Chapter replies ----------

@@ -14,6 +14,9 @@ const GEN = [
   { k: "contextTokens", label: "Context size (tokens)", min: 1000, max: 200000, step: 500, hint: "How much prompt plus history to send. Older messages drop off beyond this. Match your model's limit." },
   { k: "frequency_penalty", label: "Frequency penalty", min: -2, max: 2, step: 0.05, hint: "Above 0 discourages repeating the same words." },
   { k: "presence_penalty", label: "Presence penalty", min: -2, max: 2, step: 0.05, hint: "Above 0 nudges the model toward new topics." },
+  // Optional: sent only when set, for providers that accept them.
+  { k: "top_k", label: "Top K", min: 1, max: 200, step: 1, optional: true, hint: "Only the K most likely words are considered. Empty = not sent. Not every provider supports it." },
+  { k: "repetition_penalty", label: "Repetition penalty", min: 1, max: 2, step: 0.01, optional: true, hint: "Above 1 discourages repeating words; 1 is off. Empty = not sent. Not every provider supports it." },
 ];
 
 export async function render(main) {
@@ -93,7 +96,7 @@ export async function render(main) {
       <div class="card">
         <p class="lead">Defaults for every bot. A bot can override temperature and length in its own settings.</p>
         <div class="form-grid">
-          <div class="form-row">${GEN.map((g) => sliderHTML({ id: `gen-${g.k}`, label: g.label, min: g.min, max: g.max, step: g.step, value: settings.gen[g.k], hint: g.hint })).join("")}</div>
+          <div class="form-row">${GEN.map((g) => sliderHTML({ id: `gen-${g.k}`, label: g.label, min: g.min, max: g.max, step: g.step, value: settings.gen[g.k] ?? "", allowBlank: !!g.optional, hint: g.hint })).join("")}</div>
           <label class="check"><input type="checkbox" id="stream"><span>Stream replies<small>Show words as they arrive. Turn off if your proxy does not support streaming.</small></span></label>
         </div>
       </div>
@@ -191,6 +194,7 @@ export async function render(main) {
     for (const g of GEN) {
       const v = $(`#gen-${g.k}`, main).value;
       if (v !== "") gen[g.k] = Math.min(g.max, Math.max(g.min, Number(v)));
+      else if (g.optional) gen[g.k] = ""; // cleared: stop sending it
     }
     const loreSet = { scanDepth: Number($("#lore-scan", main).value) || 1, maxEntries: Number($("#lore-max", main).value) || 0 };
     settings = await saveSettings({ gen, lore: loreSet });

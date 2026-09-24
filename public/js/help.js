@@ -4,10 +4,16 @@
 import { getMeta, setMeta } from "./store.js";
 import { $, esc, icon, openDialog } from "./ui.js";
 
-export const APP_VERSION = "2026.09.24.3";
+export const APP_VERSION = "2026.09.24.4";
 
 // Newest first. Each item says what it is and where it lives.
 export const NEWS = [
+  {
+    version: "2026.09.24.4",
+    items: [
+      ["Long chats open fast", "A chat shows its latest 100 messages. Press Show earlier at the top for more. The bot still remembers everything."],
+    ],
+  },
   {
     version: "2026.09.24.3",
     items: [
