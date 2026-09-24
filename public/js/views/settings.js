@@ -72,7 +72,13 @@ export async function render(main) {
           </fieldset>
           <fieldset class="field">
             <legend class="field-label">Chat font</legend>
-            ${segmentedHTML("chat-font", [["rounded", "Rounded"], ["serif", "Book"], ["plain", "Plain"]], readPref("chatFont", "rounded"))}
+            ${segmentedHTML("chat-font", [["rounded", "Rounded"], ["serif", "Book"], ["clear", "Clear"], ["plain", "Plain"]], readPref("chatFont", "rounded"))}
+            <p class="hint">Clear is made for low vision and tired eyes: letters like I, l and 1 never look alike.</p>
+          </fieldset>
+          <fieldset class="field">
+            <legend class="field-label">Chat actions</legend>
+            ${segmentedHTML("chat-actions", [["italic", "Italic"], ["upright", "Upright"]], readPref("chatActions", "italic"))}
+            <p class="hint">How *actions* look. Upright is easier to read in long passages; they keep their softer colour.</p>
           </fieldset>
           <fieldset class="field">
             <legend class="field-label">Chat picture size</legend>
@@ -272,6 +278,11 @@ export async function render(main) {
     try { r.value === "lg" ? localStorage.removeItem("chatPic") : localStorage.setItem("chatPic", r.value); } catch {}
     if (r.value === "lg") delete document.documentElement.dataset.chatPic;
     else document.documentElement.dataset.chatPic = r.value;
+  }));
+  $$('input[name="chat-actions"]', main).forEach((r) => r.addEventListener("change", () => {
+    try { r.value === "italic" ? localStorage.removeItem("chatActions") : localStorage.setItem("chatActions", r.value); } catch {}
+    if (r.value === "italic") delete document.documentElement.dataset.chatActions;
+    else document.documentElement.dataset.chatActions = r.value;
   }));
   $$('input[name="chat-font"]', main).forEach((r) => r.addEventListener("change", () => {
     try { r.value === "rounded" ? localStorage.removeItem("chatFont") : localStorage.setItem("chatFont", r.value); } catch {}

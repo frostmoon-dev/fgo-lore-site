@@ -170,6 +170,8 @@ a:hover { color: var(--accent-hover); }
 button, input, select, textarea { font: inherit; color: inherit; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 [hidden] { display: none !important; }
+/* Selected text in the theme's own colour, not the system blue. */
+::selection { background: color-mix(in srgb, var(--accent) 32%, transparent); color: var(--ink); }
 
 h1, h2, h3 { font-family: var(--font-display); font-weight: 500; line-height: var(--lh-tight); letter-spacing: -.01em; }
 h1 { font-size: var(--t-2xl); }
@@ -501,6 +503,11 @@ details.more[open] > * + * { margin-top: var(--s4); }
   background: var(--raised); border-radius: var(--r-pill); box-shadow: var(--shadow-2);
 }
 .save-state { font-size: var(--t-sm); color: var(--muted); }
+/* Save status sits right under the button it describes, centred on it. */
+.save-under { margin: calc(-1 * var(--s1)) 0 var(--s1); text-align: center; }
+.save-under:empty { display: none; }
+/* A destructive button stands apart from the everyday ones. */
+.danger-apart { margin-top: var(--s3); }
 .save-pill {
   position: sticky; bottom: var(--s5); width: fit-content; margin: var(--s4) 0 0 auto;
   padding: var(--s2) var(--s4); background: var(--raised); border-radius: var(--r-pill); box-shadow: var(--shadow-2);
@@ -611,12 +618,19 @@ body.in-chat .site-footer { display: none; }
 .chat-main { position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0; }
 .chat-topbar { display: flex; align-items: center; gap: var(--s2); min-height: 64px; padding: var(--s2) var(--s4); border-bottom: 1px solid var(--line); background: var(--bg); }
 .chat-topbar .avatar-link { align-self: center; }
-.chat-topbar .title { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The title box clips long names, so it carries 4px of room on each side for
+   the focus ring of the name and the rename field (drawn slightly outside). */
+.chat-topbar .title {
+  flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  padding: 4px 4px 4px calc(var(--s2) + 4px); margin: -4px -4px -4px calc(-1 * (var(--s2) + 4px));
+  pointer-events: none;
+}
+.chat-topbar .title > * { pointer-events: auto; }
 .chat-topbar .title small { display: block; font-weight: 400; color: var(--muted); overflow: hidden; text-overflow: ellipsis; }
 /* The chat name renames in place. The pencil shows on hover and focus. */
 .title-line { display: flex; align-items: center; gap: var(--s2); min-width: 0; }
 .title-edit {
-  flex: 0 1 auto; display: inline-flex; align-items: center; gap: var(--s1); min-width: 0; height: 28px;
+  flex: 0 1 auto; display: inline-flex; align-items: center; gap: var(--s1); min-width: 0; height: 32px;
   margin-left: calc(-1 * var(--s2)); padding: 0 var(--s2); border: 0; border-radius: var(--r-sm);
   background: none; color: inherit; font: inherit; cursor: text;
 }
@@ -625,7 +639,11 @@ body.in-chat .site-footer { display: none; }
 .title-edit:hover { background: var(--fill); }
 .title-edit:hover svg, .title-edit:focus-visible svg { opacity: 1; }
 @media (hover: none) { .title-edit svg { opacity: 1; } }
-.chat-topbar .title-input { height: 28px; width: min(320px, 100%); margin-left: calc(-1 * var(--s2)); padding: 0 var(--s2); font-weight: 600; border-radius: var(--r-sm); }
+/* Same height, font and text position as the name it replaces, so nothing moves. */
+.chat-topbar .title-input {
+  height: 32px; width: min(320px, 100%); margin-left: calc(-1 * var(--s2)); padding: 0 calc(var(--s2) - 1.5px);
+  font: inherit; font-weight: 600; border-radius: var(--r-sm);
+}
 .only-mobile { display: none; }
 
 .chat-log { flex: 1; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; padding: var(--s6) var(--s5) var(--s4); }
@@ -650,6 +668,16 @@ body.in-chat .site-footer { display: none; }
 /* Chat font (Chat look, or Settings → Appearance): system faces, nothing extra to load. */
 :root[data-chat-font="serif"] { --chat-font: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif; }
 :root[data-chat-font="plain"] { --chat-font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+/* Clear: made for low vision and tired eyes; I, l and 1, O and 0 never look alike. */
+:root[data-chat-font="clear"] { --chat-font: "Atkinson Hyperlegible Next", system-ui, sans-serif; }
+/* Light text on a dark screen blooms and looks thinner, so it gets a little more weight. */
+:root[data-theme="dark"] .msg-body { font-weight: 450; }
+/* Long passages read faster upright; actions keep their softer colour either way. */
+:root[data-chat-actions="upright"] .msg-body em { font-style: normal; }
+/* About 70 characters a line (the comfortable range is 45 to 75), measured
+   in em so it holds at every message size. */
+.msg-body { max-width: 33em; }
+:root[data-chat-font="serif"] .msg-body { max-width: 30em; } /* serif fallbacks run narrow */
 .msg-body > * + * { margin-top: .75em; }
 .msg.user .msg-body { color: var(--narration); }
 .msg-body em { font-style: italic; color: var(--narration); }
@@ -684,8 +712,10 @@ body.in-chat .site-footer { display: none; }
 .composer-inner { max-width: var(--measure); margin: 0 auto; }
 .composer-inner > .note { margin-bottom: var(--s2); }
 .composer-box {
-  display: flex; align-items: flex-end; gap: var(--s2); padding: var(--s1) var(--s1) var(--s1) var(--s2);
-  background: var(--raised); border: 1.5px solid var(--line-strong); border-radius: 24px;
+  /* The send button sits 6px in from the edge, and the corner radius is its
+     radius plus that gap, so the button's curve follows the box's corner. */
+  display: flex; align-items: flex-end; gap: var(--s2); padding: 6px 6px 6px var(--s2);
+  background: var(--raised); border: 1.5px solid var(--line-strong); border-radius: 26px;
   transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
 }
 .composer-box:focus-within { border-color: var(--ink); box-shadow: 0 0 0 3px var(--accent-soft); }
@@ -1268,7 +1298,7 @@ dialog.palette-dialog { width: min(600px, calc(100vw - 32px)); margin-top: 12vh;
   .palette-btn { border-width: 4px 5px; margin: -4px -5px; }
   .brand { --hit: 9px; margin-inline: 0; border-inline-width: 0; }
   /* The chat name sits in a clipped box, so its extra area goes below, over the subtitle. */
-  .title-edit { border-width: 0 0 16px; margin: 0 0 -16px calc(-1 * var(--s2)); }
+  .title-edit { border-width: 0 0 12px; margin: 0 0 -12px calc(-1 * var(--s2)); }
   .swipes > span { pointer-events: none; }
   .site-footer a { display: inline-block; padding-block: 12px; margin-block: -12px; }
   .msg > .avatar-link { --hit: max(0px, calc((44px - var(--pic)) / 2)); }
@@ -1302,3 +1332,33 @@ dialog.palette-dialog { width: min(600px, calc(100vw - 32px)); margin-top: 12vh;
 
 /* A long chat draws its latest messages; older ones load on request. */
 .earlier { display: flex; flex-direction: column; align-items: center; gap: var(--s1); padding-bottom: var(--s4); text-align: center; }
+
+/* Import dialog: three ways in, each a short section with one action. */
+.import-way { display: grid; gap: var(--s2); padding-top: var(--s4); border-top: 1px solid var(--line); }
+.import-way h3 { font-size: var(--t-md); font-weight: 600; }
+.import-way > .btn { justify-self: start; }
+.drop-zone {
+  display: flex; align-items: center; justify-content: center; gap: var(--s3); min-height: 88px; padding: var(--s4);
+  border: 1.5px dashed var(--line-strong); border-radius: var(--r-md); background: none;
+  color: var(--muted); font: inherit; font-size: var(--t-ui); cursor: pointer;
+  transition: background var(--dur) var(--ease), border-color var(--dur) var(--ease);
+}
+.drop-zone strong { color: var(--ink); font-weight: 600; }
+@media (hover: none) { .drop-hint { display: none; } } /* no dragging on a touch screen */
+.drop-zone svg { width: 20px; height: 20px; flex: none; }
+.drop-zone:hover, .drop-zone.is-over { background: var(--fill); border-color: var(--ink); }
+.inline-form { display: flex; gap: var(--s2); }
+.inline-form input { flex: 1; min-width: 0; }
+/* Files dragged over the bots page. */
+.drop-overlay {
+  position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; padding: var(--s4);
+  background: color-mix(in srgb, var(--bg) 82%, transparent); pointer-events: none;
+}
+.drop-overlay > div {
+  display: grid; justify-items: center; gap: var(--s3); padding: var(--s6) var(--s7);
+  border: 2px dashed var(--ink); border-radius: var(--r-lg); background: var(--surface);
+  font-size: var(--t-md); font-weight: 600; color: var(--ink);
+}
+.drop-overlay svg { width: 28px; height: 28px; }
+.import-help { padding-top: var(--s4); border-top: 1px solid var(--line); }
+.import-help .steps-list { margin: var(--s3) 0; font-size: var(--t-ui); }

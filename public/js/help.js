@@ -4,10 +4,20 @@
 import { getMeta, setMeta } from "./store.js";
 import { $, esc, icon, openDialog } from "./ui.js";
 
-export const APP_VERSION = "2026.09.24.6";
+export const APP_VERSION = "2026.09.24.7";
 
 // Newest first. Each item says what it is and where it lives.
 export const NEWS = [
+  {
+    version: "2026.09.24.7",
+    items: [
+      ["Import from Chub links", "Import on the home page now takes a Chub character link, as well as card files. Paste the page's address and the card comes in with its picture and lorebook."],
+      ["Import several cards at once", "Pick several PNG or JSON cards together, or drop them anywhere on the home page. A file that is not a card now says what it is and what to download instead."],
+      ["Paste a definition", "For sites with no card download: paste the character text you can see, and it is sorted into the right fields without being rewritten. Under Import, or on a new bot's page."],
+      ["Easier reading", "A new Clear font, made for low vision and tired eyes, sits beside Rounded, Book and Plain. Actions can show upright instead of in italics (easier on long passages). Lines stop at about 70 characters, and text is a touch heavier in dark mode. In Chat look or Settings."],
+      ["Tidier spacing", "The save status sits under Save bot, Delete bot stands a little apart, the send button sits evenly inside the message box, and renaming a chat no longer cuts off the name field. Selected text uses the theme colour."],
+    ],
+  },
   {
     version: "2026.09.24.6",
     items: [
