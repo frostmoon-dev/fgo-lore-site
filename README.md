@@ -22,7 +22,9 @@ server-side storage of your key.
 - **Personas**: who you are in a chat, with a picture and description. Set a default
   and switch per chat.
 - **Prompt page**: the main prompt, post-history instructions, what to include,
-  generation settings, and a preview of the exact prompt a bot will receive.
+  generation settings (temperature, top P, max reply tokens, context size, frequency and
+  presence penalties, plus optional top K and repetition penalty, sent only when set, for
+  providers that accept them), and a preview of the exact prompt a bot will receive.
   Save several presets.
 - **Lorebooks**: lore entries live in books. A book can be used by every bot, or linked
   to the bots you choose, so a Fate bot and a sci-fi bot never see each other's world.

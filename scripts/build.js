@@ -3,7 +3,7 @@
 import fs from "node:fs";
 import { loadEntries } from "../lib/entries.js";
 
-const GEN_KEYS = ["temperature", "top_p", "max_tokens", "frequency_penalty", "presence_penalty"];
+const GEN_KEYS = ["temperature", "top_p", "top_k", "max_tokens", "frequency_penalty", "presence_penalty", "repetition_penalty"];
 const list = (v) => (Array.isArray(v) ? v.map(String) : v ? [String(v)] : []);
 
 const bots = loadEntries("bots").map(({ id, title, meta, content }) => ({
