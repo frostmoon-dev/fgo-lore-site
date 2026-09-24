@@ -123,6 +123,71 @@ export async function draftBot({ idea, signal }) {
   };
 }
 
+// ---------- Pasted definitions ----------
+// Text copied from another site's character page. Labelled text ("Scenario:",
+// "First message:") is split here without the model; otherwise the model
+// sorts it into fields, copying rather than rewriting.
+
+const FIELD_LABELS = [
+  ["name", /^(name|character name|char(?:acter)?'?s? name)$/],
+  ["tagline", /^(tagline|tag line|short description|summary)$/],
+  ["personality", /^(personality|traits|personality summary)$/],
+  ["scenario", /^(scenario|setting|world scenario)$/],
+  ["greeting", /^(first message|greeting|intro(?:duction)?|opening(?: message)?|initial message|first mes)$/],
+  ["examples", /^(example dialogues?|examples?|example messages|dialogue examples|example chats?|mes example)$/],
+  ["description", /^(description|definition|character definition|persona|character|about|bio|char persona)$/],
+];
+const FIELDS = ["name", "tagline", "description", "personality", "scenario", "greeting", "examples"];
+
+export function splitLabelled(text) {
+  const out = Object.fromEntries(FIELDS.map((k) => [k, ""]));
+  let field = null;
+  let found = 0;
+  const seen = new Set();
+  for (const line of String(text).replace(/\r\n?/g, "\n").split("\n")) {
+    // "Scenario:", "## Scenario", "**First message:**", "[Personality]"
+    const m = line.match(/^\s*(?:#{1,4}\s*)?(?:\*\*|\[)?\s*([A-Za-z' ]{3,30})\s*(?:\*\*|\])?\s*[:：]?\s*(?:\*\*)?\s*(.*)$/);
+    const label = m && (/[:：\]]|\*\*|^\s*#/.test(line) || !m[2]) ? m[1].trim().toLowerCase() : "";
+    const hit = label && FIELD_LABELS.find(([, re]) => re.test(label));
+    if (hit && !seen.has(hit[0])) {
+      field = hit[0]; seen.add(field); found++;
+      if (m[2].trim()) out[field] += `${m[2].trim()}\n`;
+      continue;
+    }
+    if (field) out[field] += `${line}\n`;
+    else out.description += `${line}\n`;
+  }
+  for (const k of FIELDS) out[k] = out[k].trim();
+  return found >= 2 ? out : null;
+}
+
+const squash = (s) => String(s).replace(/\s+/g, " ").trim().toLowerCase();
+
+export async function sortDefinition({ text, signal }) {
+  const local = splitLabelled(text);
+  if (local) return { ...local, reworded: [], byModel: false };
+  const system =
+    "You sort a character definition, copied from a roleplay site, into fields. " +
+    "Copy the text exactly, word for word: do not summarise, rewrite, translate, fix or add anything. " +
+    "Every part of the text goes into exactly one field; anything that fits no other field goes into description. " +
+    "Keep {{char}}, {{user}}, <START> and formatting as they are. " +
+    "Answer with JSON only, an object with these string keys (empty string when absent): " +
+    '"name"; "tagline" (only if the text has a one-line summary); "description" (who the character is); ' +
+    '"personality" (only a separate trait list); "scenario" (the situation the chat starts in); ' +
+    '"greeting" (the first message, in the character\'s voice); "examples" (example dialogue).';
+  const maxTokens = Math.min(16000, Math.ceil(String(text).length / 3) + 600);
+  const d = parseJSON(await ask([{ role: "system", content: system }, { role: "user", content: text }], { maxTokens, temperature: 0, signal }));
+  if (!d || typeof d !== "object" || Array.isArray(d)) throw new Error("The model did not return the fields.");
+  const out = Object.fromEntries(FIELDS.map((k) => [k, typeof d[k] === "string" ? d[k].trim() : ""]));
+  // A field is reworded when its start or end is not in the pasted text.
+  const src = squash(text);
+  const reworded = FIELDS.filter((k) => {
+    const v = squash(out[k]);
+    return v.length > 20 && !(src.includes(v.slice(0, 40)) && src.includes(v.slice(-40)));
+  });
+  return { ...out, reworded, byModel: true };
+}
+
 // ---------- Character check ----------
 
 export async function checkCharacter({ bot, names, reply, context, signal }) {

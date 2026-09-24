@@ -17,6 +17,7 @@ const api = {
   "/api/chat": () => import("./api/chat.js"),
   "/api/models": () => import("./api/models.js"),
   "/api/config": () => import("./api/config.js"),
+  "/api/card": () => import("./api/card.js"),
 };
 
 async function handleApi(req, res, load) {

@@ -9,7 +9,7 @@ import { maybeShowTour } from "./help.js";
 // { cleanup(), isDirty() } so the router can warn about unsaved changes.
 const routes = [
   [/^\/?$/, "home", () => import("./views/home.js")],
-  [/^\/bot\/new$/, "home", () => import("./views/bot-edit.js")],
+  [/^\/bot\/new(?:\?paste)?$/, "home", () => import("./views/bot-edit.js")],
   [/^\/bot\/([^/]+)$/, "home", () => import("./views/bot-edit.js")],
   [/^\/chat\/([^/?]+)(?:\/([^/?]+))?(?:\?m=([^/?]+))?$/, "home", () => import("./views/chat.js")],
   [/^\/search(?:\?q=(.*))?$/, "search", () => import("./views/search.js")],

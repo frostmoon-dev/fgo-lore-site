@@ -1,7 +1,7 @@
 import { bots, newBot, getSettings, getLorebooks, loreForBot, BOND_KINDS, BOND_POINTS, bondLevels, EXPRESSIONS, MOOD_SUGGESTIONS, moodName } from "../store.js";
 import { toCard, cardPng } from "../card.js";
 import { estimateTokens } from "../prompt.js";
-import { draftBot } from "../ai.js";
+import { draftBot, sortDefinition } from "../ai.js";
 import {
   $, $$, esc, icon, imagePicker, imagePickerHTML, avatarHTML, toast, confirmDialog,
   download, slug, parseTags, autosize, sliderHTML, wireSlider,
@@ -36,6 +36,7 @@ export async function render(main, [id]) {
   const books = await getLorebooks();
   let saved = JSON.stringify(bot);
   const isNew = !existing;
+  const pasting = isNew && /\?paste$/.test(location.hash);
 
   main.innerHTML = `
     <div class="wrap page">
@@ -47,7 +48,7 @@ export async function render(main, [id]) {
       <form class="editor-layout" id="form" novalidate>
         <div class="form-grid">
           <div class="card">
-            <details class="more" id="idea-box" ${isNew ? "open" : ""}>
+            <details class="more" id="idea-box" ${isNew && !pasting ? "open" : ""}>
               <summary>Start from an idea</summary>
               <div class="form-grid">
                 <p class="hint">Describe the character in a line or two. The model drafts the name, definition, scenario,
@@ -59,6 +60,22 @@ export async function render(main, [id]) {
                 <div class="actions">
                   <button class="btn btn-primary" type="button" id="draft">Draft the bot</button>
                   <span class="hint" id="draft-state" aria-live="polite"></span>
+                </div>
+              </div>
+            </details>
+            <details class="more" id="paste-box" ${pasting ? "open" : ""}>
+              <summary>Paste a definition from another site</summary>
+              <div class="form-grid">
+                <p class="hint">For sites with no card download. Paste the character text you can see on its page.
+                  Labelled text (Scenario:, First message:) is split as it is; otherwise the model sorts it into fields,
+                  copying rather than rewriting. Nothing is saved until you press Save bot.</p>
+                <div class="field">
+                  <label for="paste">Character text</label>
+                  <textarea id="paste" rows="6" placeholder="Name, description, scenario, first message, example dialogue…"></textarea>
+                </div>
+                <div class="actions">
+                  <button class="btn btn-primary" type="button" id="paste-go">Sort into fields</button>
+                  <span class="hint" id="paste-state" aria-live="polite"></span>
                 </div>
               </div>
             </details>
@@ -235,13 +252,13 @@ export async function render(main, [id]) {
           <div class="card card-tight">
             <div class="actions actions-col">
               <button class="btn btn-primary" type="submit">Save bot</button>
+              <p class="save-state save-under" id="save-state" aria-live="polite"></p>
               ${isNew ? "" : `<a class="btn" href="#/chat/${bot.id}">Chat</a>`}
               <button class="btn" type="button" id="export-png" ${isNew ? "disabled" : ""}>Export PNG card</button>
               <button class="btn" type="button" id="export-json" ${isNew ? "disabled" : ""}>Export JSON</button>
               ${isNew ? "" : `<button class="btn" type="button" id="duplicate">Duplicate</button>
-              <button class="btn btn-danger" type="button" id="delete">Delete bot</button>`}
+              <button class="btn btn-danger danger-apart" type="button" id="delete">Delete bot</button>`}
             </div>
-            <p class="save-state" id="save-state" aria-live="polite"></p>
           </div>
         </aside>
       </form>
@@ -489,6 +506,46 @@ export async function render(main, [id]) {
       btn.removeAttribute("aria-busy");
     }
   }
+  // ---- Paste a definition ----
+  async function sortPasted() {
+    const text = val("#paste").trim();
+    const btn = $("#paste-go", main);
+    const state = $("#paste-state", main);
+    if (!text) { $("#paste", main).focus(); state.textContent = "Paste the character text first."; return; }
+    collect();
+    if ([bot.description, bot.greeting, bot.scenario, bot.examples].some((v) => v.trim())) {
+      const ok = await confirmDialog({
+        title: "Replace what is written?",
+        body: "The pasted text fills the definition, scenario, first message and example dialogue, replacing what is there now. You can still leave without saving.",
+        confirm: "Replace",
+      });
+      if (!ok) return;
+    }
+    btn.classList.add("is-loading");
+    btn.setAttribute("aria-busy", "true");
+    state.textContent = "Sorting the text into fields…";
+    try {
+      const d = await sortDefinition({ text });
+      const set = (id, v) => { const el = $(`#${id}`, main); el.value = v; el.dispatchEvent(new Event("input", { bubbles: true })); };
+      if (d.name && !val("#name").trim()) set("name", d.name);
+      for (const k of ["tagline", "description", "personality", "scenario", "greeting", "examples"]) if (d[k] || k !== "tagline") set(k, k === "tagline" ? d[k].slice(0, 140) : d[k]);
+      const names = { description: "definition", personality: "personality", scenario: "scenario", greeting: "first message", examples: "example dialogue", name: "name", tagline: "tagline" };
+      state.textContent = d.reworded.length
+        ? `Done, but check the ${d.reworded.map((k) => names[k]).join(", ")}: the model may have changed some words.`
+        : `Done${d.byModel ? "" : " (split by its labels)"}. Check each field, then save.`;
+      $("#name", main).scrollIntoView({ behavior: "smooth", block: "center" });
+      toast(`Filled in ${d.name || val("#name") || "the bot"}. Nothing is saved yet.`, "ok");
+    } catch (err) {
+      state.textContent = "";
+      toast(err.message, "error");
+    } finally {
+      btn.classList.remove("is-loading");
+      btn.removeAttribute("aria-busy");
+    }
+  }
+  $("#paste-go", main).addEventListener("click", sortPasted);
+  if (pasting) requestAnimationFrame(() => $("#paste", main).focus());
+
   $("#draft", main).addEventListener("click", draftFromIdea);
   $("#idea", main).addEventListener("keydown", (e) => {
     if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); draftFromIdea(); }

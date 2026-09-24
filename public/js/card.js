@@ -106,19 +106,70 @@ function fromCard(json) {
   return { bot, lore };
 }
 
-export async function importCardFile(file) {
-  if (file.type === "image/png" || /\.png$/i.test(file.name)) {
-    const chunks = readTextChunks(await file.arrayBuffer());
+// What a file really is, from its first bytes rather than its name.
+function sniff(bytes) {
+  const b = new Uint8Array(bytes.slice(0, 12));
+  const at = (i, ...xs) => xs.every((x, k) => b[i + k] === x);
+  if (at(0, 0x89, 0x50, 0x4e, 0x47)) return "png";
+  if (at(0, 0xff, 0xd8, 0xff)) return "jpg";
+  if (at(0, 0x52, 0x49, 0x46, 0x46) && at(8, 0x57, 0x45, 0x42, 0x50)) return "webp";
+  if (at(0, 0x47, 0x49, 0x46)) return "gif";
+  if (at(0, 0x50, 0x4b, 0x03, 0x04)) return "zip";
+  return "text";
+}
+
+// A PNG card, or a JSON card as text. `name` only helps the error messages.
+export async function importCardBytes(buffer, name = "", type = "image/png") {
+  const kind = sniff(buffer);
+  if (kind === "png") {
+    const chunks = readTextChunks(buffer);
     const raw = chunks.ccv3 ?? chunks.chara;
-    if (!raw) throw new Error("This PNG has no character card inside it.");
-    const result = fromCard(JSON.parse(b64ToUtf8(raw)));
-    result.bot.avatar = await autoCrop(file);
+    if (!raw) throw new Error(`${name || "This picture"} is a plain picture with no character inside. On the site, download the character card (PNG card or JSON), not the image.`);
+    let card;
+    try { card = JSON.parse(b64ToUtf8(raw)); } catch { throw new Error(`${name || "This card"} has a damaged character inside. Download it again.`); }
+    const result = fromCard(card);
+    result.bot.avatar = await autoCrop(new Blob([buffer], { type }));
     return result;
   }
+  if (kind === "jpg" || kind === "webp" || kind === "gif") {
+    throw new Error(`${name || "This file"} is a ${kind.toUpperCase()} picture. Character cards are PNG or JSON files; download the card version from the site.`);
+  }
+  if (kind === "zip") throw new Error(`${name || "This file"} is a CHARX or ZIP file, which is not supported yet. Download the PNG or JSON version instead.`);
   let json;
-  try { json = JSON.parse(await file.text()); }
-  catch { throw new Error("That file is not valid JSON or a PNG card."); }
-  return fromCard(json);
+  try { json = JSON.parse(new TextDecoder().decode(buffer)); }
+  catch { throw new Error(`${name || "This file"} is not a character card. Use a PNG card or a JSON file.`); }
+  try { return fromCard(json); }
+  catch { throw new Error(`${name || "This JSON file"} has no character in it. It may be a chat, preset or lorebook export.`); }
+}
+
+export async function importCardFile(file) {
+  return importCardBytes(await file.arrayBuffer(), file.name, file.type || "image/png");
+}
+
+// A Chub character page: chub.ai/characters/<creator>/<name>, also on
+// venus.chub.ai and characterhub.org. Returns null for anything else.
+export function chubRef(link) {
+  let url;
+  try { url = new URL(String(link).trim()); } catch { return null; }
+  if (!/(^|\.)(chub\.ai|characterhub\.org)$/i.test(url.hostname)) return null;
+  const m = url.pathname.match(/^\/characters\/([\w.-]+)\/([\w.-]+)/);
+  return m ? { creator: m[1], slug: m[2] } : null;
+}
+
+// Fetched through this site's server, which only ever asks Chub's card
+// store for that one card, so the browser needs no special permission.
+export async function importChubLink(link) {
+  const ref = chubRef(link);
+  if (!ref) throw new Error("That is not a Chub character link. It should look like chub.ai/characters/creator/name.");
+  let res;
+  try {
+    res = await fetch("/api/card", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(ref) });
+  } catch { throw new Error("Could not reach Chub. Check your connection, or download the card and import the file."); }
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error ?? "Chub did not send the card. Download it from the page and import the file instead.");
+  }
+  return importCardBytes(await res.arrayBuffer(), `${ref.slug}.png`);
 }
 
 // ---------- Export ----------

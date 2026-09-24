@@ -3,8 +3,8 @@ import {
   getMeta, setMeta, exportAll, markBackedUp,
 } from "../store.js";
 import { whatsNewCardHTML, showWhatsNew, APP_VERSION } from "../help.js";
-import { importCardFile } from "../card.js";
-import { $, $$, esc, icon, avatarHTML, toast, pickFile, timeAgo, download } from "../ui.js";
+import { importCardFile, importChubLink } from "../card.js";
+import { $, $$, esc, icon, avatarHTML, toast, timeAgo, download, openDialog } from "../ui.js";
 import { currentText } from "../prompt.js";
 
 export async function render(main) {
@@ -41,7 +41,7 @@ export async function render(main) {
             API key or proxy. Everything stays in this browser.</p>
         </div>
         <div class="actions">
-          <button class="btn" type="button" id="import">Import card</button>
+          <button class="btn" type="button" id="import" aria-haspopup="dialog">Import</button>
           <a class="btn btn-primary" href="#/bot/new">New bot</a>
         </div>
       </div>
@@ -200,26 +200,148 @@ export async function render(main) {
     paint();
   }));
 
-  $("#import", main).addEventListener("click", async () => {
-    const file = await pickFile(".png,.json,application/json,image/png");
-    if (!file) return;
-    try {
-      const { bot, lore: entries } = await importCardFile(file);
-      if (entries.length) {
-        const books = await getLorebooks();
-        const book = newLorebook({ name: `${bot.name} lore`, description: "Came with an imported character card." });
-        books.push(book);
-        await saveLorebooks(books);
-        bot.lorebookIds = [book.id];
-        for (const e of entries) await lore.save({ ...e, bookId: book.id });
-      }
-      await bots.save(bot);
-      toast(`Imported ${bot.name}${entries.length ? ` with a lorebook of ${entries.length} entries` : ""}.`, "ok");
-      location.hash = `#/bot/${bot.id}`;
-    } catch (err) {
-      toast(err.message, "error");
+  // ---------- Import ----------
+  // Saves one imported card: the bot, and its lorebook if it came with one.
+  async function keep({ bot, lore: entries }) {
+    if (entries.length) {
+      const books = await getLorebooks();
+      const book = newLorebook({ name: `${bot.name} lore`, description: "Came with an imported character card." });
+      books.push(book);
+      await saveLorebooks(books);
+      bot.lorebookIds = [book.id];
+      for (const e of entries) await lore.save({ ...e, bookId: book.id });
     }
+    await bots.save(bot);
+    return bot;
+  }
+  const saved = (bot, entries) => `Imported ${bot.name}${entries.length ? ` with a lorebook of ${entries.length} entries` : ""}.`;
+
+  // Several files at once: each one is tried, and every problem is reported.
+  async function importFiles(files) {
+    files = [...files];
+    if (!files.length) return;
+    const done = [];
+    for (const file of files) {
+      try {
+        const result = await importCardFile(file);
+        done.push({ bot: await keep(result), entries: result.lore });
+      } catch (err) {
+        toast(err.message, "error");
+      }
+    }
+    if (done.length === 1) {
+      toast(saved(done[0].bot, done[0].entries), "ok");
+      location.hash = `#/bot/${done[0].bot.id}`;
+    } else if (done.length > 1) {
+      toast(`Imported ${done.length} bots: ${done.map((d) => d.bot.name).join(", ")}.`, "ok");
+      window.dispatchEvent(new HashChangeEvent("hashchange")); // redraw the list
+    }
+  }
+
+  const chooseFiles = () => new Promise((resolve) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.multiple = true;
+    input.accept = ".png,.json,application/json,image/png";
+    input.onchange = () => resolve(input.files);
+    input.click();
   });
 
+  function openImport() {
+    const dlg = openDialog(`
+      <div class="dialog-body import-dialog">
+        <h2>Import a bot</h2>
+        <section class="import-way" aria-labelledby="imp-file-h">
+          <h3 id="imp-file-h">From a card file</h3>
+          <p class="hint">PNG or JSON character cards, from Chub, SillyTavern or any site that exports them. You can pick several.</p>
+          <button type="button" class="drop-zone" id="imp-drop">
+            ${icon("upload")}<span><strong>Choose card files</strong><span class="drop-hint"> or drop them here</span></span>
+          </button>
+        </section>
+        <section class="import-way" aria-labelledby="imp-link-h">
+          <h3 id="imp-link-h">From a Chub link</h3>
+          <form class="inline-form" id="imp-link-form">
+            <label for="imp-link" class="sr-only">Chub character link</label>
+            <input type="url" id="imp-link" placeholder="chub.ai/characters/…" autocomplete="off" required>
+            <button class="btn btn-primary" type="submit" id="imp-link-go">Import</button>
+          </form>
+          <p class="hint" id="imp-link-state" aria-live="polite">Paste the address of the character's page.</p>
+        </section>
+        <section class="import-way" aria-labelledby="imp-paste-h">
+          <h3 id="imp-paste-h">Paste a definition</h3>
+          <p class="hint">For sites with no card download. Paste the character text you can see, and the model sorts it
+            into the right fields without rewriting it.</p>
+          <a class="btn" href="#/bot/new?paste" id="imp-paste">Paste a definition</a>
+        </section>
+        <details class="more import-help">
+          <summary>Where do I get bots?</summary>
+          <ol class="steps-list">
+            <li>Sites such as Chub share character cards openly. Open a character's page there.</li>
+            <li>Use the page's download option and choose PNG or JSON: the card, not the plain picture.</li>
+            <li>Import that file here, or paste the page's address above.</li>
+          </ol>
+          <p class="hint">Some sites have no card download. If the character's text is shown on its page, use Paste a
+            definition. If its creator hid the definition, it cannot be imported; that choice is theirs to make.</p>
+        </details>
+        <form method="dialog" class="dialog-actions"><button class="btn btn-ghost">Close</button></form>
+      </div>`);
+    const drop = $("#imp-drop", dlg);
+    drop.addEventListener("click", async () => { const files = await chooseFiles(); if (files?.length) { dlg.close(); importFiles(files); } });
+    drop.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.add("is-over"); });
+    drop.addEventListener("dragleave", () => drop.classList.remove("is-over"));
+    drop.addEventListener("drop", (e) => { e.preventDefault(); e.stopPropagation(); dlg.close(); importFiles(e.dataTransfer.files); });
+    $("#imp-paste", dlg).addEventListener("click", () => dlg.close());
+    $("#imp-link-form", dlg).addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const btn = $("#imp-link-go", dlg);
+      const state = $("#imp-link-state", dlg);
+      btn.classList.add("is-loading"); btn.setAttribute("aria-busy", "true");
+      state.textContent = "Fetching the card from Chub…";
+      state.classList.remove("error-text");
+      try {
+        const result = await importChubLink($("#imp-link", dlg).value);
+        const bot = await keep(result);
+        dlg.close();
+        toast(saved(bot, result.lore), "ok");
+        location.hash = `#/bot/${bot.id}`;
+      } catch (err) {
+        state.textContent = err.message;
+        state.classList.add("error-text");
+      } finally {
+        btn.classList.remove("is-loading"); btn.removeAttribute("aria-busy");
+      }
+    });
+  }
+  $("#import", main).addEventListener("click", openImport);
+
+  // Card files dropped anywhere on this page are imported too.
+  const hasFiles = (e) => [...(e.dataTransfer?.types ?? [])].includes("Files");
+  let depth = 0;
+  const overlay = document.createElement("div");
+  overlay.className = "drop-overlay";
+  overlay.hidden = true;
+  overlay.innerHTML = `<div>${icon("upload")}<p>Drop card files to import them</p></div>`;
+  main.append(overlay);
+  const onEnter = (e) => { if (!hasFiles(e) || document.querySelector("dialog[open]")) return; depth++; overlay.hidden = false; };
+  const onLeave = (e) => { if (!hasFiles(e)) return; depth = Math.max(0, depth - 1); if (!depth) overlay.hidden = true; };
+  const onOver = (e) => { if (hasFiles(e) && !overlay.hidden) e.preventDefault(); };
+  const onDrop = (e) => {
+    if (!hasFiles(e) || overlay.hidden) return;
+    e.preventDefault(); depth = 0; overlay.hidden = true;
+    importFiles(e.dataTransfer.files);
+  };
+  document.addEventListener("dragenter", onEnter);
+  document.addEventListener("dragleave", onLeave);
+  document.addEventListener("dragover", onOver);
+  document.addEventListener("drop", onDrop);
+
   paint();
+  return {
+    cleanup() {
+      document.removeEventListener("dragenter", onEnter);
+      document.removeEventListener("dragleave", onLeave);
+      document.removeEventListener("dragover", onOver);
+      document.removeEventListener("drop", onDrop);
+    },
+  };
 }
