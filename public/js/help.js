@@ -11,6 +11,7 @@ export const NEWS = [
   {
     version: "2026.09.24.13",
     items: [
+      ["Expressions with more models", "Mood tags written other ways, like (mood: Happy) or a last line \"Mood: happy\", now work and stay hidden. When a model writes no tag at all, the face is picked from how the reply ends: smiles and laughs look happy, glares look angry, blushes look flustered, and your own moods count when their word appears."],
       ["Journals stay journals", "Some models used to continue the story instead of writing a diary entry. Entries are now checked: a story is asked for again as a first-person entry, and if the model still will not, nothing is saved. Entries are also easier to read, in your chat font instead of italics."],
     ],
   },

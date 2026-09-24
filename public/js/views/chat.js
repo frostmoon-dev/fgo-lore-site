@@ -6,7 +6,7 @@ import {
 import { registerCommands } from "../palette.js";
 import { chatCompletion, listModels } from "../api.js";
 import {
-  buildPrompt, generationParams, currentText, applyMacros, readBond, readMood, stripBond, cleanImpersonation, contentLevel,
+  buildPrompt, generationParams, currentText, applyMacros, readBond, readMood, guessMood, stripBond, cleanImpersonation, contentLevel,
 } from "../prompt.js";
 import {
   summarize, suggestLore, checkCharacter, transcript, suggestReplies, translate, updateScene, recap, storyFrom, nameChat,
@@ -771,7 +771,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
           frame ||= requestAnimationFrame(paintStream);
         },
       });
-      const mood = readMood(res.content, moodsOf(speaker));
+      const mood = readMood(res.content, moodsOf(speaker)) ?? guessMood(res.content, moodsOf(speaker));
       const parsed = withBond ? readBond(res.content) : { text: stripBond(res.content), delta: 0 };
       // In a group scene models sometimes label their own line.
       if (group()) parsed.text = cleanImpersonation(parsed.text, speaker.name);

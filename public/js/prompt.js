@@ -74,11 +74,36 @@ export function readBond(text) {
 }
 
 // Mood tags pick the bot's expression picture: <mood:happy>.
-export const MOOD_TAG = /[<[]\s*mood\s*:\s*([a-z-]+)\s*[>\]]/gi;
+// Models write it in several ways: <mood:happy>, [mood: Happy], (mood: happy),
+// *mood: happy*, or a last line "Mood: happy". All count, and all are hidden.
+export const MOOD_TAG = /(?:[<[(*]\s*mood\s*[:=]\s*([a-z][a-z -]*?)\s*[>\])*]|^[ \t]*\**mood\**\s*[:=]\s*\**([a-z][a-z -]*?)\**[ \t.]*$)/gim;
+const moodKey = (s) => String(s ?? "").trim().toLowerCase().replace(/\s+/g, "-");
 export function readMood(text, allowed) {
   const last = [...String(text ?? "").matchAll(MOOD_TAG)].at(-1);
-  const mood = last?.[1]?.toLowerCase();
+  const mood = moodKey(last?.[1] ?? last?.[2]);
   return allowed.includes(mood) ? mood : null;
+}
+
+// No tag at all: a guess from the end of the reply (where the face should
+// match), by the words that describe a face or voice. A custom mood counts
+// when its own word appears. Only moods the bot has pictures for.
+const MOOD_WORDS = {
+  happy: /\b(smil|grin|laugh|chuckl|giggl|beam|delight|chee?r|happ|joy|brighten)/i,
+  sad: /\b(tear|cry|cries|crie|sob|frown|sorrow|lonel|sad|melanchol|downcast|wistful)/i,
+  angry: /\b(glar|snarl|scowl|growl|clench|furious|anger|angr|seeth|snap|hiss|rage)/i,
+  surprised: /\b(gasp|eyes widen|widen|startl|surpris|stunn|shock|blink|jaw drop)/i,
+  flustered: /\b(blush|flush|stammer|stutter|fidget|fluster|bashful|embarrass|cheeks (?:burn|heat|warm|redden))/i,
+};
+export function guessMood(text, allowed) {
+  const tail = String(text ?? "").trim().split(/\n\s*\n/).slice(-2).join(" ").slice(-600);
+  let best = null, score = 0;
+  for (const mood of allowed) {
+    if (mood === "neutral") continue;
+    const re = MOOD_WORDS[mood] ?? new RegExp(`\\b${mood.replace(/-/g, " ").slice(0, Math.max(4, mood.length - 2)).replace(/[^a-z ]/g, "")}`, "i");
+    const hits = (tail.match(new RegExp(re.source, "gi")) || []).length;
+    if (hits > score) { best = mood; score = hits; }
+  }
+  return best ?? (allowed.includes("neutral") ? "neutral" : null);
 }
 
 export const stripBond = (text) => String(text ?? "").replace(BOND_TAG, "").replace(MOOD_TAG, "").replace(/\n{3,}$/, "\n").trimEnd();
