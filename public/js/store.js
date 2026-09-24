@@ -50,6 +50,8 @@ export const DEFAULT_SETTINGS = {
   usage: { priceIn: "", priceOut: "" },
   // The bot writes a journal entry after this many new messages, when you leave the chat.
   journal: { auto: true, every: 12 },
+  // A busy or overloaded model is tried again this many times (0 = never).
+  retry: { tries: 3 },
   chatBackground: null,
   backgroundDim: 0.86,
   enterToSend: true,
@@ -386,6 +388,8 @@ export const chats = {
   get: (id) => db.get("chats", id),
   async save(chat) { chat.updatedAt = now(); await db.put("chats", chat); return chat; },
   remove: (id) => db.delete("chats", id),
+  // Puts a deleted chat back as it was (Undo), without counting as an edit.
+  restore: (chat) => db.put("chats", chat),
 };
 
 export const lore = {

@@ -153,6 +153,10 @@ html { font-size: 100%; }
 :root[data-text="lg"] { font-size: 112.5%; }
 :root[data-text="xl"] { font-size: 125%; }
 :root { --chat-scale: 1; }
+/* How far in from the message box's edge its text starts. The line under the
+   box, and on phones the + button's icon, start at the same place. */
+:root { --composer-inset: 17.5px; }
+@media (max-width: 600px) { :root { --composer-inset: 20.5px; } }
 :root[data-chat-text="sm"] { --chat-scale: .9; }
 :root[data-chat-text="lg"] { --chat-scale: 1.15; }
 :root[data-chat-text="xl"] { --chat-scale: 1.3; }
@@ -166,7 +170,7 @@ body {
 }
 img { display: block; max-width: 100%; }
 a { color: var(--accent); text-underline-offset: 3px; }
-a:hover { color: var(--accent-hover); }
+@media (hover: hover) { a:hover { color: var(--accent-hover); } }
 button, input, select, textarea { font: inherit; color: inherit; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 [hidden] { display: none !important; }
@@ -204,7 +208,7 @@ small { font-size: var(--t-sm); }
   font-family: var(--font-display); font-size: var(--t-lg); font-weight: 600;
   color: var(--ink); text-decoration: none; white-space: nowrap;
 }
-.brand:hover { color: var(--ink); }
+@media (hover: hover) { .brand:hover { color: var(--ink); } }
 .brand { display: inline-flex; align-items: center; gap: var(--s2); }
 .brand-mark { width: 24px; height: 24px; flex: none; }
 .brand-mark .moon { fill: var(--ink); }
@@ -216,7 +220,7 @@ small { font-size: var(--t-sm); }
   background: var(--fill); border-radius: var(--r-pill);
 }
 .nav-pair .icon-btn { width: 36px; height: 36px; color: var(--ink); }
-.nav-pair .icon-btn:hover { background: var(--raised); }
+@media (hover: hover) { .nav-pair .icon-btn:hover { background: var(--raised); } }
 .nav-pair-sep { width: 1px; height: 16px; margin: 0 var(--s1); background: var(--line-strong); opacity: .5; transition: opacity var(--dur) var(--ease); }
 /* A highlighted button is its own divider; the line would cut into it. */
 .nav-pair:has(.icon-btn:hover:not(:disabled), .icon-btn[aria-current="page"], .icon-btn:focus-visible) .nav-pair-sep { opacity: 0; }
@@ -229,14 +233,14 @@ small { font-size: var(--t-sm); }
   font-size: var(--t-ui); color: var(--muted); text-decoration: none; white-space: nowrap;
   border-radius: var(--r-pill); transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
 }
-.main-nav a:hover { color: var(--ink); background: var(--fill); }
+@media (hover: hover) { .main-nav a:hover { color: var(--ink); background: var(--fill); } }
 .main-nav a[aria-current="page"] { color: var(--on-primary); background: var(--primary); font-weight: 500; }
 
 .header-status {
   display: inline-flex; align-items: center; gap: var(--s2); max-width: 240px; height: 36px;
   font-size: var(--t-sm); color: var(--muted); text-decoration: none; padding: 0 var(--s3); border-radius: var(--r-pill);
 }
-.header-status:hover { background: var(--fill); color: var(--ink); }
+@media (hover: hover) { .header-status:hover { background: var(--fill); color: var(--ink); } }
 .header-status .label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* On wide screens the status gives up space before the menu does. */
 @media (min-width: 1000px) {
@@ -259,7 +263,7 @@ small { font-size: var(--t-sm); }
   display: inline-flex; align-items: center; justify-content: center;
   background: none; color: var(--muted); cursor: pointer;
 }
-.icon-toggle:hover { background: var(--fill); color: var(--ink); }
+@media (hover: hover) { .icon-toggle:hover { background: var(--fill); color: var(--ink); } }
 .icon-toggle svg { width: 18px; height: 18px; }
 .theme-toggle .icon-sun, :root[data-theme="dark"] .theme-toggle .icon-moon { display: none; }
 :root[data-theme="dark"] .theme-toggle .icon-sun { display: block; }
@@ -301,18 +305,18 @@ h2.sub {
   font-size: var(--t-ui); font-weight: 500; text-decoration: none; cursor: pointer; white-space: nowrap;
   transition: background var(--dur) var(--ease), color var(--dur) var(--ease), border-color var(--dur) var(--ease);
 }
-.btn:hover { background: var(--fill); color: var(--ink); }
+@media (hover: hover) { .btn:hover { background: var(--fill); color: var(--ink); } }
 .btn svg { width: 18px; height: 18px; flex: none; }
 .btn-primary { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
-.btn-primary:hover { background: var(--primary-hover); border-color: var(--primary-hover); color: var(--on-primary); }
+@media (hover: hover) { .btn-primary:hover { background: var(--primary-hover); border-color: var(--primary-hover); color: var(--on-primary); } }
 .btn-ghost { background: var(--fill); border-color: var(--fill); }
-.btn-ghost:hover { background: var(--fill-strong); border-color: var(--fill-strong); }
+@media (hover: hover) { .btn-ghost:hover { background: var(--fill-strong); border-color: var(--fill-strong); } }
 .btn-quiet { border-color: transparent; background: none; color: var(--muted); }
-.btn-quiet:hover { background: var(--fill); color: var(--ink); }
+@media (hover: hover) { .btn-quiet:hover { background: var(--fill); color: var(--ink); } }
 .btn-danger { color: var(--danger); border-color: var(--danger); }
-.btn-danger:hover { background: var(--danger); border-color: var(--danger); color: var(--surface); }
+@media (hover: hover) { .btn-danger:hover { background: var(--danger); border-color: var(--danger); color: var(--surface); } }
 .btn-quiet.btn-danger { border-color: transparent; }
-.btn-quiet.btn-danger:hover { background: var(--fill); color: var(--danger); }
+@media (hover: hover) { .btn-quiet.btn-danger:hover { background: var(--fill); color: var(--danger); } }
 .btn-sm { height: 32px; padding: 0 var(--s4); font-size: var(--t-sm); }
 .btn:disabled, .btn[aria-disabled="true"] { cursor: not-allowed; color: var(--muted); background: var(--fill); border-color: var(--fill); }
 /* Busy: keeps its width, swaps the label for a spinner. */
@@ -333,11 +337,11 @@ h2.sub {
   background: none; color: var(--muted); cursor: pointer; text-decoration: none;
   transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
 }
-.icon-btn:hover { background: var(--fill); color: var(--ink); }
+@media (hover: hover) { .icon-btn:hover { background: var(--fill); color: var(--ink); } }
 .icon-btn svg { width: 18px; height: 18px; }
 .icon-btn:disabled { color: var(--line-strong); cursor: not-allowed; background: none; }
 .link-btn { background: none; border: 0; padding: 0; color: var(--accent); cursor: pointer; font-size: var(--t-ui); text-decoration: none; }
-.link-btn:hover { color: var(--accent-hover); text-decoration: underline; }
+@media (hover: hover) { .link-btn:hover { color: var(--accent-hover); text-decoration: underline; } }
 
 /* Segmented control: radios that look like one pill. */
 .segmented {
@@ -347,12 +351,14 @@ h2.sub {
 }
 .segmented label { position: relative; display: inline-flex; cursor: pointer; }
 .segmented input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; margin: 0; cursor: pointer; }
+/* Outside, a segmented control is exactly as tall as a text field:
+   31 + 3 + 3 padding + 1.5 + 1.5 border = 40 (35 on touch screens = 44). */
 .segmented span {
-  display: inline-flex; align-items: center; height: 32px; padding: 0 var(--s4);
+  display: inline-flex; align-items: center; height: 31px; padding: 0 var(--s4);
   border-radius: var(--r-pill); font-size: var(--t-ui); font-weight: 500; color: var(--ink);
   transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
 }
-.segmented label:hover span { background: var(--fill); }
+@media (hover: hover) { .segmented label:hover span { background: var(--fill); } }
 .segmented input:checked + span { background: var(--primary); color: var(--on-primary); }
 .segmented input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
 /* On a phone the choices share the full width in one row instead of wrapping. */
@@ -364,7 +370,10 @@ h2.sub {
 
 /* ---------- Surfaces ---------- */
 .card { background: var(--surface); border-radius: var(--r-lg); padding: var(--s5); box-shadow: var(--shadow-1); }
-.card + .card { margin-top: var(--s4); }
+/* Stacked cards sit 24px apart everywhere; in a grid the gap already does it. */
+.card + .card { margin-top: var(--s5); }
+.form-grid > .card + .card { margin-top: 0; }
+.card > .page-head:last-child { margin-bottom: 0; }
 .card-title { font-size: var(--t-lg); margin-bottom: var(--s1); }
 .card > .card-title + .lead, .card > h2 + .lead { margin-bottom: var(--s5); }
 .card-tight { padding: var(--s4); }
@@ -379,7 +388,7 @@ h2.sub {
   background: var(--surface); border-radius: var(--r-lg); box-shadow: var(--shadow-1);
   transition: box-shadow var(--dur) var(--ease);
 }
-.bot-card:hover { box-shadow: var(--shadow-1), 0 0 0 1.5px var(--line-strong); }
+@media (hover: hover) { .bot-card:hover { box-shadow: var(--shadow-1), 0 0 0 1.5px var(--line-strong); } }
 .bot-card:focus-within { box-shadow: 0 0 0 2px var(--accent); }
 .bot-card > .portrait { aspect-ratio: 1; height: auto; }
 .bot-card-body { padding: var(--s3) var(--s4) var(--s3); flex: 1; display: flex; flex-direction: column; gap: var(--s1); }
@@ -400,7 +409,7 @@ h2.sub {
   text-decoration: none; font-size: var(--t-ui); font-weight: 500;
   transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease);
 }
-.new-card:hover { color: var(--ink); border-color: var(--ink); }
+@media (hover: hover) { .new-card:hover { color: var(--ink); border-color: var(--ink); } }
 
 .chips { display: flex; flex-wrap: wrap; gap: var(--s2); }
 .chip {
@@ -408,7 +417,7 @@ h2.sub {
   font-size: var(--t-xs); font-weight: 500; letter-spacing: .02em; color: var(--muted); background: var(--fill); border-radius: var(--r-pill);
 }
 button.chip { height: 32px; padding: 0 var(--s4); font-size: var(--t-sm); cursor: pointer; border: 0; transition: background var(--dur) var(--ease), color var(--dur) var(--ease); }
-button.chip:hover { color: var(--ink); background: var(--fill-strong); }
+@media (hover: hover) { button.chip:hover { color: var(--ink); background: var(--fill-strong); } }
 button.chip[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); }
 
 /* Avatars */
@@ -431,7 +440,7 @@ button.chip[aria-pressed="true"] { background: var(--accent); color: var(--on-ac
 .avatar-link { display: inline-flex; flex: none; border-radius: 50%; align-self: start; text-decoration: none; }
 .list-item .avatar-link, .chat-sidebar-bot .avatar-link { align-self: center; }
 .avatar-link .avatar { transition: box-shadow var(--dur) var(--ease); }
-.avatar-link:hover .avatar { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--line-strong); }
+@media (hover: hover) { .avatar-link:hover .avatar { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--line-strong); } }
 
 /* ---------- Forms ---------- */
 .form-grid { display: grid; gap: var(--s5); }
@@ -455,7 +464,7 @@ input[type="text"], input[type="url"], input[type="password"], input[type="searc
 textarea { height: auto; min-height: 88px; padding: var(--s3) var(--s4); line-height: var(--lh-read); resize: vertical; border-radius: var(--r-md); }
 textarea.tall { min-height: 200px; }
 textarea.mono, input.mono { font-family: var(--mono); font-size: var(--t-ui); }
-input:hover, select:hover, textarea:hover { border-color: var(--ink); }
+@media (hover: hover) { input:hover, select:hover, textarea:hover { border-color: var(--ink); } }
 input:focus-visible, select:focus-visible, textarea:focus-visible { outline: none; border-color: var(--ink); box-shadow: 0 0 0 3px var(--accent-soft); }
 input[aria-invalid="true"] { border-color: var(--danger); }
 .error-text { font-size: var(--t-sm); color: var(--danger); }
@@ -588,7 +597,7 @@ dialog::backdrop { background: var(--scrim); }
 }
 .toast .msg-text { flex: 1; }
 .toast .icon-btn { color: inherit; opacity: .7; }
-.toast .icon-btn:hover { opacity: 1; background: color-mix(in srgb, var(--on-primary) 12%, transparent); }
+@media (hover: hover) { .toast .icon-btn:hover { opacity: 1; background: color-mix(in srgb, var(--on-primary) 12%, transparent); } }
 .toast .link-btn { color: inherit; font-weight: 600; text-decoration: underline; }
 .toast.error { background: var(--danger); color: #ffffff; }
 :root[data-theme="dark"] .toast.error { color: #1a1210; }
@@ -607,11 +616,18 @@ body.in-chat .site-footer { display: none; }
 .chat-sidebar-bot .avatar { --size: 48px; }
 .chat-sidebar-bot .grow { min-width: 0; }
 .chat-sidebar-bot .name { font-family: var(--font-display); font-size: var(--t-lg); font-weight: 500; line-height: var(--lh-tight); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.chat-list { list-style: none; flex: 1; overflow-y: auto; padding: var(--s2); display: grid; align-content: start; gap: 2px; }
+/* Rows line up with the New chat button above them (16px in from each side). */
+.chat-list { list-style: none; flex: 1; overflow-y: auto; padding: var(--s2) var(--s4); display: grid; align-content: start; gap: 2px; }
 .chat-list li { border-radius: var(--r-md); }
-.chat-list li:hover { background: var(--fill); }
+@media (hover: hover) { .chat-list li:hover { background: var(--fill); } }
 .chat-list li.is-active { background: var(--fill); }
-.chat-list a { display: block; padding: var(--s2) var(--s3); color: var(--ink); text-decoration: none; border-radius: var(--r-md); }
+.chat-list li { display: flex; align-items: center; gap: var(--s1); padding-right: var(--s1); }
+.chat-list a { display: block; flex: 1; min-width: 0; padding: var(--s2) var(--s3); color: var(--ink); text-decoration: none; border-radius: var(--r-md); }
+/* Delete shows on the row under the pointer or focus; always on touch screens. */
+.chat-list .chat-del { opacity: 0; transition: opacity var(--dur) var(--ease); }
+.chat-list li:focus-within .chat-del { opacity: 1; }
+@media (hover: hover) { .chat-list li:hover .chat-del { opacity: 1; } }
+@media (hover: none) { .chat-list .chat-del { opacity: 1; } }
 .chat-list .t { display: block; font-size: var(--t-ui); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chat-list .d { font-size: var(--t-sm); color: var(--muted); }
 
@@ -636,8 +652,9 @@ body.in-chat .site-footer { display: none; }
 }
 .title-edit > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .title-edit svg { flex: none; width: 14px; height: 14px; color: var(--muted); opacity: 0; transition: opacity var(--dur) var(--ease); }
-.title-edit:hover { background: var(--fill); }
-.title-edit:hover svg, .title-edit:focus-visible svg { opacity: 1; }
+@media (hover: hover) { .title-edit:hover { background: var(--fill); } }
+.title-edit:focus-visible svg { opacity: 1; }
+@media (hover: hover) { .title-edit:hover svg { opacity: 1; } }
 @media (hover: none) { .title-edit svg { opacity: 1; } }
 /* Same height, font and text position as the name it replaces, so nothing moves. */
 .chat-topbar .title-input {
@@ -691,10 +708,13 @@ body.in-chat .site-footer { display: none; }
 .msg-body details.thinking { font-size: var(--t-ui); color: var(--muted); }
 .msg-body details.thinking summary { cursor: pointer; }
 .msg-body details.thinking div { white-space: pre-wrap; padding-left: var(--s3); border-left: 2px solid var(--line); margin-top: var(--s2); }
-.msg-foot { display: flex; align-items: center; gap: var(--s1); flex-wrap: wrap; min-height: 36px; margin-top: var(--s1); }
+/* Pulled left by half the space around an icon (36px button, 18px icon), so
+   the first icon lines up with the message text above it. */
+.msg-foot { display: flex; align-items: center; gap: var(--s1); flex-wrap: wrap; min-height: 36px; margin-top: var(--s1); margin-left: -9px; }
 /* Kept in the tab order at opacity 0, so keyboard focus reveals them. */
 .msg-tools { display: flex; opacity: 0; transition: opacity var(--dur) var(--ease); }
-.msg:hover .msg-tools, .msg:focus-within .msg-tools, .msg.is-last .msg-tools { opacity: 1; }
+.msg:focus-within .msg-tools, .msg.is-last .msg-tools { opacity: 1; }
+@media (hover: hover) { .msg:hover .msg-tools { opacity: 1; } }
 /* Touch screens have no hover. Tools show on the latest reply and on the
    message last tapped; the rest stay out of the way while reading. */
 @media (hover: none) {
@@ -721,7 +741,9 @@ body.in-chat .site-footer { display: none; }
 .composer-box:focus-within { border-color: var(--ink); box-shadow: 0 0 0 3px var(--accent-soft); }
 .composer-box textarea {
   font-family: var(--chat-font, var(--font));
-  min-height: 40px; max-height: 40svh; border: 0; background: none; resize: none; padding: var(--s2);
+  min-height: 40px; max-height: 40svh; border: 0; background: none; resize: none;
+  /* Text starts --composer-inset in from the box's outer edge (1.5 border + 8 box padding + this). */
+  padding: var(--s2) var(--s2) var(--s2) calc(var(--composer-inset) - 9.5px);
   border-radius: 0; font-size: calc(var(--t-md) * var(--chat-scale));
 }
 .composer-box textarea:focus-visible { box-shadow: none; }
@@ -730,12 +752,18 @@ body.in-chat .site-footer { display: none; }
   background: var(--primary); color: var(--on-primary); cursor: pointer; display: grid; place-items: center;
   transition: background var(--dur) var(--ease);
 }
-.send-btn:hover { background: var(--primary-hover); }
+@media (hover: hover) { .send-btn:hover { background: var(--primary-hover); } }
 .send-btn:disabled { background: var(--fill); color: var(--muted); cursor: not-allowed; }
 .send-btn svg { width: 20px; height: 20px; }
 .send-btn.stop { background: var(--danger); color: var(--surface); }
-.composer-foot { display: flex; flex-wrap: wrap; gap: var(--s3); justify-content: space-between; align-items: center; margin-top: var(--s2); padding: 0 var(--s2); font-size: var(--t-sm); color: var(--muted); }
-.composer-foot select { width: auto; height: 32px; font-size: var(--t-sm); padding-left: var(--s3); padding-right: var(--s6); background-position: calc(100% - 12px) center; }
+.composer-foot { display: flex; flex-wrap: wrap; gap: var(--s3); justify-content: space-between; align-items: center; margin-top: var(--s2); padding: 0 var(--s2) 0 var(--composer-inset); font-size: var(--t-sm); color: var(--muted); }
+/* The persona picker is a quiet filled pill, not a boxed field: it is a
+   setting beside the message box, not something to type into. */
+.composer-foot select {
+  width: auto; height: 32px; font-size: var(--t-sm); padding-left: var(--s3); padding-right: var(--s6);
+  border-color: transparent; background-color: var(--fill); background-position: calc(100% - 12px) center;
+}
+@media (hover: hover) { .composer-foot select:hover { border-color: transparent; background-color: var(--fill-strong); } }
 .persona-pick { display: inline-flex; align-items: center; gap: var(--s2); }
 .persona-pick > span { white-space: nowrap; }
 .persona-group { display: inline-flex; align-items: center; gap: var(--s1); }
@@ -770,7 +798,7 @@ body.in-chat .site-footer { display: none; }
 .lore-nav h3:first-of-type { margin-top: 0; }
 .lore-nav ul { list-style: none; }
 .lore-nav a { display: flex; align-items: center; gap: var(--s2); padding: var(--s2) var(--s3); color: var(--ink); text-decoration: none; border-radius: var(--r-pill); font-size: var(--t-ui); }
-.lore-nav a:hover { background: var(--fill); }
+@media (hover: hover) { .lore-nav a:hover { background: var(--fill); } }
 .lore-nav a[aria-current] { background: var(--primary); color: var(--on-primary); font-weight: 500; }
 .lore-nav a.off { color: var(--muted); }
 .lore-nav input[type="search"] { margin-bottom: var(--s3); }
@@ -807,6 +835,8 @@ body.in-chat .site-footer { display: none; }
   .series-filter {
     flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none;
     margin-inline: calc(-1 * var(--s4)); padding-inline: var(--s4); scroll-padding-inline: var(--s4);
+    /* Room for the chips' 4px tap borders, which a scrolling row would clip. */
+    padding-block: 4px; margin-block: calc(-1 * var(--s2) - 4px) calc(var(--s3) - 4px);
   }
   .series-filter::-webkit-scrollbar { display: none; }
   .series-filter button.chip { flex: none; white-space: nowrap; }
@@ -884,7 +914,9 @@ body.in-chat .site-footer { display: none; }
 .chat-main.has-bg .msg-body {
   background: var(--surface); border-radius: var(--r-md); padding: var(--s3) var(--s4); box-shadow: var(--shadow-1);
 }
-.chat-main.has-bg .msg-head, .chat-main.has-bg .msg-foot { padding-inline: var(--s1); }
+/* Name, tools and details line up with the words inside the card (16px in). */
+.chat-main.has-bg .msg-head { padding-inline: var(--s4); }
+.chat-main.has-bg .msg-foot { margin-left: calc(var(--s4) - 9px); padding-right: var(--s4); }
 
 /* ---------- Bond meter ---------- */
 .bond {
@@ -892,8 +924,8 @@ body.in-chat .site-footer { display: none; }
   background: none; border: 0; border-radius: var(--r-pill);
   padding: 0 var(--s3); cursor: pointer;
 }
-.bond:hover { background: var(--fill); }
-.bond:hover .bond-label { color: var(--ink); }
+@media (hover: hover) { .bond:hover { background: var(--fill); } }
+@media (hover: hover) { .bond:hover .bond-label { color: var(--ink); } }
 .bond-label { font-size: var(--t-sm); color: var(--muted); }
 .bond-bar { display: block; width: 72px; height: 6px; border-radius: var(--r-pill); background: var(--fill-strong); overflow: hidden; }
 .bond-fill { display: block; height: 100%; width: 0; background: var(--accent); border-radius: var(--r-pill); transition: width 400ms var(--ease); }
@@ -936,7 +968,8 @@ body.in-chat .site-footer { display: none; }
   color: var(--ink); font-size: var(--t-ui); text-align: left; cursor: pointer;
 }
 .menu-item small { color: var(--muted); font-size: var(--t-xs); }
-.menu-item:hover, .menu-item:focus-visible { background: var(--fill); outline: none; }
+.menu-item:focus-visible { background: var(--fill); outline: none; }
+@media (hover: hover) { .menu-item:hover { background: var(--fill); outline: none; } }
 .menu-item.danger { color: var(--danger); }
 .menu-item:disabled { color: var(--line-strong); cursor: not-allowed; background: none; }
 .menu-sep { height: 1px; margin: var(--s1) var(--s2); background: var(--line); }
@@ -989,7 +1022,7 @@ button.check-chip.bad {
   display: flex; align-items: center; gap: var(--s3); padding: var(--s2) var(--s3);
   border-radius: var(--r-md); cursor: pointer;
 }
-.cast-row:hover { background: var(--fill); }
+@media (hover: hover) { .cast-row:hover { background: var(--fill); } }
 .cast-row .grow { flex: 1; min-width: 0; display: grid; }
 .cast-row .t { font-weight: 500; }
 .cast-row small { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1047,7 +1080,7 @@ button.check-chip.bad {
   background: var(--raised); color: var(--ink); font-size: var(--t-sm); font-weight: 500; cursor: pointer;
   transition: background var(--dur) var(--ease), color var(--dur) var(--ease);
 }
-.suggest-chip:hover { background: var(--primary); color: var(--on-primary); }
+@media (hover: hover) { .suggest-chip:hover { background: var(--primary); color: var(--on-primary); } }
 .skeleton-chip { width: 112px; height: 32px; border-radius: var(--r-pill); }
 .suggest-bar .icon-btn { width: 32px; height: 32px; }
 
@@ -1176,11 +1209,11 @@ input[type="search"]::-webkit-search-cancel-button {
 }
 /* Which model answers, always in view. */
 .model-chip {
-  display: inline-flex; align-items: center; gap: var(--s1); max-width: 220px; height: 32px; padding: 0 var(--s2) 0 var(--s3);
+  display: inline-flex; align-items: center; gap: var(--s1); max-width: 220px; height: 36px; padding: 0 var(--s2) 0 var(--s3);
   border: 1.5px solid var(--line-strong); border-radius: var(--r-pill); background: none; color: var(--muted);
   font-size: var(--t-sm); cursor: pointer; transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease);
 }
-.model-chip:hover { border-color: var(--ink); color: var(--ink); }
+@media (hover: hover) { .model-chip:hover { border-color: var(--ink); color: var(--ink); } }
 .model-chip.is-custom { border-color: var(--accent); color: var(--accent); }
 .model-chip .model-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .model-chip .chev { width: 14px; height: 14px; flex: none; transform: rotate(-90deg); }
@@ -1233,7 +1266,8 @@ dialog.palette-dialog { width: min(600px, calc(100vw - 32px)); margin-top: 12vh;
   flex: none; height: 56px; padding: 0 var(--s5); border: 0; border-bottom: 1px solid var(--line); border-radius: 0;
   background: none; font-size: var(--t-md); box-shadow: none;
 }
-.palette #pal-input:hover, .palette #pal-input:focus-visible { box-shadow: none; border-color: var(--line); }
+.palette #pal-input:focus-visible { box-shadow: none; border-color: var(--line); }
+@media (hover: hover) { .palette #pal-input:hover { box-shadow: none; border-color: var(--line); } }
 .pal-list { list-style: none; margin: 0; padding: var(--s2); overflow-y: auto; flex: 1; }
 .pal-group {
   padding: var(--s3) var(--s3) var(--s1); font-size: var(--t-xs); font-weight: 600;
@@ -1293,7 +1327,8 @@ dialog.palette-dialog { width: min(600px, calc(100vw - 32px)); margin-top: 12vh;
 .fav-btn.is-on { color: var(--accent); }
 .fav-btn.is-on svg path { fill: currentColor; }
 .fav-btn:not(.is-on) { opacity: 0; }
-.bot-card:hover .fav-btn, .bot-card:focus-within .fav-btn { opacity: 1; }
+.bot-card:focus-within .fav-btn { opacity: 1; }
+@media (hover: hover) { .bot-card:hover .fav-btn { opacity: 1; } }
 @media (hover: none) { .fav-btn:not(.is-on) { opacity: 1; } }
 
 /* Dice */
@@ -1302,6 +1337,16 @@ dialog.palette-dialog { width: min(600px, calc(100vw - 32px)); margin-top: 12vh;
 #dice-roll svg { width: 16px; height: 16px; margin-right: var(--s2); }
 @media (prefers-reduced-motion: reduce) { .flash-card { animation: none; box-shadow: 0 0 0 2px var(--accent); } }
 .news-earlier { font-family: var(--font); font-size: var(--t-xs); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+
+/* Touch screens have no hover; hover colours would stick after a tap. They
+   get a brief press colour instead, and no grey system flash. */
+html { -webkit-tap-highlight-color: transparent; }
+@media (hover: none) {
+  .btn:active, .btn-quiet:active, .icon-btn:active, .icon-toggle:active, button.chip:active,
+  .menu-item:active, .chat-list a:active, .main-nav a:active, .title-edit:active, .bond:active { background-color: var(--fill); }
+  .segmented label:active span { background-color: var(--fill); }
+  .btn-primary:active, .send-btn:active { background-color: var(--primary-hover); }
+}
 
 /* Phones zoom in on any field with text under 16px, and the page then slides
    around. Fields on touch screens are never smaller than that. */
@@ -1319,7 +1364,12 @@ dialog.palette-dialog { width: min(600px, calc(100vw - 32px)); margin-top: 12vh;
     background-clip: padding-box !important;
   }
   .send-btn, .composer-tool, .avatar-link { --hit: 2px; }
-  .composer-foot .persona-edit, .direct-bar .icon-btn, .suggest-bar .icon-btn, .expr-slot-head .icon-btn { --hit: 6px; }
+  .direct-bar .icon-btn, .suggest-bar .icon-btn, .expr-slot-head .icon-btn { --hit: 6px; }
+  /* The pencil matches the 36px persona pill beside it. */
+  .composer-foot .persona-edit { width: 36px; height: 36px; --hit: 4px; }
+  /* Chips: 32px drawn (series chips 36px), 44px to a finger. */
+  button.chip { box-sizing: content-box; border: 6px solid transparent; margin: -6px; background-clip: padding-box !important; }
+  .series-filter button.chip { border-width: 4px; margin: -4px; }
   .palette-btn { border-width: 4px 5px; margin: -4px -5px; }
   .brand { --hit: 9px; margin-inline: 0; border-inline-width: 0; }
   /* The chat name sits in a clipped box, so its extra area goes below, over the subtitle. */
@@ -1336,10 +1386,11 @@ dialog.palette-dialog { width: min(600px, calc(100vw - 32px)); margin-top: 12vh;
   .btn-sm::before { content: ""; position: absolute; inset: -7px -2px; }
   /* Drawn larger: these keep their own border, so they cannot grow unseen. */
   .btn, input[type="text"], input[type="url"], input[type="password"], input[type="search"], input[type="number"], select { height: 44px; }
-  .composer-foot select { height: 44px; }
+  /* Drawn 36px; a clear 4px border makes the tap area 44px without moving anything. */
+  .composer-foot select { height: 44px; border: 4px solid transparent; margin-block: -4px; background-clip: padding-box; background-position: calc(100% - 12px) center; }
   .btn-sm { height: 32px; }
   /* Segments: a little taller, and each one takes taps over the frame's padding. */
-  .segmented span { height: 38px; }
+  .segmented span { height: 35px; }
   .segmented label::before, .segmented label::after { content: ""; position: absolute; left: 0; right: 0; height: 3px; }
   .segmented label::before { top: -3px; }
   .segmented label::after { bottom: -3px; }
@@ -1371,7 +1422,8 @@ dialog.palette-dialog { width: min(600px, calc(100vw - 32px)); margin-top: 12vh;
 .drop-zone strong { color: var(--ink); font-weight: 600; }
 @media (hover: none) { .drop-hint { display: none; } } /* no dragging on a touch screen */
 .drop-zone svg { width: 20px; height: 20px; flex: none; }
-.drop-zone:hover, .drop-zone.is-over { background: var(--fill); border-color: var(--ink); }
+.drop-zone.is-over { background: var(--fill); border-color: var(--ink); }
+@media (hover: hover) { .drop-zone:hover { background: var(--fill); border-color: var(--ink); } }
 .inline-form { display: flex; gap: var(--s2); }
 .inline-form input { flex: 1; min-width: 0; }
 /* Files dragged over the bots page. */

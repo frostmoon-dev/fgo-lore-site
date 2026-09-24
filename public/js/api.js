@@ -49,6 +49,11 @@ function friendly(status, detail) {
     403: "Access denied. The key may not have access to this model.",
     404: "Not found. Check the base URL and model name on the Connection page.",
     429: "Rate limited. Wait a moment and try again.",
+    500: "The provider had an error on its side.",
+    502: "The provider had an error on its side.",
+    503: "The model is busy or briefly down.",
+    504: "The provider took too long to answer.",
+    529: "The provider is overloaded.",
   }[status];
   return hint ? `${hint}${msg ? ` (${status}: ${msg})` : ""}` : `The API returned ${status}${msg ? `: ${msg}` : ""}`;
 }
@@ -93,7 +98,7 @@ export async function listModels(conn) {
 
 // Sends a chat request. Calls onDelta as text streams in. Resolves with the
 // full reply; rejects with AbortError when stopped.
-import { recordUsage } from "./store.js";
+import { recordUsage, getSettings } from "./store.js";
 import { cachedTokens } from "./memory.js";
 
 // Every finished request is counted. Providers that do not report token
@@ -110,13 +115,68 @@ function count(payload, result) {
   });
 }
 
-export async function chatCompletion(conn, body, { signal, onDelta = () => {} } = {}) {
+// ---------- Busy models ----------
+// Free and shared models often answer "overloaded", "try again" or 429/503.
+// Those are retried a few times, waiting longer each time (or as long as the
+// provider asks). Only before any text has arrived, so nothing is repeated.
+const BUSY_STATUS = new Set([408, 425, 429, 500, 502, 503, 504, 520, 521, 522, 523, 524, 529]);
+const BUSY_TEXT = /overload|capacity|busy|temporar|unavailable|try again|rate.?limit|too many requests|timed? ?out|high demand/i;
+
+function busyError(message, wait) {
+  const err = new Error(message);
+  err.busy = true;
+  err.wait = wait;
+  return err;
+}
+
+// Retry-After is seconds or an HTTP date.
+function retryAfter(r) {
+  const v = r.headers.get("retry-after");
+  if (!v) return undefined;
+  const ms = /^\d+(\.\d+)?$/.test(v) ? Number(v) * 1000 : Date.parse(v) - Date.now();
+  return Number.isFinite(ms) && ms > 0 ? ms : undefined;
+}
+
+const sleep = (ms, signal) => new Promise((resolve, reject) => {
+  if (signal?.aborted) return reject(new DOMException("Stopped", "AbortError"));
+  const t = setTimeout(resolve, ms);
+  signal?.addEventListener("abort", () => { clearTimeout(t); reject(new DOMException("Stopped", "AbortError")); }, { once: true });
+});
+
+// retries: how many more tries after the first; defaults to the setting.
+// onRetry({ attempt, max, delay, message }) runs before each wait.
+export async function chatCompletion(conn, body, { signal, onDelta = () => {}, onRetry = () => {}, retries } = {}) {
+  const max = retries ?? (await getSettings()).retry?.tries ?? 3;
+  for (let attempt = 0; ; attempt++) {
+    let started = false;
+    try {
+      return await completeOnce(conn, body, { signal, onDelta: (r) => { started ||= !!(r.content || r.reasoning); onDelta(r); } });
+    } catch (err) {
+      if (err.name === "AbortError" || !err.busy || started || attempt >= max) {
+        if (err.busy && attempt > 0) err.message = `${err.message} Tried ${attempt + 1} times; try again in a minute, or pick another model.`;
+        throw err;
+      }
+      const delay = Math.min(20000, err.wait ?? 1500 * 2 ** attempt) + Math.round(Math.random() * 400);
+      onRetry({ attempt: attempt + 1, max, delay, message: err.message });
+      await sleep(delay, signal);
+    }
+  }
+}
+
+async function completeOnce(conn, body, { signal, onDelta }) {
   const payload = { ...body };
   if (conn.model) payload.model ??= conn.model;
   if (!payload.model && conn.mode !== "server") throw new Error("No model chosen. Pick one on the Connection page.");
 
   const r = await request(conn, "chat/completions", payload, signal);
-  if (!r.ok) throw new Error(friendly(r.status, await r.text()));
+  if (!r.ok) {
+    const text = friendly(r.status, await r.text());
+    // The site's relay marks its own errors; a wrong base URL is not busy.
+    const relayProblem = r.headers.get("x-relay-error") === "1" && r.status !== 504;
+    const clientError = [401, 402, 403, 404].includes(r.status); // wrong key, no credit, wrong model: waiting will not help
+    if (!relayProblem && !clientError && (BUSY_STATUS.has(r.status) || BUSY_TEXT.test(text))) throw busyError(text, retryAfter(r));
+    throw new Error(text);
+  }
 
   const type = r.headers.get("content-type") ?? "";
   if (!payload.stream || !type.includes("text/event-stream")) {
@@ -128,7 +188,10 @@ export async function chatCompletion(conn, body, { signal, onDelta = () => {} } 
       usage: data.usage,
       finishReason: data.choices?.[0]?.finish_reason,
     };
-    if (!result.content && data.error) throw new Error(data.error.message ?? String(data.error));
+    if (!result.content && data.error) {
+      const text = data.error.message ?? String(data.error);
+      throw BUSY_TEXT.test(text) ? busyError(text) : new Error(text);
+    }
     onDelta(result);
     count(payload, result);
     return result;
@@ -150,7 +213,10 @@ export async function chatCompletion(conn, body, { signal, onDelta = () => {} } 
       if (data === "[DONE]") continue;
       let json;
       try { json = JSON.parse(data); } catch { continue; }
-      if (json.error) throw new Error(json.error.message ?? String(json.error));
+      if (json.error) {
+        const text = json.error.message ?? String(json.error);
+        throw BUSY_TEXT.test(text) ? busyError(text) : new Error(text);
+      }
       const choice = json.choices?.[0];
       const delta = choice?.delta ?? {};
       result.content += delta.content ?? "";

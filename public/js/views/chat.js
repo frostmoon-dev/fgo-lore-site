@@ -109,6 +109,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
   let busy = false;
   let controller = null;
   let pendingError = null; // shown under the log, not saved
+  let left = false; // set when the page is left; late results then draw nothing
   let editingId = null;
   let memoryBusy = false;
   let sceneBusy = false;
@@ -289,6 +290,9 @@ export async function render(main, [botId, chatId, jumpTo]) {
 
   const log = $("#log", main);
   const logInner = $("#log-inner", main);
+  // The page may have been replaced (left while a reply or task finished,
+  // even before it was fully open); then there is nothing to draw into.
+  const gone = () => { if (!left && !logInner.isConnected) left = true; return left; };
   const input = $("#input", main);
   const sendBtn = $("#send", main);
   const sidebar = $("#sidebar", main);
@@ -305,9 +309,35 @@ export async function render(main, [botId, chatId, jumpTo]) {
         <a href="#/chat/${bot.id}/${c.id}" ${c.id === chat.id ? 'aria-current="page"' : ""}>
           <span class="t">${esc(c.title)}</span>
           <span class="d">${c.messages.length} message${c.messages.length === 1 ? "" : "s"} · ${timeAgo(c.updatedAt)}${extra.length ? ` · ${extra.join(" · ")}` : ""}</span>
-        </a></li>`;
+        </a>
+        <button class="icon-btn chat-del" type="button" data-del="${c.id}" aria-label="Delete ${esc(c.title)}" title="Delete chat">${icon("trash")}</button></li>`;
     }).join("");
   }
+  // Deleting from the list is immediate, with Undo, like clearing a notification.
+  $("#chat-list", main).addEventListener("click", async (e) => {
+    const btn = e.target.closest("[data-del]");
+    if (!btn || busy) return;
+    const gone = list.find((c) => c.id === btn.dataset.del);
+    if (!gone) return;
+    await chats.remove(gone.id);
+    const current = gone.id === chat.id;
+    toast(`Deleted “${gone.title}”.`, "info", {
+      action: "Undo", timeout: 8000,
+      onAction: async () => {
+        await chats.restore(gone);
+        if (current) location.hash = `#/chat/${bot.id}/${gone.id}`;
+        else if ($("#chat-list", main)) { list = [...list, gone].sort((a, b) => b.updatedAt - a.updatedAt); paintList(); }
+      },
+    });
+    if (current) {
+      const rest = list.filter((c) => c.id !== gone.id);
+      location.hash = rest[0] ? `#/chat/${bot.id}/${rest[0].id}` : `#/chat/${bot.id}`;
+    } else {
+      list = list.filter((c) => c.id !== gone.id);
+      paintList();
+      $("#chat-list [data-del]", main)?.focus();
+    }
+  });
   const setSidebar = (open) => {
     sidebar.classList.toggle("is-open", open);
     scrim.hidden = !open;
@@ -326,7 +356,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
   });
 
   function paintBond() {
-    if (!bondOn) return;
+    if (!bondOn || gone()) return;
     const { value, label, index } = bondNow();
     $("#bond-label", main).textContent = label;
     $("#bond-fill", main).style.width = `${value}%`;
@@ -394,6 +424,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
   }
 
   function paintHeader() {
+    if (gone()) return;
     $("#chat-title", main).innerHTML = `<span>${esc(chat.title)}</span>${icon("edit")}`;
     $("#chat-title", main).setAttribute("aria-label", `Chat name: ${chat.title}. Rename`);
     const p = persona();
@@ -558,6 +589,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
   }
 
   function paintLog({ scroll = true } = {}) {
+    if (gone()) return;
     // Without "Show earlier", the page follows the newest messages; after a
     // rewind there may be fewer than before.
     const latest = Math.max(0, chat.messages.length - PAGE);
@@ -731,7 +763,9 @@ export async function render(main, [botId, chatId, jumpTo]) {
     try {
       const res = await chatCompletion(conn, body, {
         signal: controller.signal,
+        onRetry: ({ attempt, max }) => setActivity("reply", `The model is busy. Trying again (${attempt} of ${max})…`),
         onDelta: (r) => {
+          if (r.content && activity.get("reply")?.startsWith("The model is busy")) setActivity("reply", `${speaker.name} is writing…`);
           target.swipes[si] = kind === "continue" ? join(r.content) : r.content;
           if (kind !== "continue") target.meta[si].reasoning = r.reasoning;
           frame ||= requestAnimationFrame(paintStream);
@@ -798,6 +832,8 @@ export async function render(main, [botId, chatId, jumpTo]) {
     } finally {
       cancelAnimationFrame(frame);
       controller = null;
+      // Left the chat while the reply was coming in: keep what arrived, draw nothing.
+      if (gone()) { await bots.touch(bot); await persist(); return; }
       setActivity("reply", null);
       setBusy(false);
       await bots.touch(bot);
@@ -1690,6 +1726,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
     try {
       const res = await chatCompletion(conn, body, {
         signal: drafting.signal,
+        onRetry: ({ attempt, max }) => showDraftBar(`The model is busy. Trying again (${attempt} of ${max})…`, { tools: false }),
         onDelta: (r) => { input.value = cleanImpersonation(r.content, who); fitInput(); },
       });
       text = cleanImpersonation(res.content, who);
@@ -1703,8 +1740,9 @@ export async function render(main, [botId, chatId, jumpTo]) {
       }
     } finally {
       drafting = null;
-      setDrafting(false);
+      if (!gone()) setDrafting(false);
     }
+    if (gone()) return;
 
     if (text) {
       input.value = text;
@@ -2401,6 +2439,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
 
   return {
     cleanup: () => {
+      left = true;
       unregister();
       controller?.abort();
       drafting?.abort();
