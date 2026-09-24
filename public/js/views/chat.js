@@ -17,7 +17,7 @@ import {
   chaptersToFold, recallFor, parseChapter, cachedTokens, trimMemory, KEEP_RECENT,
 } from "../memory.js";
 import { bondChartHTML, wireBondChart } from "../chart.js";
-import { renderMarkdown } from "../markdown.js";
+import { renderMarkdown, previewHTML } from "../markdown.js";
 import {
   $, $$, esc, icon, avatarHTML, toast, confirmDialog, promptDialog, openDialog, openMenu,
   download, slug, timeAgo, clock, autosize, sliderHTML, wireSlider, imagePicker, imagePickerHTML, debounce,
@@ -1418,7 +1418,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
       ${pins.length ? `<ul class="pin-list">${pins.map((m) => `
         <li class="pin-row">
           <div class="grow"><strong>${esc(nameOf(m))}</strong>
-            <p>${esc(stripBond(currentText(m)).replace(/\s+/g, " ").slice(0, 180))}${currentText(m).length > 180 ? "…" : ""}</p></div>
+            <p>${previewHTML(stripBond(currentText(m)), 180)}</p></div>
           <button class="btn btn-sm" type="button" data-go="${m.id}">Go to</button>
           <button class="btn btn-sm btn-quiet" type="button" data-unpin="${m.id}">Unpin</button>
         </li>`).join("")}</ul>`

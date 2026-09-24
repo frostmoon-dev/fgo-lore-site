@@ -21,6 +21,18 @@ function inline(s, { quotes }) {
   return s.replace(/\u0000(\d+)\u0000/g, (_, i) => `<code>${codes[i]}</code>`);
 }
 
+// One line of a message for lists (recent chats, pinned moments): cut at a
+// word near `max` characters, with *actions* and **bold** still formatted.
+export function previewHTML(src, max = 120) {
+  let text = String(src ?? "").replace(/\s+/g, " ").trim();
+  if (text.length > max) {
+    text = text.slice(0, max).replace(/\s+\S*$/, "").replace(/[\s*_~]+$/, "");
+    if ((text.match(/\*\*/g) || []).length % 2) text = text.replace(/\*\*(?!.*\*\*)/, ""); // a bold cut in half
+    text += "…";
+  }
+  return inline(escapeHTML(text), { quotes: false });
+}
+
 export function renderMarkdown(src, { quotes = false } = {}) {
   const lines = escapeHTML(src).replace(/\r\n?/g, "\n").split("\n");
   const out = [];
