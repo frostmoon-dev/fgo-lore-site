@@ -4,10 +4,16 @@
 import { getMeta, setMeta } from "./store.js";
 import { $, esc, icon, openDialog } from "./ui.js";
 
-export const APP_VERSION = "2026.09.24.10";
+export const APP_VERSION = "2026.09.24.11";
 
 // Newest first. Each item says what it is and where it lives.
 export const NEWS = [
+  {
+    version: "2026.09.24.11",
+    items: [
+      ["No more half-finished recaps", "When a recap, journal entry, summary or other background task runs out of room mid-sentence, it is asked for again with more room. If it is still cut off, a recap or journal entry ends at its last whole sentence."],
+    ],
+  },
   {
     version: "2026.09.24.10",
     items: [

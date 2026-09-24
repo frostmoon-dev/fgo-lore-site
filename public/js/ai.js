@@ -6,7 +6,26 @@ import { getActiveConnection, getSettings } from "./store.js";
 import { chatCompletion } from "./api.js";
 import { currentText, stripBond, applyMacros, contentLevel, contentRule } from "./prompt.js";
 
-export async function ask(messages, { bot, maxTokens = 800, temperature = 0.4, signal } = {}) {
+// A reply cut off by the length limit is asked for once more with more room
+// (thinking models spend part of it before writing). If it is still cut and
+// the task is prose, it ends at the last whole sentence instead of mid-word.
+export async function ask(messages, { bot, maxTokens = 800, temperature = 0.4, signal, prose = false } = {}) {
+  let res = await askOnce(messages, { bot, maxTokens, temperature, signal });
+  if (res.finishReason === "length") res = await askOnce(messages, { bot, maxTokens: Math.min(8000, Math.ceil(maxTokens * 2.5)), temperature, signal });
+  let text = String(res.content ?? "").trim();
+  if (prose && res.finishReason === "length") text = toLastSentence(text);
+  return text;
+}
+
+// Cuts text after its last complete sentence, keeping a closing quote or *.
+// Left as it is when that would drop most of it.
+export function toLastSentence(text) {
+  let end = -1;
+  for (const m of text.matchAll(/[.!?…]["”'’*)]*(?=\s|$)/g)) end = m.index + m[0].length;
+  return end > text.length / 3 ? text.slice(0, end).trim() : text;
+}
+
+async function askOnce(messages, { bot, maxTokens, temperature, signal }) {
   const [conn, settings] = await Promise.all([getActiveConnection(), getSettings()]);
   if (!conn) throw new Error("Set up an API connection first, on the Connection page.");
   // Every task follows the same content level as the chat itself, so a
@@ -18,7 +37,7 @@ export async function ask(messages, { bot, maxTokens = 800, temperature = 0.4, s
     messages, stream: false, max_tokens: maxTokens, temperature,
   }, { signal });
   window.dispatchEvent(new CustomEvent("api-status", { detail: true }));
-  return String(res.content ?? "").trim();
+  return res;
 }
 
 // Models often wrap JSON in a code fence or add a sentence around it.
@@ -249,7 +268,7 @@ export async function recap({ bot, names, memory, lines, signal }) {
     `Write a short "previously on" recap of a roleplay between ${names.user} and ${names.char}, to help ${names.user} pick the story back up. ` +
     `Two to four sentences of plain prose, past tense, ending with where things stand right now. Refer to ${names.user} as "you". No headings, no lists.`;
   const user = `${memory?.trim() ? `Summary of earlier events:\n${memory.trim()}\n\n` : ""}Most recent messages:\n\n${lines}`;
-  return ask([{ role: "system", content: system }, { role: "user", content: user }], { bot, maxTokens: 300, temperature: 0.5, signal });
+  return ask([{ role: "system", content: system }, { role: "user", content: user }], { bot, maxTokens: 500, temperature: 0.5, signal, prose: true });
 }
 
 // ---------- Story ----------
@@ -284,7 +303,7 @@ export async function journalEntry({ bot, names, previous, lines, signal }) {
     `what you really think and feel about ${names.user} now, and anything you would never say aloud. ` +
     "80 to 160 words. No date line, no heading, no sign-off. Stay consistent with your earlier entries.";
   const user = `${previous?.trim() ? `Your last entry:\n${previous.trim()}\n\n` : ""}What happened since:\n\n${lines}`;
-  return ask([{ role: "system", content: system }, { role: "user", content: user }], { bot, maxTokens: 400, temperature: 0.8, signal });
+  return ask([{ role: "system", content: system }, { role: "user", content: user }], { bot, maxTokens: 400, temperature: 0.8, signal, prose: true });
 }
 
 // ---------- Surprise ----------
