@@ -501,6 +501,8 @@ details.more > summary::after {
 details.more[open] > summary::after { content: "\2212"; }
 details.more[open] > * + * { margin-top: var(--s4); }
 .card > details.more:first-child { border-top: 0; padding-top: 0; }
+/* Stacked sections: the dividing line sits 16px from what is above and below it. */
+details.more + details.more { margin-top: var(--s4); }
 
 .editor-layout { display: grid; gap: var(--s5); grid-template-columns: minmax(0, 1fr) 280px; align-items: start; }
 .editor-aside { position: sticky; top: 80px; display: grid; gap: var(--s4); }
@@ -733,9 +735,10 @@ body.in-chat .site-footer { display: none; }
 .composer-inner > .note { margin-bottom: var(--s2); }
 .composer-box {
   /* The send button sits 6px in from the edge, and the corner radius is its
-     radius plus that gap, so the button's curve follows the box's corner. */
+     radius plus that gap plus the border (20 + 6 + 1.5, capped at half the
+     54px height), so the button's curve follows the box's corner. */
   display: flex; align-items: flex-end; gap: var(--s2); padding: 6px 6px 6px var(--s2);
-  background: var(--raised); border: 1.5px solid var(--line-strong); border-radius: 26px;
+  background: var(--raised); border: 1.5px solid var(--line-strong); border-radius: 27px;
   transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
 }
 .composer-box:focus-within { border-color: var(--ink); box-shadow: 0 0 0 3px var(--accent-soft); }
@@ -744,6 +747,9 @@ body.in-chat .site-footer { display: none; }
   min-height: 40px; max-height: 40svh; border: 0; background: none; resize: none;
   /* Text starts --composer-inset in from the box's outer edge (1.5 border + 8 box padding + this). */
   padding: var(--s2) var(--s2) var(--s2) calc(var(--composer-inset) - 9.5px);
+  /* One line is exactly as tall as the 40px buttons beside it, so the send
+     button sits the same 6px from the top, right and bottom of the box. */
+  padding-block: max(0px, calc((40px - 1lh) / 2));
   border-radius: 0; font-size: calc(var(--t-md) * var(--chat-scale));
 }
 .composer-box textarea:focus-visible { box-shadow: none; }

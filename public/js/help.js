@@ -4,10 +4,17 @@
 import { getMeta, setMeta } from "./store.js";
 import { $, esc, icon, openDialog } from "./ui.js";
 
-export const APP_VERSION = "2026.09.24.9";
+export const APP_VERSION = "2026.09.24.10";
 
 // Newest first. Each item says what it is and where it lives.
 export const NEWS = [
+  {
+    version: "2026.09.24.10",
+    items: [
+      ["Send button centred", "With one line typed, the send button now sits the same distance from the top, right and bottom of the message box."],
+      ["Even gaps between sections", "Fold-out sections, like Start from an idea and Paste a definition, have the same space above and below the line between them."],
+    ],
+  },
   {
     version: "2026.09.24.9",
     items: [

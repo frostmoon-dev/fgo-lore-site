@@ -462,7 +462,8 @@ export function debounce(fn, ms = 400) {
 }
 
 export function autosize(textarea) {
-  const fit = () => { textarea.style.height = "auto"; textarea.style.height = `${textarea.scrollHeight + 2}px`; };
+  // scrollHeight leaves out the border, so the real border is added back.
+  const fit = () => { textarea.style.height = "auto"; textarea.style.height = `${textarea.scrollHeight + textarea.offsetHeight - textarea.clientHeight}px`; };
   textarea.addEventListener("input", fit);
   requestAnimationFrame(fit);
   return fit;
