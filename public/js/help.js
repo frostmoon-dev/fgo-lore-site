@@ -4,10 +4,19 @@
 import { getMeta, setMeta } from "./store.js";
 import { $, esc, icon, openDialog } from "./ui.js";
 
-export const APP_VERSION = "2026.09.24.8";
+export const APP_VERSION = "2026.09.24.9";
 
 // Newest first. Each item says what it is and where it lives.
 export const NEWS = [
+  {
+    version: "2026.09.24.9",
+    items: [
+      ["Tries again when the model is busy", "Free and shared models often answer \"overloaded\" or \"try again\". The reply is now asked for again up to 3 times, waiting a little longer each time, and the line under the message box says so. Stop cancels it. Turn it off in Settings, under Chat."],
+      ["Delete chats from the list", "A bin button on each chat in the chat list, and on Recent chats on the home page. Undo brings it back."],
+      ["Tidier layout", "Controls share one set of sizes, stacked cards sit the same distance apart, and text, icons and labels line up along the same edges. The persona picker is a lighter pill. On phones, buttons no longer stay grey after a tap."],
+      ["Unfinished actions", "An action whose closing * never came, such as in a cut-off reply, now shows in italics instead of with a stray *."],
+    ],
+  },
   {
     version: "2026.09.24.8",
     items: [

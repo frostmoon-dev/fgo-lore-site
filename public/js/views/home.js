@@ -82,7 +82,7 @@ export async function render(main) {
       ${recent.length ? `
         <section class="section" aria-labelledby="recent-title">
           <h2 class="sub" id="recent-title">Recent chats</h2>
-          <ul class="list">
+          <ul class="list" id="recent-list">
             ${recent.map((c) => {
               const b = byId.get(c.botId);
               return `<li class="list-item">
@@ -92,7 +92,10 @@ export async function render(main) {
                   <div class="sub">${esc(currentText(c.messages.at(-1)).slice(0, 120))}</div>
                 </div>
                 <span class="sub">${timeAgo(c.updatedAt)}</span>
-                <a class="btn btn-sm" href="#/chat/${b.id}/${c.id}">Open<span class="sr-only"> chat with ${esc(b.name)}</span></a>
+                <div class="actions">
+                  <a class="btn btn-sm" href="#/chat/${b.id}/${c.id}">Open<span class="sr-only"> chat with ${esc(b.name)}</span></a>
+                  <button class="icon-btn" type="button" data-del-chat="${c.id}" aria-label="Delete chat with ${esc(b.name)}: ${esc(c.title)}" title="Delete chat">${icon("trash")}</button>
+                </div>
               </li>`;
             }).join("")}
           </ul>
@@ -188,6 +191,24 @@ export async function render(main) {
     }
     $("#grid-status", main).textContent = `${list.length} of ${allBots.length} bots shown`;
   }
+
+  // Recent chats: delete straight away, with Undo.
+  $("#recent-list", main)?.addEventListener("click", async (e) => {
+    const btn = e.target.closest("[data-del-chat]");
+    if (!btn) return;
+    const gone = allChats.find((c) => c.id === btn.dataset.delChat);
+    if (!gone) return;
+    const row = btn.closest("li");
+    const next = row.nextElementSibling ?? row.previousElementSibling;
+    await chats.remove(gone.id);
+    row.remove();
+    if (!$("#recent-list li", main)) $("#recent-list", main).closest("section").remove();
+    else next?.querySelector("[data-del-chat]")?.focus();
+    toast(`Deleted “${gone.title}” with ${byId.get(gone.botId)?.name ?? "a bot"}.`, "info", {
+      action: "Undo", timeout: 8000,
+      onAction: async () => { await chats.restore(gone); window.dispatchEvent(new HashChangeEvent("hashchange")); },
+    });
+  });
 
   grid.addEventListener("click", async (e) => {
     const btn = e.target.closest("[data-fav]");

@@ -13,7 +13,10 @@ function inline(s, { quotes }) {
     .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
     .replace(/(^|[^*\w])\*(?!\s)(.+?)(?<!\s)\*(?!\w)/g, "$1<em>$2</em>")
     .replace(/(^|[^_\w])_(?!\s)(.+?)(?<!\s)_(?!\w)/g, "$1<em>$2</em>")
-    .replace(/~~(.+?)~~/g, "<del>$1</del>");
+    .replace(/~~(.+?)~~/g, "<del>$1</del>")
+    // An action whose closing * never came (a cut-off or still-streaming
+    // reply) runs in italics to the end of the line instead of showing a *.
+    .replace(/(^|[^*\w])\*(?=[^\s*])([^*]+)$/, "$1<em>$2</em>");
   if (quotes) s = s.replace(/(&quot;|“)(.+?)(&quot;|”)/g, '<span class="q">$1$2$3</span>');
   return s.replace(/\u0000(\d+)\u0000/g, (_, i) => `<code>${codes[i]}</code>`);
 }

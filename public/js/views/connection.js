@@ -200,7 +200,7 @@ export async function render(main) {
         const res = await chatCompletion(conn, {
           messages: [{ role: "user", content: "Reply with exactly one word: ready" }],
           max_tokens: 20, stream: false,
-        });
+        }, { retries: 0 }); // a test reports what happened, straight away
         const ms = Math.round(performance.now() - t0);
         out.innerHTML = `<div class="note">${icon("check")}<span><strong>It works.</strong> Replied in ${ms} ms: “${esc(res.content.trim().slice(0, 80) || "(empty)")}”</span></div>`;
         window.dispatchEvent(new CustomEvent("api-status", { detail: true }));

@@ -182,3 +182,6 @@ document.addEventListener("keydown", (e) => {
   }
 });
 $("#footer-backup")?.addEventListener("click", (e) => { e.preventDefault(); goToSettings("data"); });
+
+// iOS Safari only shows :active press colours once a touch listener exists.
+document.addEventListener("touchstart", () => {}, { passive: true });
