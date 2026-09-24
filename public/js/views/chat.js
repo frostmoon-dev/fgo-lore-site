@@ -14,7 +14,7 @@ import {
 } from "../ai.js";
 import {
   memoryContext, liveChapters, windowStart as memoryWindowStart, autoChapters, pendingChapters,
-  chaptersToFold, recall, recallDocs, parseChapter, cachedTokens, trimMemory, KEEP_RECENT,
+  chaptersToFold, recallFor, parseChapter, cachedTokens, trimMemory, KEEP_RECENT,
 } from "../memory.js";
 import { bondChartHTML, wireBondChart } from "../chart.js";
 import { renderMarkdown } from "../markdown.js";
@@ -538,12 +538,34 @@ export async function render(main, [botId, chatId, jumpTo]) {
   const nearBottom = () => log.scrollHeight - log.scrollTop - log.clientHeight < 120;
   const toBottom = () => { log.scrollTop = log.scrollHeight; };
 
+  // Only the latest PAGE messages are drawn, so a long chat opens quickly.
+  // "Show earlier" adds a page at a time; jumping to an old message (search,
+  // pinned) draws back to it first.
+  const PAGE = 100;
+  let shownFrom = Math.max(0, chat.messages.length - PAGE);
+  let expanded = false;
+  const earlierHTML = () => (shownFrom > 0 ? `<div class="earlier">
+      <button class="btn btn-sm" type="button" data-action="show-earlier">Show ${Math.min(PAGE, shownFrom)} earlier message${Math.min(PAGE, shownFrom) === 1 ? "" : "s"}</button>
+      <span class="hint">${shownFrom.toLocaleString()} not shown. ${esc(bot.name)} still remembers them.</span>
+    </div>` : "");
+  function showEarlier(to = shownFrom - PAGE) {
+    const fromBottom = log.scrollHeight - log.scrollTop;
+    shownFrom = Math.max(0, to);
+    expanded = true;
+    paintLog({ scroll: false });
+    log.scrollTop = log.scrollHeight - fromBottom; // keep your place
+  }
+
   function paintLog({ scroll = true } = {}) {
+    // Without "Show earlier", the page follows the newest messages; after a
+    // rewind there may be fewer than before.
+    const latest = Math.max(0, chat.messages.length - PAGE);
+    shownFrom = expanded ? Math.min(shownFrom, latest) : latest;
     if (!chat.messages.length && !pendingError) {
       logInner.innerHTML = `<div class="empty"><h2>A quiet room</h2>
         <p>${esc(bot.name)} has no opening line. Say something to begin.</p></div>`;
     } else {
-      logInner.innerHTML = chat.messages.map(messageHTML).join("") + (pendingError ? `
+      logInner.innerHTML = earlierHTML() + chat.messages.slice(shownFrom).map((m, i) => messageHTML(m, shownFrom + i)).join("") + (pendingError ? `
         <div class="msg"><span></span><div>
           <div class="msg-body error" role="alert">${esc(pendingError)}</div>
           <div class="msg-foot"><button class="btn btn-sm" type="button" data-action="retry">Try again</button>
@@ -801,7 +823,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
     // Recall looks for old moments that share names or rarer words with
     // the last two messages.
     const query = hist.slice(-2).map((m) => stripBond(currentText(m))).join("\n");
-    const recalled = recall(recallDocs(chat, { nameOf, textOf: (m) => stripBond(currentText(m)), start: ctx.windowStart }), query);
+    const recalled = recallFor(chat, { query, nameOf, textOf: (m) => stripBond(currentText(m)), start: ctx.windowStart });
     return { memory: ctx.story, facts: ctx.facts, chapters: ctx.chapters, windowStart: ctx.windowStart, recalled };
   }
 
@@ -1340,6 +1362,8 @@ export async function render(main, [botId, chatId, jumpTo]) {
 
   // ---------- Pinned moments ----------
   function scrollToMessage(id) {
+    const at = chat.messages.findIndex((m) => m.id === id);
+    if (at >= 0 && at < shownFrom) showEarlier(at - 10);
     const el = $(`[data-id="${CSS.escape(id)}"]`, logInner);
     if (!el) return false;
     el.scrollIntoView({ block: "center", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
@@ -1864,6 +1888,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
     if (!btn) return;
     const action = btn.dataset.action;
     if (action === "retry") { pendingError = null; generate("new"); return; }
+    if (action === "show-earlier") { showEarlier(); $('[data-action="show-earlier"]', logInner)?.focus({ preventScroll: true }); return; }
     const el = btn.closest("[data-id]");
     const i = chat.messages.findIndex((m) => m.id === el?.dataset.id);
     const m = chat.messages[i];

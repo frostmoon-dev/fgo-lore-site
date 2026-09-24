@@ -43,6 +43,11 @@ server-side storage of your key.
   each request. In a 200-message test chat this cut a reply's input from about 7,800 to about
   2,100 tokens. Read and edit it all from the book button in a chat; the usage numbers show
   how much the provider reused from its cache.
+- **Long chats stay fast**: a chat draws its latest 100 messages, with "Show earlier" for more
+  (jumping to an old message from search or pinned draws back to it). Recall keeps a word
+  index per chat and only adds new messages to it, so looking up old moments takes well under
+  a millisecond per reply even in a 100,000-message chat. A 5,000-message chat opens in about
+  half a second instead of five.
 - **Scene director**: the megaphone button (Alt+D) adds a hidden direction for the next
   reply only, such as "time skip to nightfall". It never appears in the chat.
 - **Reply nudges**: the Regenerate button offers Shorter, Longer, More emotion, More action
