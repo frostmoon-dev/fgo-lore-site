@@ -4,10 +4,16 @@
 import { getMeta, setMeta } from "./store.js";
 import { $, esc, icon, openDialog } from "./ui.js";
 
-export const APP_VERSION = "2026.09.24.4";
+export const APP_VERSION = "2026.09.24.5";
 
 // Newest first. Each item says what it is and where it lives.
 export const NEWS = [
+  {
+    version: "2026.09.24.5",
+    items: [
+      ["Easier-to-read actions", "Roleplay actions in italics and your own messages use a slightly stronger colour, so long passages are easier to read, especially in dark mode."],
+    ],
+  },
   {
     version: "2026.09.24.4",
     items: [
