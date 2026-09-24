@@ -267,7 +267,8 @@ export async function recap({ bot, names, memory, lines, signal }) {
   const system =
     `Write a short "previously on" recap of a roleplay between ${names.user} and ${names.char}, to help ${names.user} pick the story back up. ` +
     `Two to four sentences of plain prose, past tense, ending with where things stand right now. Refer to ${names.user} as "you". No headings, no lists.`;
-  const user = `${memory?.trim() ? `Summary of earlier events:\n${memory.trim()}\n\n` : ""}Most recent messages:\n\n${lines}`;
+  const user = `${memory?.trim() ? `Summary of earlier events:\n${memory.trim()}\n\n` : ""}Most recent messages, for reference only (do not continue them):\n<chat>\n${lines}\n</chat>\n\n` +
+    `Now write the recap: two to four sentences, past tense, addressing ${names.user} as "you". Do not continue the scene.`;
   return ask([{ role: "system", content: system }, { role: "user", content: user }], { bot, maxTokens: 500, temperature: 0.5, signal, prose: true });
 }
 
@@ -296,14 +297,32 @@ export async function nameChat({ bot, names, lines, signal }) {
 
 // ---------- Journal ----------
 
+// Some models read the chat and simply continue the scene. So the chat is
+// fenced off as reference, the request comes after it (models follow what
+// they read last), and the reply is checked: a diary entry says "I" and
+// "my" outside quoted speech. One retry with a sharper reminder, then none.
+export function looksLikeDiary(text) {
+  const narration = String(text).replace(/["“][^"”]*["”]/g, " ");
+  const firstPerson = (narration.match(/\b(I|I'm|I've|I'd|I'll|me|my|myself|mine)\b/g) || []).length;
+  return firstPerson >= 3;
+}
+
 export async function journalEntry({ bot, names, previous, lines, signal }) {
   const system =
     `You are ${names.char}, writing in your private journal after time spent with ${names.user}. ` +
     `Write one entry in first person, in ${names.char}'s own voice, personality and way of speaking: what happened, ` +
     `what you really think and feel about ${names.user} now, and anything you would never say aloud. ` +
     "80 to 160 words. No date line, no heading, no sign-off. Stay consistent with your earlier entries.";
-  const user = `${previous?.trim() ? `Your last entry:\n${previous.trim()}\n\n` : ""}What happened since:\n\n${lines}`;
-  return ask([{ role: "system", content: system }, { role: "user", content: user }], { bot, maxTokens: 400, temperature: 0.8, signal, prose: true });
+  const ask1 = `Now write today's journal entry as ${names.char}: first person ("I", "me", "my"), looking back on what happened, ` +
+    `80 to 160 words. Do not continue the scene, do not write dialogue or actions, and do not narrate in the third person.`;
+  const user = (reminder) => `${previous?.trim() ? `Your last journal entry:\n${previous.trim()}\n\n` : ""}` +
+    `The chat since then, for reference only (do not continue it):\n<chat>\n${lines}\n</chat>\n\n${reminder}`;
+  const opts = { bot, maxTokens: 400, temperature: 0.8, signal, prose: true };
+  let text = await ask([{ role: "system", content: system }, { role: "user", content: user(ask1) }], opts);
+  if (looksLikeDiary(text)) return text;
+  text = await ask([{ role: "system", content: system }, { role: "user", content: user(`${ask1} Start with "I". This is a diary, not a story.`) }], { ...opts, temperature: 0.6 });
+  if (looksLikeDiary(text)) return text;
+  throw new Error("This model kept continuing the story instead of writing a journal entry. Try another model, or turn journals off in Settings.");
 }
 
 // ---------- Surprise ----------
