@@ -4,10 +4,18 @@
 import { getMeta, setMeta } from "./store.js";
 import { $, esc, icon, openDialog } from "./ui.js";
 
-export const APP_VERSION = "2026.09.24.5";
+export const APP_VERSION = "2026.09.24.6";
 
 // Newest first. Each item says what it is and where it lives.
 export const NEWS = [
+  {
+    version: "2026.09.24.6",
+    items: [
+      ["Easier to tap on a phone", "Every button is now at least 44 pixels to a finger, the size phones recommend. Buttons look the same; they are only easier to hit."],
+      ["Quieter messages on a phone", "Message buttons show on the latest reply. Tap any other message to show its buttons."],
+      ["Grouped chat menu", "The ⋯ menu is split into This chat, Story, Behind the scenes and Manage, so it is quicker to scan."],
+    ],
+  },
   {
     version: "2026.09.24.5",
     items: [

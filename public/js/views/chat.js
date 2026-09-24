@@ -512,7 +512,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
           <span>Bond with ${esc(speaker.name)}: ${esc(meta.milestone.from)} → ${esc(meta.milestone.to)}</span></div>` : "";
 
     const cutOff = isLastBot && !busy && meta.finish === "length";
-    return `<article class="msg ${m.role} ${isLastBot ? "is-last" : ""}${face ? " has-face" : ""}" data-id="${m.id}" aria-label="${esc(name)}">
+    return `<article class="msg ${m.role} ${isLastBot ? "is-last" : ""}${face ? " has-face" : ""}${m.id === toolsFor ? " tools-open" : ""}" data-id="${m.id}" aria-label="${esc(name)}">
       ${av}
       <div style="min-width:0">
         <div class="msg-head"><span class="msg-name">${esc(name)}</span><time class="msg-time" datetime="${new Date(m.at).toISOString()}">${clock(m.at)}</time></div>
@@ -542,6 +542,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
   // "Show earlier" adds a page at a time; jumping to an old message (search,
   // pinned) draws back to it first.
   const PAGE = 100;
+  let toolsFor = null; // the message whose tools a touch screen shows (see showToolsOn)
   let shownFrom = Math.max(0, chat.messages.length - PAGE);
   let expanded = false;
   const earlierHTML = () => (shownFrom > 0 ? `<div class="earlier">
@@ -1883,9 +1884,20 @@ export async function render(main, [botId, chatId, jumpTo]) {
   document.addEventListener("keydown", onGlobalKey);
 
   // ---------- Message actions ----------
+  // Touch screens show message tools on the latest reply only; tapping a
+  // message shows its tools instead. Tapping a link or selecting text does not.
+  const noHover = matchMedia("(hover: none)");
+  function showToolsOn(e) {
+    if (!noHover.matches || e.target.closest("a, button, input, textarea, select, summary") || String(getSelection()).trim()) return;
+    const el = e.target.closest(".msg[data-id]");
+    if (!el) return;
+    toolsFor = toolsFor === el.dataset.id ? null : el.dataset.id;
+    $$(".msg.tools-open", logInner).forEach((x) => x.classList.remove("tools-open"));
+    if (toolsFor) el.classList.add("tools-open");
+  }
   logInner.addEventListener("click", async (e) => {
     const btn = e.target.closest("[data-action]");
-    if (!btn) return;
+    if (!btn) { showToolsOn(e); return; }
     const action = btn.dataset.action;
     if (action === "retry") { pendingError = null; generate("new"); return; }
     if (action === "show-earlier") { showEarlier(); $('[data-action="show-earlier"]', logInner)?.focus({ preventScroll: true }); return; }
@@ -2302,27 +2314,28 @@ export async function render(main, [botId, chatId, jumpTo]) {
   }
 
   // On a phone, Memory and Characters live in this menu instead of the bar.
+  // Grouped under headings so a long menu scans quickly.
   $("#more", main).addEventListener("click", (e) => openMenu(e.currentTarget, [
     ...(narrow.matches ? [
+      { heading: "This chat" },
       { label: "Model", hint: `${currentModel()}${chat.model ? " (this chat)" : ""}`, onSelect: () => openModelMenu($("#more", main)) },
       { label: "Memory", hint: chat.memory?.text || liveChapters(chat).length ? "Chapters, key facts and the story so far" : "Empty so far", onSelect: openMemory },
       { label: "Scene tracker", hint: chat.scene?.text ? "Where everyone is right now" : "Off so far", onSelect: openScene },
       { label: "Characters in this chat", hint: group() ? `${everyone().length} in the scene` : "Add bots for a group scene", onSelect: openCast },
-      "-",
     ] : []),
+    { heading: "Story" },
     { label: `Pinned moments (${chat.messages.filter((m) => m.pinned).length})`, hint: "Always remembered by the model", onSelect: openPinned },
     { label: `${bot.name}'s journal (${chat.journal.length})`, hint: "Private diary entries about you", onSelect: openJournal },
     { label: "Recap so far", hint: "A few lines on what has happened", onSelect: showRecap },
     { label: "Turn into a story", hint: "Rewrite the chat as prose", onSelect: openStory },
     { label: "Suggest lore from this chat", hint: "New entries from what happened", onSelect: openLoreSuggestions },
-    "-",
+    { heading: "Behind the scenes" },
     { label: "See the prompt", hint: "Exactly what the model gets next", onSelect: previewPrompt },
     { label: "Usage in this chat", hint: "Tokens used by replies here", onSelect: openChatUsage },
-    "-",
+    { heading: "Manage" },
     { label: "Chat look", hint: "Background, font, text and picture size", onSelect: openLook },
     { label: "Rename chat", onSelect: rename },
     { label: "Export chat", onSelect: exportChat },
-    "-",
     { label: "Delete chat", danger: true, onSelect: deleteChat },
   ]));
 

@@ -667,7 +667,14 @@ body.in-chat .site-footer { display: none; }
 /* Kept in the tab order at opacity 0, so keyboard focus reveals them. */
 .msg-tools { display: flex; opacity: 0; transition: opacity var(--dur) var(--ease); }
 .msg:hover .msg-tools, .msg:focus-within .msg-tools, .msg.is-last .msg-tools { opacity: 1; }
-@media (hover: none) { .msg-tools { opacity: 1; } }
+/* Touch screens have no hover. Tools show on the latest reply and on the
+   message last tapped; the rest stay out of the way while reading. */
+@media (hover: none) {
+  .msg-tools { opacity: 1; }
+  .msg:not(.is-last):not(.tools-open):not(:focus-within) .msg-tools { display: none; }
+  .msg:not(.is-last):not(.tools-open):not(:focus-within) .msg-foot { min-height: 0; }
+  .msg:not(.is-last):not(.tools-open):not(:focus-within) .msg-foot:not(:has(.swipes, .msg-meta)) { display: none; }
+}
 .msg-meta { font-size: var(--t-sm); color: var(--muted); margin-left: auto; display: flex; align-items: center; gap: var(--s2); }
 .swipes { display: inline-flex; align-items: center; font-size: var(--t-sm); color: var(--muted); font-variant-numeric: tabular-nums; }
 .msg-edit textarea { min-height: 112px; }
@@ -881,6 +888,9 @@ body.in-chat .site-footer { display: none; }
 .menu-item.danger { color: var(--danger); }
 .menu-item:disabled { color: var(--line-strong); cursor: not-allowed; background: none; }
 .menu-sep { height: 1px; margin: var(--s1) var(--s2); background: var(--line); }
+/* Long menus are grouped under short headings, so the eye can skip ahead. */
+.menu-heading { padding: var(--s2) var(--s3) var(--s1); font-size: var(--t-xs); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.menu-group + .menu-group { margin-top: var(--s1); padding-top: var(--s1); border-top: 1px solid var(--line); }
 
 /* ---------- Chat tools ---------- */
 /* A small dot marks a tool that holds something (memory saved, cast added). */
@@ -1243,6 +1253,41 @@ dialog.palette-dialog { width: min(600px, calc(100vw - 32px)); margin-top: 12vh;
 @media (pointer: coarse) {
   input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea { font-size: max(16px, var(--t-base)) !important; }
   .composer-box textarea { font-size: max(16px, calc(var(--t-md) * var(--chat-scale))) !important; }
+
+  /* Every control is at least 44 by 44 px to a finger (Apple's minimum, and
+     WCAG 2.5.5). The drawn size stays the same: a clear border grows the hit
+     area, the background stays inside it, and an equal negative margin keeps
+     the layout where it was. --hit is (44 - drawn size) / 2. */
+  .icon-btn, .icon-toggle, .send-btn, .bond, .brand, .title-edit, .avatar-link {
+    --hit: 4px;
+    box-sizing: content-box; border: var(--hit) solid transparent; margin: calc(-1 * var(--hit));
+    background-clip: padding-box !important;
+  }
+  .send-btn, .composer-tool, .avatar-link { --hit: 2px; }
+  .composer-foot .persona-edit, .direct-bar .icon-btn, .suggest-bar .icon-btn, .expr-slot-head .icon-btn { --hit: 6px; }
+  .palette-btn { border-width: 4px 5px; margin: -4px -5px; }
+  .brand { --hit: 9px; margin-inline: 0; border-inline-width: 0; }
+  /* The chat name sits in a clipped box, so its extra area goes below, over the subtitle. */
+  .title-edit { border-width: 0 0 16px; margin: 0 0 -16px calc(-1 * var(--s2)); }
+  .swipes > span { pointer-events: none; }
+  .site-footer a { display: inline-block; padding-block: 12px; margin-block: -12px; }
+  .msg > .avatar-link { --hit: max(0px, calc((44px - var(--pic)) / 2)); }
+  /* The subtitle under the chat name lets taps through to the name. */
+  .chat-topbar .title small { pointer-events: none; }
+  /* Page tabs: the pill stays 36 px tall; the clear border adds the rest. */
+  .main-nav a { box-sizing: content-box; border: 4px solid transparent; background-clip: padding-box; }
+  /* Small buttons keep their look; an invisible layer takes taps around them. */
+  .btn-sm { position: relative; }
+  .btn-sm::before { content: ""; position: absolute; inset: -7px -2px; }
+  /* Drawn larger: these keep their own border, so they cannot grow unseen. */
+  .btn, input[type="text"], input[type="url"], input[type="password"], input[type="search"], input[type="number"], select { height: 44px; }
+  .composer-foot select { height: 44px; }
+  .btn-sm { height: 32px; }
+  /* Segments: a little taller, and each one takes taps over the frame's padding. */
+  .segmented span { height: 38px; }
+  .segmented label::before, .segmented label::after { content: ""; position: absolute; left: 0; right: 0; height: 3px; }
+  .segmented label::before { top: -3px; }
+  .segmented label::after { bottom: -3px; }
 }
 
 /* Memory dialog: facts, story and chapters, newest chapter first. */
