@@ -296,10 +296,19 @@ export function closeMenu() {
 export function openMenu(anchor, items, { align = "end" } = {}) {
   if (openMenuEl?.anchor === anchor) { closeMenu(); return; }
   closeMenu();
-  const el = html(`<div class="menu" role="menu">${items.map((it, i) => (it === "-"
-    ? '<div class="menu-sep" role="separator"></div>'
-    : `<button type="button" role="menuitem" class="menu-item${it.danger ? " danger" : ""}" data-i="${i}" ${it.disabled ? "disabled" : ""}>
-        <span>${esc(it.label)}</span>${it.hint ? `<small>${esc(it.hint)}</small>` : ""}</button>`)).join("")}</div>`);
+  // { heading } starts a labelled group that runs to the next heading.
+  let open = false;
+  const parts = items.map((it, i) => {
+    if (it === "-") return '<div class="menu-sep" role="separator"></div>';
+    if (it.heading) {
+      const start = `${open ? "</div>" : ""}<div class="menu-group" role="group" aria-label="${esc(it.heading)}"><div class="menu-heading" aria-hidden="true">${esc(it.heading)}</div>`;
+      open = true;
+      return start;
+    }
+    return `<button type="button" role="menuitem" class="menu-item${it.danger ? " danger" : ""}" data-i="${i}" ${it.disabled ? "disabled" : ""}>
+        <span>${esc(it.label)}</span>${it.hint ? `<small>${esc(it.hint)}</small>` : ""}</button>`;
+  });
+  const el = html(`<div class="menu" role="menu">${parts.join("")}${open ? "</div>" : ""}</div>`);
   document.body.append(el);
 
   const r = anchor.getBoundingClientRect();
