@@ -42,6 +42,9 @@
   --raised: #ffffff;
   --ink: #1c1a17;
   --muted: #6b645b;
+  /* Roleplay actions and your own messages: softer than --ink, but still at
+     APCA Lc 75+ so long passages stay easy to read (--muted is ~Lc 70). */
+  --narration: #5b554d;
   --line: #e6e0d6;
   --line-strong: #8c8478;
   --fill: #ece6dc;
@@ -72,6 +75,7 @@
   --raised: #262320;
   --ink: #f2ede5;
   --muted: #a9a197;
+  --narration: #d5cfc6;
   --line: #2f2b27;
   --line-strong: #7a7268;
   --fill: #2e2a26;
@@ -103,6 +107,7 @@
   --raised: #ffffff;
   --ink: #1e1828;
   --muted: #655c72;
+  --narration: #5a5166;
   --line: #e4ddec;
   --line-strong: #877d94;
   --fill: #ebe5f2;
@@ -124,6 +129,7 @@
   --raised: #221d2c;
   --ink: #efeaf6;
   --muted: #a89fb6;
+  --narration: #d3ccdc;
   --line: #2c2638;
   --line-strong: #776d88;
   --fill: #29233a;
@@ -645,12 +651,12 @@ body.in-chat .site-footer { display: none; }
 :root[data-chat-font="serif"] { --chat-font: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif; }
 :root[data-chat-font="plain"] { --chat-font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
 .msg-body > * + * { margin-top: .75em; }
-.msg.user .msg-body { color: var(--muted); }
-.msg-body em { font-style: italic; color: var(--muted); }
+.msg.user .msg-body { color: var(--narration); }
+.msg-body em { font-style: italic; color: var(--narration); }
 .msg.user .msg-body em { color: inherit; }
 .msg-body pre { background: var(--surface); padding: var(--s3); border-radius: var(--r-sm); overflow-x: auto; }
 .msg-body ul, .msg-body ol { padding-left: 1.3em; }
-.msg-body blockquote { border-left: 2px solid var(--line-strong); padding-left: var(--s3); color: var(--muted); }
+.msg-body blockquote { border-left: 2px solid var(--line-strong); padding-left: var(--s3); color: var(--narration); }
 .msg-body.error { color: var(--danger); }
 .msg-body .caret { display: inline-block; width: 7px; height: 1.05em; background: var(--ink); border-radius: 2px; vertical-align: text-bottom; margin-left: 2px; animation: blink 1s steps(2) infinite; }
 @keyframes blink { 50% { opacity: 0; } }
