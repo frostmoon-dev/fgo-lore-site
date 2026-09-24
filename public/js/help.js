@@ -4,10 +4,16 @@
 import { getMeta, setMeta } from "./store.js";
 import { $, esc, icon, openDialog } from "./ui.js";
 
-export const APP_VERSION = "2026.09.24.12";
+export const APP_VERSION = "2026.09.24.13";
 
 // Newest first. Each item says what it is and where it lives.
 export const NEWS = [
+  {
+    version: "2026.09.24.13",
+    items: [
+      ["Journals stay journals", "Some models used to continue the story instead of writing a diary entry. Entries are now checked: a story is asked for again as a first-person entry, and if the model still will not, nothing is saved. Entries are also easier to read, in your chat font instead of italics."],
+    ],
+  },
   {
     version: "2026.09.24.12",
     items: [
