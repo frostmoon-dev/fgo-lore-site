@@ -32,7 +32,13 @@ export async function render(main, [id]) {
   bot.bondMilestones ??= true;
   bot.contentMode ??= "site";
   bot.expressions ??= {};
+  bot.series ??= "";
   const settings = await getSettings();
+  // Series already in use come first; tags follow, since many people put the fandom in the tags.
+  const others = (await bots.all()).filter((b) => b.id !== bot.id);
+  const seriesNames = [...new Map(others.map((b) => (b.series ?? "").trim()).filter(Boolean).map((n) => [n.toLowerCase(), n])).values()];
+  const tagNames = others.flatMap((b) => b.tags).filter((t) => !seriesNames.some((n) => n.toLowerCase() === t.toLowerCase()));
+  const seriesSuggestions = [...seriesNames.sort((a, b) => a.localeCompare(b)), ...[...new Set(tagNames)].sort((a, b) => a.localeCompare(b))];
   const books = await getLorebooks();
   let saved = JSON.stringify(bot);
   const isNew = !existing;
@@ -92,9 +98,15 @@ export async function render(main, [id]) {
                   <p class="error-text" id="name-err" hidden>Give the bot a name.</p>
                 </div>
                 <div class="field">
-                  <label for="tags">Tags</label>
-                  <input type="text" id="tags" value="${esc(bot.tags.join(", "))}" placeholder="fantasy, royalty, slow-burn" autocomplete="off">
+                  <label for="series">Series</label>
+                  <input type="text" id="series" value="${esc(bot.series)}" list="series-list" placeholder="Fate/Grand Order, Honkai: Star Rail…" autocomplete="off" aria-describedby="series-hint">
+                  <datalist id="series-list">${seriesSuggestions.map((n) => `<option value="${esc(n)}">`).join("")}</datalist>
+                  <p class="hint" id="series-hint">The fandom or world. Groups bots on the home page. Leave empty for an original character.</p>
                 </div>
+              </div>
+              <div class="field">
+                <label for="tags">Tags</label>
+                <input type="text" id="tags" value="${esc(bot.tags.join(", "))}" placeholder="fantasy, royalty, slow-burn" autocomplete="off">
               </div>
               <div class="field">
                 <label for="tagline">Tagline <span class="count" id="tagline-count"></span></label>
@@ -290,6 +302,9 @@ export async function render(main, [id]) {
     bot.name = val("#name").trim();
     bot.tagline = val("#tagline").trim();
     bot.tags = parseTags(val("#tags"));
+    bot.series = val("#series").trim().replace(/\s+/g, " ").slice(0, 80);
+    // "honkai: star rail" joins "Honkai: Star Rail" as it is already spelled.
+    bot.series = seriesNames.find((n) => n.toLowerCase() === bot.series.toLowerCase()) ?? bot.series;
     for (const k of ["description", "greeting", "scenario", "examples", "personality", "systemPrompt", "postHistory", "creatorNotes"]) bot[k] = val(`#${k}`);
     bot.model = val("#model").trim();
     bot.lorebookIds = $$("[data-book]", main).filter((c) => c.checked && !c.disabled).map((c) => c.dataset.book);

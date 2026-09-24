@@ -12,6 +12,7 @@ const bots = loadEntries("bots").map(({ id, title, meta, content }) => ({
   tagline: meta.tagline ?? "",
   avatar: meta.avatar ?? null, // e.g. "avatars/Morgan.webp", a file in public/
   tags: list(meta.tags),
+  series: meta.series ?? "",
   description: content,
   personality: meta.personality ?? "",
   scenario: meta.scenario ?? "",

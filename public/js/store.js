@@ -192,6 +192,7 @@ export function newConnection(partial = {}) {
 export function newBot(partial = {}) {
   return {
     id: uid(), name: "", tagline: "", avatar: null, tags: [],
+    series: "", // the fandom or world it belongs to, e.g. "Fate/Grand Order"; groups bots on the home page
     description: "", personality: "", scenario: "",
     greeting: "", altGreetings: [], examples: "",
     systemPrompt: "", postHistory: "", creatorNotes: "",
@@ -201,6 +202,22 @@ export function newBot(partial = {}) {
     contentMode: "site", // "site" follows Settings; "safe" keeps this bot safe for work
     createdAt: now(), updatedAt: now(), lastChatAt: 0, ...partial,
   };
+}
+
+// Bots grouped by series, A to Z, with bots that have none at the end.
+// Names match without regard to case, so "fgo" and "FGO" are one group.
+export function seriesGroups(list) {
+  const groups = new Map();
+  for (const b of list) {
+    const name = (b.series ?? "").trim();
+    const key = name.toLowerCase();
+    if (!groups.has(key)) groups.set(key, { key, name, bots: [], since: Infinity });
+    const g = groups.get(key);
+    g.bots.push(b);
+    // The group is named as its oldest bot spells it.
+    if ((b.createdAt ?? 0) < g.since) { g.since = b.createdAt ?? 0; g.name = name; }
+  }
+  return [...groups.values()].sort((a, b) => (!a.key) - (!b.key) || a.name.localeCompare(b.name));
 }
 
 export function newPersona(partial = {}) {
@@ -396,6 +413,12 @@ export async function seed() {
     if (seeded.has(id)) continue;
     await db.put("bots", newBot({ ...b, id, builtin: true }));
     seeded.add(id);
+  }
+  // Built-ins copied in before series existed get theirs once. After that
+  // the series is the user's to change, like everything else.
+  for (const b of library.bots ?? []) {
+    const stored = b.series ? await db.get("bots", `builtin-${b.id}`) : null;
+    if (stored && stored.series === undefined) await db.put("bots", { ...stored, series: b.series });
   }
   for (const e of library.lore ?? []) {
     const id = `builtin-${e.id}`;

@@ -9,7 +9,7 @@ server-side storage of your key.
 
 ## What it does
 
-- **Bots** with picture, tagline, tags, definition, scenario, first message, alternate
+- **Bots** with picture, tagline, series (the fandom, which groups the home page), tags, definition, scenario, first message, alternate
   first messages, example dialogue, and per-bot overrides for the system prompt,
   post-history instructions, model, temperature and reply length.
 - **Pictures you crop yourself**: drag to move, wheel, pinch or the slider to zoom, for
@@ -246,7 +246,8 @@ A bot file:
 ---
 title: Morgan
 tagline: Queen of Fairy Britain. Cold, exact, and slow to trust.
-tags: [fate, royalty]
+series: Fate/Grand Order        # optional: the fandom or world
+tags: [royalty]
 avatar: avatars/morgan.webp     # a file you put in public/
 greeting: Speak.
 alternate_greetings:

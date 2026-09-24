@@ -796,6 +796,28 @@ body.in-chat .site-footer { display: none; }
 .setup-steps .is-done .step-mark { background: var(--primary); color: var(--on-primary); }
 .setup-steps .is-done .step-mark svg { width: 14px; height: 14px; }
 .tag-filter { margin: calc(-1 * var(--s2)) 0 var(--s5); }
+/* Series come before tags: a step up in size, and chosen in the primary colour. */
+.series-filter { margin: calc(-1 * var(--s2)) 0 var(--s3); }
+.series-filter + .tag-filter { margin-top: 0; }
+.series-filter button.chip { height: 36px; font-size: var(--t-ui); gap: var(--s2); }
+.series-filter button.chip[aria-pressed="true"] { background: var(--primary); color: var(--on-primary); }
+.chip .n { font-variant-numeric: tabular-nums; opacity: .72; }
+/* On a phone, many series would stack into a tall block; they scroll sideways instead. */
+@media (max-width: 600px) {
+  .series-filter {
+    flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none;
+    margin-inline: calc(-1 * var(--s4)); padding-inline: var(--s4); scroll-padding-inline: var(--s4);
+  }
+  .series-filter::-webkit-scrollbar { display: none; }
+  .series-filter button.chip { flex: none; white-space: nowrap; }
+}
+/* A heading over each series when every bot is shown. */
+.series-head {
+  display: flex; align-items: baseline; gap: var(--s2); margin-top: var(--s4);
+  font-family: var(--font-display); font-size: var(--t-lg); font-weight: 500; line-height: var(--lh-tight);
+}
+.series-head:first-child { margin-top: 0; }
+.series-head .n { font-family: var(--font); font-size: var(--t-sm); color: var(--muted); font-variant-numeric: tabular-nums; }
 .span-all { grid-column: 1 / -1; }
 
 @media (max-width: 600px) {
@@ -959,7 +981,10 @@ button.check-chip.bad {
 .issue-list { padding-left: 1.2em; display: grid; gap: var(--s1); }
 
 /* Cast picker */
-.cast-list { display: grid; gap: var(--s1); max-height: 50svh; overflow-y: auto; }
+.cast-list { display: grid; gap: var(--s1); }
+.cast-scroll { display: grid; gap: var(--s2); max-height: 50svh; overflow-y: auto; }
+.cast-group { margin-top: var(--s2); font-family: var(--font); font-size: var(--t-xs); font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.cast-group:first-child { margin-top: 0; }
 .cast-row {
   display: flex; align-items: center; gap: var(--s3); padding: var(--s2) var(--s3);
   border-radius: var(--r-md); cursor: pointer;

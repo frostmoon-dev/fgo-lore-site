@@ -86,7 +86,8 @@ function fromCard(json) {
     systemPrompt: d.system_prompt ?? "",
     postHistory: d.post_history_instructions ?? "",
     creatorNotes: d.creator_notes ?? "",
-    tags: Array.isArray(d.tags) ? d.tags.map(String) : [],
+    tags: (Array.isArray(d.tags) ? d.tags.map(String) : []).filter((t) => t.toLowerCase() !== String(ext.series ?? "").toLowerCase()),
+    series: typeof ext.series === "string" ? ext.series : "",
     model: ext.model ?? "",
     gen: ext.gen ?? {},
     avatar: ext.avatar ?? null,
@@ -189,7 +190,8 @@ export function toCard(bot, loreEntries = []) {
       system_prompt: bot.systemPrompt,
       post_history_instructions: bot.postHistory,
       alternate_greetings: bot.altGreetings,
-      tags: bot.tags,
+      // Other apps have no series; it travels as a tag too.
+      tags: bot.series && !bot.tags.some((t) => t.toLowerCase() === bot.series.toLowerCase()) ? [bot.series, ...bot.tags] : bot.tags,
       creator: "",
       character_version: "",
       character_book: loreEntries.length ? {
@@ -200,7 +202,7 @@ export function toCard(bot, loreEntries = []) {
         extensions: {},
       } : undefined,
       extensions: { shirus_garden: {
-        tagline: bot.tagline, model: bot.model, gen: bot.gen,
+        tagline: bot.tagline, series: bot.series ?? "", model: bot.model, gen: bot.gen,
         bondKind: bot.bondKind, bondLevels: bot.bondLevels, bondMilestones: bot.bondMilestones, contentMode: bot.contentMode,
       } },
     },

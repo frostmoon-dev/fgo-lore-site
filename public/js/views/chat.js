@@ -1,7 +1,7 @@
 import {
   bots, chats, lore, personas, getSettings, saveSettings, getActiveConnection, getActivePreset,
   getLorebooks, saveLorebooks, newLorebook, newLore, loreForBot, bondTier, bondLevels, BOND_KINDS, moodsOf, uid, now,
-  getBotPersonas, rememberBotPersona,
+  getBotPersonas, rememberBotPersona, seriesGroups,
 } from "../store.js";
 import { registerCommands } from "../palette.js";
 import { chatCompletion, listModels } from "../api.js";
@@ -1488,6 +1488,16 @@ export async function render(main, [botId, chatId, jumpTo]) {
   }
 
   // ---------- Cast (group scenes) ----------
+  // Candidates grouped by series: this bot's own series first, then A to Z,
+  // bots with no series last. No headings when nobody has a series.
+  function castGroups(list) {
+    const groups = seriesGroups(list);
+    if (!groups.some((g) => g.key)) return [{ title: "", bots: list }];
+    const own = (bot.series ?? "").trim().toLowerCase();
+    groups.sort((a, b) => (b.key === own && !!own) - (a.key === own && !!own));
+    return groups.map((g) => ({ title: g.key ? (g.key === own ? `From ${g.name}` : g.name) : "No series", bots: g.bots }));
+  }
+
   function openCast() {
     const candidates = allBots.filter((b) => b.id !== bot.id);
     const dlg = openDialog(`
@@ -1495,12 +1505,14 @@ export async function render(main, [botId, chatId, jumpTo]) {
         <h2>Characters in this chat</h2>
         <p class="hint">Add other bots to make this a group scene. Each character keeps a bond of their own; the meter in the header
           shows ${esc(bot.name)}'s and opens all of them. The chat stays in ${esc(bot.name)}'s list. Pick who replies next under the message box, or leave it on Auto.</p>
-        ${candidates.length ? `<div class="cast-list">${candidates.map((b) => `
+        ${candidates.length ? `<div class="cast-scroll">${castGroups(candidates).map((g) => `
+          ${g.title ? `<h3 class="cast-group">${esc(g.title)}</h3>` : ""}
+          <div class="cast-list">${g.bots.map((b) => `
           <label class="cast-row">
             <input type="checkbox" value="${b.id}" ${chat.castIds.includes(b.id) ? "checked" : ""}>
             ${avatarHTML(b.avatar, b.name, 36)}
             <span class="grow"><span class="t">${esc(b.name)}</span><small>${esc(b.tagline || "")}</small></span>
-          </label>`).join("")}</div>` : `<p class="note">${icon("info")}<span>There are no other bots yet. <a href="#/bot/new">Make one</a> first.</span></p>`}
+          </label>`).join("")}</div>`).join("")}</div>` : `<p class="note">${icon("info")}<span>There are no other bots yet. <a href="#/bot/new">Make one</a> first.</span></p>`}
         <div class="dialog-actions">
           <button class="btn btn-ghost" value="cancel" formnovalidate>Cancel</button>
           <button class="btn btn-primary" value="ok" ${candidates.length ? "" : "disabled"}>Save</button>
