@@ -4,10 +4,17 @@
 import { getMeta, setMeta } from "./store.js";
 import { $, esc, icon, openDialog } from "./ui.js";
 
-export const APP_VERSION = "2026.09.24.7";
+export const APP_VERSION = "2026.09.24.8";
 
 // Newest first. Each item says what it is and where it lives.
 export const NEWS = [
+  {
+    version: "2026.09.24.8",
+    items: [
+      ["Series", "Give each bot a series, like Fate/Grand Order or Honkai: Star Rail, in its editor. The home page gets a Series filter and a heading over each series, with favourites in their own section first. Imported cards join a series you already use when one of their tags names it."],
+      ["Group scenes by series", "When adding characters to a chat, bots from the same series come first."],
+    ],
+  },
   {
     version: "2026.09.24.7",
     items: [

@@ -1,7 +1,8 @@
 ---
 title: Character name
 tagline: One line shown on the bot's card.
-tags: [fandom, trait]
+series: Fandom or world (leave out for an original character)
+tags: [trait, trait]
 avatar: avatars/name.webp        # optional: a file you put in public/
 greeting: What they say first.
 alternate_greetings:

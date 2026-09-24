@@ -1,7 +1,7 @@
 // The command palette: one box that finds any page, bot, setting or chat
 // action. Ctrl+K (Cmd+K on a Mac) or the search button in the header opens
 // it. Views add their own commands while they are on screen.
-import { bots } from "./store.js";
+import { bots, seriesGroups } from "./store.js";
 import { $, $$, esc, openDialog } from "./ui.js";
 
 const providers = new Set();
@@ -49,6 +49,14 @@ async function baseCommands() {
       else { location.hash = "#/"; setTimeout(function wait(n = 0) { if (document.getElementById("import")) open(); else if (n < 40) setTimeout(() => wait(n + 1), 50); }, 50); }
     } },
     { group: "Bots", title: "Paste a definition from another site", keywords: "import janitor text copy", run: go("#/bot/new?paste") },
+    ...seriesGroups(allBots).filter((g) => g.key).map((g) => ({
+      group: "Series", title: `Show ${g.name} bots`, keywords: "series fandom filter category", hint: `${g.bots.length}`,
+      run: () => {
+        try { localStorage.setItem("botSeries", g.key); } catch { /* private mode */ }
+        if (location.hash.replace(/^#\/?/, "") === "") window.dispatchEvent(new HashChangeEvent("hashchange"));
+        else location.hash = "#/";
+      },
+    })),
     ...allBots.flatMap((b) => [
       { group: "Bots", title: `Chat with ${b.name || "Unnamed"}`, keywords: `${b.tags.join(" ")} talk open`, run: go(`#/chat/${b.id}`) },
       { group: "Bots", title: `Edit ${b.name || "Unnamed"}`, keywords: "bot editor definition expressions", run: go(`#/bot/${b.id}`) },

@@ -1,5 +1,5 @@
 import {
-  bots, chats, lore, personas, getConnections, getLorebooks, saveLorebooks, newLorebook,
+  bots, chats, lore, personas, getConnections, getLorebooks, saveLorebooks, newLorebook, seriesGroups,
   getMeta, setMeta, exportAll, markBackedUp,
 } from "../store.js";
 import { whatsNewCardHTML, showWhatsNew, APP_VERSION } from "../help.js";
@@ -15,6 +15,12 @@ export async function render(main) {
   const recent = allChats.filter((c) => byId.has(c.botId) && c.messages.length > 1)
     .sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 3);
   const tags = [...new Set(allBots.flatMap((b) => b.tags))].sort((a, b) => a.localeCompare(b));
+  // Series: one per bot (the fandom or world), shown as its own filter and as
+  // headings on the list. Only offered once some bot has one.
+  const NONE = "\u0000none";
+  const allGroups = seriesGroups(allBots);
+  const hasSeries = allGroups.some((g) => g.key);
+  const seriesKeyOf = (b) => (b.series ?? "").trim().toLowerCase();
 
   const steps = [
     { done: conns.length > 0, text: "Connect an API or proxy", href: "#/connection" },
@@ -104,6 +110,10 @@ export async function render(main) {
             <option value="name">Name A to Z</option>
           </select>
         </div>
+        ${hasSeries ? `<div class="chips series-filter" role="group" aria-label="Filter by series">
+          <button type="button" class="chip" data-series="" aria-pressed="true">All <span class="n">${allBots.length}</span></button>
+          ${allGroups.map((g) => `<button type="button" class="chip" data-series="${esc(g.key || NONE)}" aria-pressed="false">${esc(g.name || "No series")} <span class="n">${g.bots.length}</span></button>`).join("")}
+        </div>` : ""}
         ${tags.length ? `<div class="chips tag-filter" role="group" aria-label="Filter by tag">
           ${tags.map((t) => `<button type="button" class="chip" aria-pressed="false" data-tag="${esc(t)}">${esc(t)}</button>`).join("")}
         </div>` : ""}
@@ -116,11 +126,22 @@ export async function render(main) {
   const q = $("#q", main);
   const sort = $("#sort", main);
   const activeTags = new Set();
+  let activeSeries = "";
+  try { activeSeries = localStorage.getItem("botSeries") ?? ""; } catch { /* private mode */ }
+  if (activeSeries && !allGroups.some((g) => (g.key || NONE) === activeSeries)) activeSeries = "";
+  const inSeries = (b) => !activeSeries || (activeSeries === NONE ? !seriesKeyOf(b) : seriesKeyOf(b) === activeSeries);
 
   function paint() {
     const term = q.value.trim().toLowerCase();
-    const list = allBots.filter((b) =>
-      (!term || [b.name, b.tagline, ...b.tags].join(" ").toLowerCase().includes(term)) &&
+    // Tags from other series are hidden, and stop filtering while hidden.
+    const shownTags = new Set(allBots.filter(inSeries).flatMap((b) => b.tags));
+    $$("[data-tag]", main).forEach((btn) => {
+      btn.hidden = !shownTags.has(btn.dataset.tag);
+      if (btn.hidden && activeTags.delete(btn.dataset.tag)) btn.setAttribute("aria-pressed", "false");
+    });
+    $$("[data-series]", main).forEach((btn) => btn.setAttribute("aria-pressed", String((btn.dataset.series || "") === activeSeries)));
+    const list = allBots.filter((b) => inSeries(b) &&
+      (!term || [b.name, b.tagline, b.series ?? "", ...b.tags].join(" ").toLowerCase().includes(term)) &&
       [...activeTags].every((t) => b.tags.includes(t)));
     const key = sort.value;
     list.sort(key === "name" ? (a, b) => a.name.localeCompare(b.name) : (a, b) => (b[key] ?? 0) - (a[key] ?? 0));
@@ -133,12 +154,20 @@ export async function render(main) {
     } else if (!list.length) {
       grid.innerHTML = `<p class="hint span-all">No bots match. <button class="link-btn" type="button" id="clear">Clear filters</button></p>`;
       $("#clear", grid).addEventListener("click", () => {
-        q.value = ""; activeTags.clear();
+        q.value = ""; activeTags.clear(); activeSeries = "";
         $$("[data-tag]", main).forEach((b) => b.setAttribute("aria-pressed", "false"));
         paint();
       });
     } else {
-      grid.innerHTML = list.map((b) => `
+      // Showing every series: a heading over each one, so a large library scans by fandom.
+      // Favourites keep their place at the front, as a section of their own.
+      const favs = list.filter((b) => b.favorite);
+      let groups = !activeSeries && hasSeries ? seriesGroups(list.filter((b) => !b.favorite)) : [{ key: "", name: "", bots: list }];
+      if (!activeSeries && hasSeries && favs.length) groups = [{ key: "\u0000fav", name: "Favourites", bots: favs }, ...groups];
+      groups = groups.filter((g) => g.bots.length);
+      const heads = groups.length > 1;
+      grid.innerHTML = groups.map((g) => (heads
+        ? `<h3 class="series-head span-all">${esc(g.name || "No series")} <span class="n">${g.bots.length}</span></h3>` : "") + g.bots.map((b) => `
         <article class="bot-card${b.favorite ? " is-favorite" : ""}">
           <div class="portrait">${avatarHTML(b.avatar, b.name, 212, "portrait")}</div>
           <div class="bot-card-body">
@@ -153,7 +182,9 @@ export async function render(main) {
               </span>
             </div>
           </div>
-        </article>`).join("") + (term || activeTags.size ? "" : `<a class="new-card" href="#/bot/new">New bot</a>`);
+        </article>`).join("")).join("") +
+        // Under series headings it would look like part of the last series; New bot is at the top anyway.
+        (term || activeTags.size || activeSeries || heads ? "" : `<a class="new-card" href="#/bot/new">New bot</a>`);
     }
     $("#grid-status", main).textContent = `${list.length} of ${allBots.length} bots shown`;
   }
@@ -193,6 +224,11 @@ export async function render(main) {
     paint();
   });
   try { sort.value = localStorage.getItem("botSort") || "updatedAt"; } catch { /* private mode */ }
+  $$("[data-series]", main).forEach((btn) => btn.addEventListener("click", () => {
+    activeSeries = btn.dataset.series;
+    try { activeSeries ? localStorage.setItem("botSeries", activeSeries) : localStorage.removeItem("botSeries"); } catch { /* private mode */ }
+    paint();
+  }));
   $$("[data-tag]", main).forEach((btn) => btn.addEventListener("click", () => {
     const t = btn.dataset.tag;
     activeTags.has(t) ? activeTags.delete(t) : activeTags.add(t);
@@ -203,6 +239,13 @@ export async function render(main) {
   // ---------- Import ----------
   // Saves one imported card: the bot, and its lorebook if it came with one.
   async function keep({ bot, lore: entries }) {
+    // A card with no series joins one you already use when a tag names it,
+    // e.g. a Chub card tagged "Honkai: Star Rail". The tag then goes.
+    if (!bot.series) {
+      const known = seriesGroups(await bots.all()).filter((g) => g.key);
+      const match = known.find((g) => bot.tags.some((t) => t.trim().toLowerCase() === g.key));
+      if (match) { bot.series = match.name; bot.tags = bot.tags.filter((t) => t.trim().toLowerCase() !== match.key); }
+    }
     if (entries.length) {
       const books = await getLorebooks();
       const book = newLorebook({ name: `${bot.name} lore`, description: "Came with an imported character card." });
