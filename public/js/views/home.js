@@ -6,6 +6,7 @@ import { whatsNewCardHTML, showWhatsNew, APP_VERSION } from "../help.js";
 import { importCardFile, importChubLink } from "../card.js";
 import { $, $$, esc, icon, avatarHTML, toast, timeAgo, download, openDialog } from "../ui.js";
 import { currentText } from "../prompt.js";
+import { previewHTML } from "../markdown.js";
 
 export async function render(main) {
   const [allBots, allChats, conns, persona] = await Promise.all([
@@ -89,7 +90,7 @@ export async function render(main) {
                 <a class="avatar-link" href="#/bot/${b.id}" aria-label="Edit ${esc(b.name)}" title="Edit ${esc(b.name)}">${avatarHTML(b.avatar, b.name, 40)}</a>
                 <div class="grow">
                   <div class="title">${esc(b.name)}</div>
-                  <div class="sub">${esc(currentText(c.messages.at(-1)).slice(0, 120))}</div>
+                  <div class="sub">${previewHTML(currentText(c.messages.at(-1)))}</div>
                 </div>
                 <span class="sub">${timeAgo(c.updatedAt)}</span>
                 <div class="actions">
