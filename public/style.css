@@ -668,6 +668,16 @@ body.in-chat .site-footer { display: none; }
 /* Chat font (Chat look, or Settings → Appearance): system faces, nothing extra to load. */
 :root[data-chat-font="serif"] { --chat-font: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif; }
 :root[data-chat-font="plain"] { --chat-font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+/* Clear: made for low vision and tired eyes; I, l and 1, O and 0 never look alike. */
+:root[data-chat-font="clear"] { --chat-font: "Atkinson Hyperlegible Next", system-ui, sans-serif; }
+/* Light text on a dark screen blooms and looks thinner, so it gets a little more weight. */
+:root[data-theme="dark"] .msg-body { font-weight: 450; }
+/* Long passages read faster upright; actions keep their softer colour either way. */
+:root[data-chat-actions="upright"] .msg-body em { font-style: normal; }
+/* About 70 characters a line (the comfortable range is 45 to 75), measured
+   in em so it holds at every message size. */
+.msg-body { max-width: 33em; }
+:root[data-chat-font="serif"] .msg-body { max-width: 30em; } /* serif fallbacks run narrow */
 .msg-body > * + * { margin-top: .75em; }
 .msg.user .msg-body { color: var(--narration); }
 .msg-body em { font-style: italic; color: var(--narration); }

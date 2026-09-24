@@ -13,6 +13,8 @@ try {
   if (chatText) root.dataset.chatText = chatText;
   const chatFont = localStorage.getItem("chatFont");
   if (chatFont) root.dataset.chatFont = chatFont;
+  const chatActions = localStorage.getItem("chatActions");
+  if (chatActions) root.dataset.chatActions = chatActions;
   const chatPic = localStorage.getItem("chatPic");
   if (chatPic) root.dataset.chatPic = chatPic;
 } catch {

@@ -2085,7 +2085,8 @@ export async function render(main, [botId, chatId, jumpTo]) {
   }
   paintBackground();
 
-  const LOOK_FONTS = [["rounded", "Rounded"], ["serif", "Book"], ["plain", "Plain"]];
+  const LOOK_FONTS = [["rounded", "Rounded"], ["serif", "Book"], ["clear", "Clear"], ["plain", "Plain"]];
+  const LOOK_ACTIONS = [["italic", "Italic"], ["upright", "Upright"]];
   const LOOK_SIZES = [["sm", "Small"], ["md", "Default"], ["lg", "Large"], ["xl", "Largest"]];
   const LOOK_PICS = [["sm", "Small"], ["md", "Medium"], ["lg", "Large"]];
   const readLocal = (key, fallback) => { try { return localStorage.getItem(key) ?? fallback; } catch { return fallback; } };
@@ -2109,7 +2110,11 @@ export async function render(main, [botId, chatId, jumpTo]) {
       ${sliderHTML({ id: "look-dim", label: "Dim behind the text", min: 0.4, max: 0.98, step: 0.02, value: settings.backgroundDim ?? 0.86, hint: "Higher hides more of the picture. Applies to every chat." })}
       <fieldset class="field"><legend class="field-label">Font</legend>
         ${seg("look-font", LOOK_FONTS, readLocal("chatFont", "rounded"))}
-        <p class="hint">For messages and the box you type in.</p>
+        <p class="hint">For messages and the box you type in. Clear is made for low vision and tired eyes.</p>
+      </fieldset>
+      <fieldset class="field"><legend class="field-label">Actions</legend>
+        ${seg("look-actions", LOOK_ACTIONS, readLocal("chatActions", "italic"))}
+        <p class="hint">How *actions* look. Upright is easier on long passages; they keep their softer colour.</p>
       </fieldset>
       <fieldset class="field"><legend class="field-label">Message size</legend>
         ${seg("look-size", LOOK_SIZES, readLocal("chatTextSize", "md"))}
@@ -2144,6 +2149,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
       saveDim();
     });
     $$('input[name="look-font"]', dlg).forEach((r) => r.addEventListener("change", () => setLocal("chatFont", "chatFont", r.value, "rounded")));
+    $$('input[name="look-actions"]', dlg).forEach((r) => r.addEventListener("change", () => setLocal("chatActions", "chatActions", r.value, "italic")));
     $$('input[name="look-size"]', dlg).forEach((r) => r.addEventListener("change", () => setLocal("chatTextSize", "chatText", r.value, "md")));
     $$('input[name="look-pic"]', dlg).forEach((r) => r.addEventListener("change", () => setLocal("chatPic", "chatPic", r.value, "lg")));
     $("#look-done", dlg).addEventListener("click", () => dlg.close());
