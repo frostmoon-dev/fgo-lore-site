@@ -1247,8 +1247,7 @@ input[type="search"]::-webkit-search-cancel-button {
 .journal-list { display: grid; gap: var(--s3); max-height: 58svh; overflow-y: auto; }
 .journal-entry { padding: var(--s4); background: var(--surface); border-radius: var(--r-md); }
 .journal-entry header { display: flex; justify-content: space-between; gap: var(--s2); font-size: var(--t-sm); color: var(--muted); margin-bottom: var(--s2); }
-/* Read like chat messages: the chosen reading font, upright, easy on long entries. */
-.journal-entry .prose { font-family: var(--chat-font, var(--font)); font-size: calc(var(--t-md) * var(--chat-scale)); line-height: var(--lh-read); }
+.journal-entry .prose { font-family: var(--font-display); font-style: italic; font-size: var(--t-md); }
 
 /* Swipe between versions on touch screens */
 .msg.assistant { transition: transform 180ms var(--ease); touch-action: pan-y; }
