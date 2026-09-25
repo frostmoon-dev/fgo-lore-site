@@ -4,15 +4,21 @@
 import { getMeta, setMeta } from "./store.js";
 import { $, esc, icon, openDialog } from "./ui.js";
 
-export const APP_VERSION = "2026.09.24.13";
+export const APP_VERSION = "2026.09.25.1";
 
 // Newest first. Each item says what it is and where it lives.
 export const NEWS = [
   {
+    version: "2026.09.25.1",
+    items: [
+      ["Journals in the right voice", "The bot now knows who it is when writing its journal, and that \"I\" is always the bot, so entries no longer come out as if you wrote them. Entries are back in the journal's own italic type."],
+    ],
+  },
+  {
     version: "2026.09.24.13",
     items: [
       ["Expressions with more models", "Mood tags written other ways, like (mood: Happy) or a last line \"Mood: happy\", now work and stay hidden. When a model writes no tag at all, the face is picked from how the reply ends: smiles and laughs look happy, glares look angry, blushes look flustered, and your own moods count when their word appears."],
-      ["Journals stay journals", "Some models used to continue the story instead of writing a diary entry. Entries are now checked: a story is asked for again as a first-person entry, and if the model still will not, nothing is saved. Entries are also easier to read, in your chat font instead of italics."],
+      ["Journals stay journals", "Some models used to continue the story instead of writing a diary entry. Entries are now checked: a story is asked for again as a first-person entry, and if the model still will not, nothing is saved."],
     ],
   },
   {

@@ -308,19 +308,25 @@ export function looksLikeDiary(text) {
 }
 
 export async function journalEntry({ bot, names, previous, lines, signal }) {
+  // Without knowing who the character is, models lose track of whose diary
+  // it is and write as the user. So: the definition, and plain roles.
+  const who = applyMacros([bot?.personality, bot?.description].filter((t) => t?.trim()).join("\n\n"), names).slice(0, 1800);
   const system =
-    `You are ${names.char}, writing in your private journal after time spent with ${names.user}. ` +
+    `You are ${names.char}, writing in your own private journal after time spent with ${names.user}. ` +
+    (who ? `Who you are, so the entry sounds like you:\n<character>\n${who}\n</character>\n\n` : "") +
+    `In the journal, "I" is always ${names.char}. ${names.user} is the other person: write about ${names.user} by name, never as "I". ` +
+    `In the chat, lines starting "${names.char}:" are what you said and did; lines starting "${names.user}:" are what ${names.user} said and did. ` +
     `Write one entry in first person, in ${names.char}'s own voice, personality and way of speaking: what happened, ` +
     `what you really think and feel about ${names.user} now, and anything you would never say aloud. ` +
     "80 to 160 words. No date line, no heading, no sign-off. Stay consistent with your earlier entries.";
-  const ask1 = `Now write today's journal entry as ${names.char}: first person ("I", "me", "my"), looking back on what happened, ` +
+  const ask1 = `Now write today's journal entry as ${names.char} ("I" = ${names.char}, not ${names.user}), looking back on what happened, ` +
     `80 to 160 words. Do not continue the scene, do not write dialogue or actions, and do not narrate in the third person.`;
   const user = (reminder) => `${previous?.trim() ? `Your last journal entry:\n${previous.trim()}\n\n` : ""}` +
     `The chat since then, for reference only (do not continue it):\n<chat>\n${lines}\n</chat>\n\n${reminder}`;
   const opts = { bot, maxTokens: 400, temperature: 0.8, signal, prose: true };
   let text = await ask([{ role: "system", content: system }, { role: "user", content: user(ask1) }], opts);
   if (looksLikeDiary(text)) return text;
-  text = await ask([{ role: "system", content: system }, { role: "user", content: user(`${ask1} Start with "I". This is a diary, not a story.`) }], { ...opts, temperature: 0.6 });
+  text = await ask([{ role: "system", content: system }, { role: "user", content: user(`${ask1} Start with "I". This is ${names.char}'s diary, not a story.`) }], { ...opts, temperature: 0.6 });
   if (looksLikeDiary(text)) return text;
   throw new Error("This model kept continuing the story instead of writing a journal entry. Try another model, or turn journals off in Settings.");
 }
