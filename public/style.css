@@ -664,6 +664,11 @@ body.in-chat .site-footer { display: none; }
   font: inherit; font-weight: 600; border-radius: var(--r-sm);
 }
 .only-mobile { display: none; }
+/* Hide chats (wide screens): the chat list folds away and the conversation takes the room.
+   The bot's picture moves into the top bar so Edit bot stays one click away. */
+:root[data-chat-sidebar="hidden"] .chat-layout { grid-template-columns: minmax(0, 1fr); }
+:root[data-chat-sidebar="hidden"] .chat-sidebar { display: none; }
+:root[data-chat-sidebar="hidden"] .chat-topbar > .avatar-link.only-mobile { display: inline-flex; }
 
 .chat-log { flex: 1; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; padding: var(--s6) var(--s5) var(--s4); }
 .chat-log-inner { max-width: var(--measure); margin: 0 auto; display: grid; gap: var(--s4); }
@@ -794,6 +799,8 @@ body.in-chat .site-footer { display: none; }
   .chat-sidebar { position: fixed; inset: 0 auto 0 0; width: min(304px, 86vw); z-index: 60; transform: translateX(-100%); transition: transform 200ms var(--ease); }
   .chat-sidebar.is-open { transform: none; box-shadow: var(--shadow-2); }
   .only-mobile { display: inline-flex; }
+  .only-desktop { display: none; }
+  :root[data-chat-sidebar="hidden"] .chat-sidebar { display: flex; }
   .scrim { position: fixed; inset: 0; z-index: 55; background: var(--scrim); }
   .chat-log { padding: var(--s4) var(--s4) var(--s2); }
   .chat-log-inner { gap: var(--s5); }

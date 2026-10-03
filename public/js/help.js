@@ -9,6 +9,12 @@ export const APP_VERSION = "2026.09.25.1";
 // Newest first. Each item says what it is and where it lives.
 export const NEWS = [
   {
+    version: "2026.10.03.2",
+    items: [
+      ["Hide the chat list", "On a wide screen, the button left of the chat name folds the chat list away so the conversation gets the room. Click it again to bring the list back. It stays the way you left it."],
+    ],
+  },
+  {
     version: "2026.10.03.1",
     items: [
       ["Novel layout", "Hide the pictures beside each message and read a chat like a book: names and text only. In a chat, ⋯ → Chat look → Layout → Novel, or in Settings → Appearance."],
