@@ -2139,6 +2139,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
   const LOOK_ACTIONS = [["italic", "Italic"], ["upright", "Upright"]];
   const LOOK_SIZES = [["sm", "Small"], ["md", "Default"], ["lg", "Large"], ["xl", "Largest"]];
   const LOOK_PICS = [["sm", "Small"], ["md", "Medium"], ["lg", "Large"]];
+  const LOOK_LAYOUTS = [["chat", "Chat"], ["novel", "Novel"]];
   const readLocal = (key, fallback) => { try { return localStorage.getItem(key) ?? fallback; } catch { return fallback; } };
   // Same storage as Settings → Appearance, so both stay in step.
   function setLocal(key, dataKey, value, fallback) {
@@ -2168,6 +2169,10 @@ export async function render(main, [botId, chatId, jumpTo]) {
       </fieldset>
       <fieldset class="field"><legend class="field-label">Message size</legend>
         ${seg("look-size", LOOK_SIZES, readLocal("chatTextSize", "md"))}
+      </fieldset>
+      <fieldset class="field"><legend class="field-label">Layout</legend>
+        ${seg("look-layout", LOOK_LAYOUTS, readLocal("chatLayout", "chat"))}
+        <p class="hint">Novel hides the pictures beside each message and leaves names and text, like a book.</p>
       </fieldset>
       <fieldset class="field"><legend class="field-label">Picture size</legend>
         ${seg("look-pic", LOOK_PICS, readLocal("chatPic", "lg"))}
@@ -2201,6 +2206,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
     $$('input[name="look-font"]', dlg).forEach((r) => r.addEventListener("change", () => setLocal("chatFont", "chatFont", r.value, "rounded")));
     $$('input[name="look-actions"]', dlg).forEach((r) => r.addEventListener("change", () => setLocal("chatActions", "chatActions", r.value, "italic")));
     $$('input[name="look-size"]', dlg).forEach((r) => r.addEventListener("change", () => setLocal("chatTextSize", "chatText", r.value, "md")));
+    $$('input[name="look-layout"]', dlg).forEach((r) => r.addEventListener("change", () => setLocal("chatLayout", "chatLayout", r.value, "chat")));
     $$('input[name="look-pic"]', dlg).forEach((r) => r.addEventListener("change", () => setLocal("chatPic", "chatPic", r.value, "lg")));
     $("#look-done", dlg).addEventListener("click", () => dlg.close());
     $("#look-more", dlg).addEventListener("click", () => dlg.close());
@@ -2429,7 +2435,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
       c(`Translate my message into ${chatLanguage()}`, translateOutgoing, "language", "Alt+T"),
       c("See the prompt", previewPrompt, "debug context"),
       c("Usage in this chat", openChatUsage, "tokens cost"),
-      c("Chat look", openLook, "background font text size appearance wallpaper avatar picture resize"),
+      c("Chat look", openLook, "background font text size appearance wallpaper avatar picture resize layout novel hide"),
       c("Rename chat", rename, "title"),
       c("Edit my persona", editPersona, "who i am description me user"),
       c("Export chat", exportChat, "download save"),

@@ -17,6 +17,8 @@ try {
   if (chatActions) root.dataset.chatActions = chatActions;
   const chatPic = localStorage.getItem("chatPic");
   if (chatPic) root.dataset.chatPic = chatPic;
+  const chatLayout = localStorage.getItem("chatLayout");
+  if (chatLayout) root.dataset.chatLayout = chatLayout;
 } catch {
   root.dataset.theme = "light";
   root.dataset.palette = "moon";

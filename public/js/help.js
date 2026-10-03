@@ -9,6 +9,12 @@ export const APP_VERSION = "2026.09.25.1";
 // Newest first. Each item says what it is and where it lives.
 export const NEWS = [
   {
+    version: "2026.10.03.1",
+    items: [
+      ["Novel layout", "Hide the pictures beside each message and read a chat like a book: names and text only. In a chat, ⋯ → Chat look → Layout → Novel, or in Settings → Appearance."],
+    ],
+  },
+  {
     version: "2026.09.25.1",
     items: [
       ["Journals in the right voice", "The bot now knows who it is when writing its journal, and that \"I\" is always the bot, so entries no longer come out as if you wrote them. Entries are back in the journal's own italic type."],
@@ -102,7 +108,7 @@ export const NEWS = [
   {
     version: "2026.09.24",
     items: [
-      ["Chat look", "In a chat, ⋯ → Chat look changes the bot's background, how dim it is, the font, the message size and the picture size."],
+      ["Chat look", "In a chat, ⋯ → Chat look changes the bot's background, how dim it is, the font, the message size, the layout (Chat, or Novel without pictures) and the picture size."],
       ["Bigger faces", "Every picture in a chat is the same large size, faces included. A bot with a Neutral expression shows it whenever a reply has no mood."],
       ["Straight crops", "Cropping no longer squeezes pictures on short screens. Re-crop any that came out stretched."],
       ["Moods from edits", "Editing a reply to end with <mood:happy> changes its expression picture."],
