@@ -98,6 +98,9 @@ server-side storage of your key.
   (Rounded, Book or Plain), the message size, the layout (Chat, or Novel with no pictures beside
   messages) and the picture size (Small, Medium, Large), live.
   The font, layout and picture size are also in Settings → Appearance.
+- **Book mode**: the scroll button in a chat's top bar (or Alt+B) turns the chat into plain prose for
+  privacy: no site header, chat list, names, pictures, bubbles, model or content tags, and the tab
+  shows only the chat's name. Remembered on this device.
 - **Hide chats**: on a wide screen, the button left of the chat name folds the chat list away.
   Click it again to bring it back. The choice is remembered on this device.
 - **Edit your persona from a chat**: the pencil beside "Speaking as" edits the persona's
