@@ -11,7 +11,7 @@ export const NEWS = [
   {
     version: "2026.10.03.3",
     items: [
-      ["Book mode", "For reading in company: the chat turns into plain pages of prose. No names, pictures, model, tags or menus; the tab shows only the chat's name. The scroll button at the top right of a chat, or Alt+B, switches it on and off. Rename the chat to something like \"Chapter 3\" and nothing on screen says it is a chat."],
+      ["Read mode", "For reading in company: only the story and the box you type in. No header, chat list, names, pictures, tools or tags, and the tab shows only the chat's name. Turn it on with the scroll button at the top right of a chat, and off with the same button inside the message box. Alt+B does both. Rename the chat to something like \"Chapter 3\" and nothing on screen says it is a chat."],
     ],
   },
   {

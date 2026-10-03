@@ -934,44 +934,38 @@ body.in-chat .site-footer { display: none; }
 .chat-main.has-bg .msg-head { padding-inline: var(--s4); }
 .chat-main.has-bg .msg-foot { margin-left: calc(var(--s4) - 9px); padding-right: var(--s4); }
 
-/* ---------- Book mode ----------
-   For reading in company: the chat looks like a page of prose. No site header,
-   chat list, names, times, pictures, bubbles, model or content tags; tools only
-   on the last message and on hover. One button (or Alt+B) switches it back. */
-:root[data-chat-book="on"] body.in-chat .site-header,
-:root[data-chat-book="on"] .chat-sidebar,
-:root[data-chat-book="on"] .chat-bg,
-:root[data-chat-book="on"] .chat-topbar > :not(.title):not(#book-toggle):not(#more),
-:root[data-chat-book="on"] #chat-sub,
-:root[data-chat-book="on"] #content-tag,
-:root[data-chat-book="on"] .msg > .avatar,
-:root[data-chat-book="on"] .msg > .avatar-link,
-:root[data-chat-book="on"] .msg-head,
-:root[data-chat-book="on"] .msg-meta,
-:root[data-chat-book="on"] .milestone,
-:root[data-chat-book="on"] .composer-foot,
-:root[data-chat-book="on"] #suggest { display: none !important; }
-:root[data-chat-book="on"] .chat-layout { grid-template-columns: minmax(0, 1fr); }
-:root[data-chat-book="on"] .chat-main.has-bg .chat-topbar,
-:root[data-chat-book="on"] .chat-main.has-bg .composer { background: var(--bg); }
-:root[data-chat-book="on"] .chat-topbar { border-bottom-color: transparent; }
-:root[data-chat-book="on"] .msg { grid-template-columns: minmax(0, 1fr); }
-:root[data-chat-book="on"] .chat-log-inner { gap: .9em; }
+/* ---------- Read mode ----------
+   For reading in company: only the story and the box you type in. No header,
+   chat list, top bar, names, pictures, bubbles, tools or tags. The button in the
+   box (or Alt+B) brings everything back. Notes that need you, like a missing
+   connection or a reply cut off, still show. */
+:root[data-chat-read="on"] body.in-chat .site-header,
+:root[data-chat-read="on"] .chat-sidebar,
+:root[data-chat-read="on"] .chat-bg,
+:root[data-chat-read="on"] .chat-topbar,
+:root[data-chat-read="on"] .msg > .avatar,
+:root[data-chat-read="on"] .msg > .avatar-link,
+:root[data-chat-read="on"] .msg-head,
+:root[data-chat-read="on"] .msg-foot,
+:root[data-chat-read="on"] .milestone,
+:root[data-chat-read="on"] .composer-foot,
+:root[data-chat-read="on"] .composer-tool { display: none !important; }
+#read-exit { display: none; }
+:root[data-chat-read="on"] #read-exit { display: inline-flex; color: var(--muted); }
+:root[data-chat-read="on"] .chat-layout { grid-template-columns: minmax(0, 1fr); }
+:root[data-chat-read="on"] .chat-main.has-bg .composer { background: var(--bg); }
+:root[data-chat-read="on"] .msg { grid-template-columns: minmax(0, 1fr); }
+:root[data-chat-read="on"] .chat-log-inner { gap: .9em; }
 /* One voice: both sides in the same book face and ink, no cards. */
-:root[data-chat-book="on"] .msg-body,
-:root[data-chat-book="on"] .chat-main.has-bg .msg-body {
+:root[data-chat-read="on"] .msg-body,
+:root[data-chat-read="on"] .chat-main.has-bg .msg-body {
   --chat-font: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
   max-width: 34em; margin-inline: auto; background: none; box-shadow: none; padding: 0; border-radius: 0;
   color: var(--ink); text-align: justify; hyphens: auto;
 }
-:root[data-chat-book="on"] .msg.user .msg-body { color: var(--ink); }
-:root[data-chat-book="on"] .msg-foot,
-:root[data-chat-book="on"] .chat-main.has-bg .msg-foot { max-width: 34em; margin-inline: auto; padding-inline: 0; transform: translateX(-9px); }
-:root[data-chat-book="on"] .msg:not(.is-last):not(:focus-within):not(.tools-open) .msg-foot { display: none; }
-@media (hover: hover) { :root[data-chat-book="on"] .msg:hover .msg-foot { display: flex; } }
+:root[data-chat-read="on"] .msg.user .msg-body { color: var(--ink); }
 /* Narrow columns justify into gaps; ragged right reads better there. */
-@media (max-width: 600px) { :root[data-chat-book="on"] .msg-body { text-align: left; } }
-#book-toggle.is-on { color: var(--accent); }
+@media (max-width: 600px) { :root[data-chat-read="on"] .msg-body { text-align: left; } }
 
 /* ---------- Bond meter ---------- */
 .bond {

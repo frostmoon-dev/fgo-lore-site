@@ -190,7 +190,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
   const bondOn = bondOnFor(bot); // the meter in the header follows the chat's own bot
   const bondNow = () => bondFor(bot);
 
-  const bookOn = () => document.documentElement.dataset.chatBook === "on";
+  const readOn = () => document.documentElement.dataset.chatRead === "on";
 
   // A bot's picture always opens its editor.
   const botAvatar = (b, size, extra = "") =>
@@ -227,7 +227,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
           <button class="icon-btn tool-btn hide-narrow" type="button" id="memory" aria-label="Memory" title="Memory">${icon("book")}<span class="tool-label">Memory</span></button>
           <button class="icon-btn tool-btn hide-narrow" type="button" id="scene" aria-label="Scene tracker" title="Scene tracker">${icon("map")}<span class="tool-label">Scene</span></button>
           <button class="icon-btn tool-btn hide-narrow" type="button" id="cast" aria-label="Characters in this chat" title="Characters in this chat">${icon("users")}<span class="tool-label">Characters</span></button>
-          <button class="icon-btn" type="button" id="book-toggle" aria-pressed="false">${icon("scroll")}</button>
+          <button class="icon-btn" type="button" id="read-enter" aria-label="Read mode: only the story and the message box (Alt+B)" title="Read mode (Alt+B)">${icon("scroll")}</button>
           <button class="icon-btn" type="button" id="more" aria-label="More chat actions" aria-haspopup="menu" aria-expanded="false" title="More">${icon("dots")}</button>
         </div>
 
@@ -272,6 +272,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
               <button class="icon-btn composer-tool hide-narrow" type="button" id="suggest" aria-label="Ideas for what to say next" title="Ideas for what to say (Alt+S)">${icon("bulb")}</button>
               <button class="icon-btn composer-tool" type="button" id="impersonate"
                 aria-label="Write my reply. Uses what you typed as the idea." title="Write my reply (Alt+W)">${icon("quill")}</button>
+              <button class="icon-btn" type="button" id="read-exit" aria-label="Leave read mode (Alt+B)" title="Leave read mode (Alt+B)">${icon("scroll")}</button>
               <button class="send-btn" type="submit" id="send" aria-label="Send message">${icon("send")}</button>
             </div>
             <div class="composer-foot">
@@ -368,26 +369,17 @@ export async function render(main, [botId, chatId, jumpTo]) {
   toggleBtn.addEventListener("click", toggleChats);
   paintToggle();
 
-  // Book mode: reads like prose, for privacy. Remembered on this device.
-  const bookBtn = $("#book-toggle", main);
-  const paintBook = () => {
-    const on = bookOn();
-    const label = on ? "Leave book mode (Alt+B)" : "Book mode: read like a novel (Alt+B)";
-    bookBtn.setAttribute("aria-label", label);
-    bookBtn.title = label;
-    bookBtn.setAttribute("aria-pressed", String(on));
-    bookBtn.classList.toggle("is-on", on);
-  };
-  function toggleBook() {
-    const on = !bookOn();
-    try { on ? localStorage.setItem("chatBook", "on") : localStorage.removeItem("chatBook"); } catch { /* private mode */ }
-    if (on) document.documentElement.dataset.chatBook = "on";
-    else delete document.documentElement.dataset.chatBook;
-    paintBook();
+  // Read mode: only the story and the message box, for privacy. Remembered on this device.
+  function toggleRead() {
+    const on = !readOn();
+    try { on ? localStorage.setItem("chatRead", "on") : localStorage.removeItem("chatRead"); } catch { /* private mode */ }
+    if (on) document.documentElement.dataset.chatRead = "on";
+    else delete document.documentElement.dataset.chatRead;
     paintHeader();
+    (on ? input : $("#read-enter", main)).focus({ preventScroll: true });
   }
-  bookBtn.addEventListener("click", toggleBook);
-  paintBook();
+  $("#read-enter", main).addEventListener("click", toggleRead);
+  $("#read-exit", main).addEventListener("click", toggleRead);
   scrim.addEventListener("click", () => setSidebar(false));
   sidebar.addEventListener("keydown", (e) => { if (e.key === "Escape") setSidebar(false); });
 
@@ -479,7 +471,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
     tag.textContent = level === "explicit" ? "18+ explicit" : "18+";
     tag.title = level === "explicit" ? "Explicit content is on for this chat (Settings)" : "Mature content is on for this chat (Settings)";
     $("#persona", main).value = p?.id ?? "";
-    document.title = bookOn() ? chat.title : `${bot.name} · MoonPaper`;
+    document.title = readOn() ? chat.title : `${bot.name} · MoonPaper`;
     // Speaker picker only matters when more than one bot can answer.
     const pick = $("#speaker-pick", main);
     const select = $("#speaker", main);
@@ -677,7 +669,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
   const directInput = $("#direction", main);
   const direction = () => (directBar.hidden ? "" : directInput.value.trim());
   // With a direction waiting, an empty send lets the bot go ahead with it.
-  const placeholderText = () => (bookOn() ? "Continue the story…" : !directBar.hidden
+  const placeholderText = () => (readOn() ? "Continue the story…" : !directBar.hidden
     ? `Press send to let ${group() ? "the scene" : bot.name} react`
     : group() ? "Message the scene…" : `Message ${bot.name}…`);
   function setDirecting(open, { surprise = false } = {}) {
@@ -1973,7 +1965,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
   const onGlobalKey = (e) => {
     if (e.key === "Escape" && busy) controller?.abort();
     if (e.key === "Escape" && drafting) drafting.abort();
-    if (e.altKey && e.code === "KeyB" && !e.ctrlKey && !e.metaKey) { e.preventDefault(); toggleBook(); }
+    if (e.altKey && e.code === "KeyB" && !e.ctrlKey && !e.metaKey) { e.preventDefault(); toggleRead(); }
   };
   document.addEventListener("keydown", onGlobalKey);
 
@@ -2480,7 +2472,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
       c("See the prompt", previewPrompt, "debug context"),
       c("Usage in this chat", openChatUsage, "tokens cost"),
       c("Chat look", openLook, "background font text size appearance wallpaper avatar picture resize layout novel hide"),
-      c(bookOn() ? "Leave book mode" : "Book mode", toggleBook, "novel read privacy hide reading prose", "Alt+B"),
+      c(readOn() ? "Leave read mode" : "Read mode", toggleRead, "novel book privacy hide reading prose", "Alt+B"),
       c(sidebarHidden() ? "Show chat list" : "Hide chat list", toggleChats, "sidebar panel history focus"),
       c("Rename chat", rename, "title"),
       c("Edit my persona", editPersona, "who i am description me user"),
