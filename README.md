@@ -98,6 +98,8 @@ server-side storage of your key.
   (Rounded, Book or Plain), the message size, the layout (Chat, or Novel with no pictures beside
   messages) and the picture size (Small, Medium, Large), live.
   The font, layout and picture size are also in Settings → Appearance.
+- **Hide chats**: on a wide screen, the button left of the chat name folds the chat list away.
+  Click it again to bring it back. The choice is remembered on this device.
 - **Edit your persona from a chat**: the pencil beside "Speaking as" edits the persona's
   name and description. The change applies to every chat that uses that persona.
 - **Bonds in group scenes**: every character in a group chat has a bond of their own.

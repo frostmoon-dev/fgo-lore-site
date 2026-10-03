@@ -213,6 +213,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
       <section class="chat-main" aria-label="Conversation">
         <div class="chat-bg" aria-hidden="true" hidden></div>
         <div class="chat-topbar">
+          <button class="icon-btn only-desktop" type="button" id="toggle-sidebar" aria-controls="sidebar">${icon("sidebar")}</button>
           <button class="icon-btn only-mobile" type="button" id="open-sidebar" aria-label="Show chats" aria-controls="sidebar" aria-expanded="false">${icon("menu")}</button>
           ${botAvatar(bot, 36, " only-mobile")}
           <div class="title"><span class="title-line"><button class="title-edit" type="button" id="chat-title" title="Rename this chat"></button><input type="text" class="title-input" id="title-input" aria-label="Chat name" maxlength="80" autocomplete="off" hidden><span class="content-tag" id="content-tag" hidden></span></span><small id="chat-sub"></small></div>
@@ -345,6 +346,24 @@ export async function render(main, [botId, chatId, jumpTo]) {
     if (open) $("#new-chat", main).focus();
   };
   $("#open-sidebar", main).addEventListener("click", () => setSidebar(true));
+  // Wide screens: fold the chat list away. Remembered on this device, like Chat look.
+  const toggleBtn = $("#toggle-sidebar", main);
+  const sidebarHidden = () => document.documentElement.dataset.chatSidebar === "hidden";
+  const paintToggle = () => {
+    const label = sidebarHidden() ? "Show chats" : "Hide chats";
+    toggleBtn.setAttribute("aria-label", label);
+    toggleBtn.title = label;
+    toggleBtn.setAttribute("aria-expanded", String(!sidebarHidden()));
+  };
+  function toggleChats() {
+    const hide = !sidebarHidden();
+    try { hide ? localStorage.setItem("chatSidebar", "hidden") : localStorage.removeItem("chatSidebar"); } catch { /* private mode */ }
+    if (hide) document.documentElement.dataset.chatSidebar = "hidden";
+    else delete document.documentElement.dataset.chatSidebar;
+    paintToggle();
+  }
+  toggleBtn.addEventListener("click", toggleChats);
+  paintToggle();
   scrim.addEventListener("click", () => setSidebar(false));
   sidebar.addEventListener("keydown", (e) => { if (e.key === "Escape") setSidebar(false); });
 
@@ -2436,6 +2455,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
       c("See the prompt", previewPrompt, "debug context"),
       c("Usage in this chat", openChatUsage, "tokens cost"),
       c("Chat look", openLook, "background font text size appearance wallpaper avatar picture resize layout novel hide"),
+      c(sidebarHidden() ? "Show chat list" : "Hide chat list", toggleChats, "sidebar panel history focus"),
       c("Rename chat", rename, "title"),
       c("Edit my persona", editPersona, "who i am description me user"),
       c("Export chat", exportChat, "download save"),
