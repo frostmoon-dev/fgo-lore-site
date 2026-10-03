@@ -9,6 +9,12 @@ export const APP_VERSION = "2026.09.25.1";
 // Newest first. Each item says what it is and where it lives.
 export const NEWS = [
   {
+    version: "2026.10.03.4",
+    items: [
+      ["Read mode follows your font", "Read mode now uses the chat font, message size and action style you picked in Chat look or Settings → Appearance, instead of always switching to Book."],
+    ],
+  },
+  {
     version: "2026.10.03.3",
     items: [
       ["Read mode", "For reading in company: only the story and the box you type in. No header, chat list, names, pictures, tools or tags, and the tab shows only the chat's name. Turn it on with the scroll button at the top right of a chat, and off with the same button inside the message box. Alt+B does both. Rename the chat to something like \"Chapter 3\" and nothing on screen says it is a chat."],
