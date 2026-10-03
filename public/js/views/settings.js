@@ -81,6 +81,11 @@ export async function render(main) {
             <p class="hint">How *actions* look. Upright is easier to read in long passages; they keep their softer colour.</p>
           </fieldset>
           <fieldset class="field">
+            <legend class="field-label">Chat layout</legend>
+            ${segmentedHTML("chat-layout", [["chat", "Chat"], ["novel", "Novel"]], readPref("chatLayout", "chat"))}
+            <p class="hint">Novel hides the pictures beside each message and leaves names and text, like a book.</p>
+          </fieldset>
+          <fieldset class="field">
             <legend class="field-label">Chat picture size</legend>
             ${segmentedHTML("chat-pic", [["sm", "Small"], ["md", "Medium"], ["lg", "Large"]], readPref("chatPic", "lg"))}
             <p class="hint">Avatars and expressions beside each message.</p>
@@ -276,6 +281,11 @@ export async function render(main) {
   }));
   sizePref("text-size", "textSize", "text");
   sizePref("chat-text-size", "chatTextSize", "chatText");
+  $$('input[name="chat-layout"]', main).forEach((r) => r.addEventListener("change", () => {
+    try { r.value === "chat" ? localStorage.removeItem("chatLayout") : localStorage.setItem("chatLayout", r.value); } catch {}
+    if (r.value === "chat") delete document.documentElement.dataset.chatLayout;
+    else document.documentElement.dataset.chatLayout = r.value;
+  }));
   $$('input[name="chat-pic"]', main).forEach((r) => r.addEventListener("change", () => {
     try { r.value === "lg" ? localStorage.removeItem("chatPic") : localStorage.setItem("chatPic", r.value); } catch {}
     if (r.value === "lg") delete document.documentElement.dataset.chatPic;
