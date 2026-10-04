@@ -157,12 +157,13 @@ export function cleanImpersonation(text, userName) {
 // part of history begins. note is a one-reply instruction
 // (a scene direction or a nudge like "shorter"). cast is the other bots in
 // a group scene; history messages then carry the botId of who spoke.
-// scene is the tracked state of the scene right now. Pinned messages in
+// scene is the tracked state of the scene right now. authorNote is a lasting
+// instruction for this chat. Pinned messages in
 // history are always included, even after they fall out of the context.
 export function buildPrompt({
   bot, persona, preset, settings, history, loreEntries = [], bond = null,
   mode = "reply", hint = "", memory = "", note = "", cast = [], scene = "",
-  facts = "", chapters = [], recalled = [], windowStart = 0,
+  facts = "", chapters = [], recalled = [], windowStart = 0, authorNote = "",
 }) {
   const asUser = mode === "impersonate";
   if (asUser) bond = null;
@@ -262,6 +263,8 @@ export function buildPrompt({
     post = [post, `This is a group scene. Write only ${names.char}'s next reply. Do not write lines or actions for ${names.user} ` +
       `or for ${cast.map((c) => c.name).join(", ")}. Do not start with a name label.`].filter(Boolean).join("\n\n");
   }
+  // A lasting instruction for this chat (the author's note), sent with every request.
+  if (authorNote?.trim()) post = [post, `Author's note for this story (keep following it): ${m(authorNote)}`].filter(Boolean).join("\n\n");
   const moods = asUser ? [] : moodsOf(bot);
   if (moods.length) {
     post = [post, `At the very end of your reply, on its own line, add a tag like <mood:${moods[0]}> naming ${names.char}'s expression ` +

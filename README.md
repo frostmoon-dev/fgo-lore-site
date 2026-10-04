@@ -98,6 +98,10 @@ server-side storage of your key.
   (Rounded, Book or Plain), the message size, the layout (Chat, or Novel with no pictures beside
   messages) and the picture size (Small, Medium, Large), live.
   The font, layout and picture size are also in Settings → Appearance.
+- **Author's note**: ⋯ → Author's note sets a lasting instruction for one chat ("slow burn",
+  "past tense", "short replies"), sent with every reply and with Write my reply until removed. A
+  pill above the message box shows it is on. Branches keep it. For one reply only, use the scene
+  director (Alt+D).
 - **Phrases to avoid**: Settings → Phrases to avoid holds phrases models overuse (a starter list
   is included). Every request says never to use them; any that still appear are marked in the
   reply, and the "overused phrases" chip rewrites only those sentences as a new version (the old

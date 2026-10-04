@@ -274,6 +274,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
               <button class="icon-btn" type="button" id="suggest-more" aria-label="Other ideas" title="Other ideas">${icon("refresh")}</button>
               <button class="icon-btn" type="button" id="suggest-close" aria-label="Close ideas" title="Close">${icon("x")}</button>
             </div>
+            <button class="note-pill" type="button" id="note-pill" hidden></button>
             <div class="composer-box">
               <label for="input" class="sr-only">Message</label>
               <textarea id="input" rows="1" placeholder="Message ${esc(bot.name)}…" enterkeyhint="send"></textarea>
@@ -802,7 +803,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
     const prompt = buildPrompt({
       bot: speaker, persona: persona(), preset, settings: freshSettings, loreEntries, history: hist,
       bond: withBond ? beforeBond : null,
-      ...memoryArgs(hist), scene: chat.scene?.text ?? "", note: fullNote, cast: group() ? others(speaker) : [],
+      ...memoryArgs(hist), scene: chat.scene?.text ?? "", authorNote: chat.authorNote ?? "", note: fullNote, cast: group() ? others(speaker) : [],
     });
     const body = {
       model: chat.model || speaker.model || conn.model || undefined,
@@ -1110,6 +1111,46 @@ export async function render(main, [botId, chatId, jumpTo]) {
       dlg.close();
       generate("swipe", { note: `Stay true to ${speaker.name}'s character. Avoid these problems from the last attempt: ${c.issues.join("; ")}. ${c.fix}` });
     });
+  }
+
+  // ---------- Author's note ----------
+  // A lasting instruction for this chat, sent with every reply until removed.
+  // The pill above the message box shows it is on and opens it.
+  const clipText = (t, n) => { const x = String(t).replace(/\s+/g, " ").trim(); return x.length > n ? `${x.slice(0, n - 1)}…` : x; };
+  const notePill = $("#note-pill", main);
+  function paintNotePill() {
+    const t = chat.authorNote?.trim();
+    notePill.hidden = !t;
+    if (!t) return;
+    notePill.innerHTML = `<span class="note-pill-label">Author's note</span> <span class="note-pill-text">${esc(clipText(t, 80))}</span>`;
+    notePill.title = `Author's note, sent with every reply: ${t}`;
+  }
+  notePill.addEventListener("click", () => openAuthorNote());
+  paintNotePill();
+  function openAuthorNote() {
+    const dlg = openDialog(`<form method="dialog" class="dialog-body">
+      <h2>Author's note</h2>
+      <p class="hint">A lasting instruction for this chat, sent with every reply until you remove it. For one reply only, use Direct the next reply (Alt+D) instead.</p>
+      <div class="field"><label for="an-text">Note</label>
+        <textarea id="an-text" class="tall" placeholder="e.g. Slow burn: no romance before chapter 5. Keep replies under 200 words. Write in past tense.">${esc(chat.authorNote ?? "")}</textarea></div>
+      <div class="dialog-actions">
+        ${chat.authorNote?.trim() ? `<button class="btn btn-ghost push" value="remove" formnovalidate>Remove</button>` : ""}
+        <button class="btn btn-ghost" value="cancel" formnovalidate>Cancel</button>
+        <button class="btn btn-primary" value="ok">Save</button>
+      </div></form>`, {
+      onClose: async (v) => {
+        if (v !== "ok" && v !== "remove") return;
+        const text = v === "remove" ? "" : $("#an-text", dlg).value.trim();
+        if (text === (chat.authorNote ?? "").trim()) return;
+        if (text) chat.authorNote = text; else delete chat.authorNote;
+        await persist();
+        paintNotePill();
+        toast(text ? "Author's note saved. Every reply follows it." : "Author's note removed.");
+      },
+    });
+    const ta = $("#an-text", dlg);
+    autosize(ta);
+    ta.focus();
   }
 
   // ---------- Phrases to avoid ----------
@@ -1814,7 +1855,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
     const prompt = buildPrompt({
       bot: partner, persona: persona(), preset, settings: freshSettings, loreEntries,
       history: hist, mode: "impersonate", hint,
-      ...memoryArgs(hist), scene: chat.scene?.text ?? "", cast: group() ? others(partner) : [],
+      ...memoryArgs(hist), scene: chat.scene?.text ?? "", authorNote: chat.authorNote ?? "", cast: group() ? others(partner) : [],
     });
     const body = {
       model: chat.model || partner.model || conn.model || undefined,
@@ -2471,7 +2512,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
     const p = buildPrompt({
       bot: speaker, persona: persona(), preset, settings: s, history: withSpeakers(hist), loreEntries: entries,
       bond: bondOnFor(speaker) ? bondFor(speaker) : null,
-      ...memoryArgs(hist), scene: chat.scene?.text ?? "", note: direction(), cast: group() ? others(speaker) : [],
+      ...memoryArgs(hist), scene: chat.scene?.text ?? "", authorNote: chat.authorNote ?? "", note: direction(), cast: group() ? others(speaker) : [],
     });
     const params = generationParams(s, speaker);
     openDialog(`<div class="dialog-body">
@@ -2500,6 +2541,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
     { label: `Pinned moments (${chat.messages.filter((m) => m.pinned).length})`, hint: "Always remembered by the model", onSelect: openPinned },
     { label: `${bot.name}'s journal (${chat.journal.length})`, hint: "Private diary entries about you", onSelect: openJournal },
     { label: "Recap so far", hint: "A few lines on what has happened", onSelect: showRecap },
+    { label: "Author's note", hint: chat.authorNote?.trim() ? clipText(chat.authorNote, 40) : "A lasting instruction for this chat", onSelect: openAuthorNote },
     { label: "Turn into a story", hint: "Rewrite the chat as prose", onSelect: openStory },
     { label: "Suggest lore from this chat", hint: "New entries from what happened", onSelect: openLoreSuggestions },
     { heading: "Behind the scenes" },
@@ -2546,6 +2588,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
       c(`Translate my message into ${chatLanguage()}`, translateOutgoing, "language", "Alt+T"),
       c("See the prompt", previewPrompt, "debug context"),
       c("Usage in this chat", openChatUsage, "tokens cost"),
+      c("Author's note", openAuthorNote, "instruction direction style rule lasting always steer"),
       c("Chat look", openLook, "background font text size appearance wallpaper avatar picture resize layout novel hide"),
       c(readOn() ? "Leave read mode" : "Read mode", toggleRead, "novel book privacy hide reading prose", "Alt+B"),
       c(sidebarHidden() ? "Show chat list" : "Hide chat list", toggleChats, "sidebar panel history focus"),

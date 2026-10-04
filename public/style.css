@@ -968,6 +968,18 @@ body.in-chat .site-footer { display: none; }
 /* Narrow columns justify into gaps; ragged right reads better there. */
 @media (max-width: 600px) { :root[data-chat-read="on"] .msg-body { text-align: left; } }
 
+/* Author's note: a quiet reminder above the message box that a lasting instruction is on. */
+.note-pill {
+  display: flex; align-items: baseline; gap: var(--s2); max-width: 100%; margin-bottom: var(--s2); padding: 4px var(--s3);
+  border: 1px dashed var(--line-strong); border-radius: var(--r-pill); background: none; color: var(--muted);
+  font: inherit; font-size: var(--t-sm); text-align: left; cursor: pointer;
+}
+.note-pill[hidden] { display: none; }
+.note-pill-label { flex: none; font-weight: 600; color: var(--ink); }
+.note-pill-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (hover: hover) { .note-pill:hover { border-style: solid; color: var(--ink); } }
+:root[data-chat-read="on"] .note-pill { display: none !important; }
+
 /* Phrases on the avoid list, marked in a reply. */
 mark.avoided { background: color-mix(in srgb, var(--accent) 18%, transparent); color: inherit; border-radius: 3px; padding: 0 1px; text-decoration: underline wavy color-mix(in srgb, var(--accent) 60%, transparent); text-underline-offset: 3px; }
 :root[data-chat-read="on"] mark.avoided { background: none; text-decoration: none; padding: 0; }
