@@ -98,6 +98,10 @@ server-side storage of your key.
   (Rounded, Book or Plain), the message size, the layout (Chat, or Novel with no pictures beside
   messages) and the picture size (Small, Medium, Large), live.
   The font, layout and picture size are also in Settings → Appearance.
+- **Phrases to avoid**: Settings → Phrases to avoid holds phrases models overuse (a starter list
+  is included). Every request says never to use them; any that still appear are marked in the
+  reply, and the "overused phrases" chip rewrites only those sentences as a new version (the old
+  one stays a swipe back).
 - **Read mode**: the scroll button in a chat's top bar (or Alt+B) leaves only the story and the
   message box, for privacy: no site header, chat list, top bar, names, pictures, tools or tags, and
   the tab shows only the chat's name. The same button inside the message box turns it off.

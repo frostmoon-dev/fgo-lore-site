@@ -222,6 +222,19 @@ export async function checkCharacter({ bot, names, reply, context, signal }) {
   return { ok: out?.ok !== false && !issues.length, issues, fix: typeof out?.fix === "string" ? out.fix : "" };
 }
 
+// ---------- Phrases to avoid ----------
+// Rewrites only the sentences that use a listed phrase; everything else stays word for word.
+export async function rewriteAvoiding({ bot, text, phrases, signal }) {
+  const system =
+    "You are a careful prose editor. Rewrite only the sentences that contain one of the listed phrases, " +
+    "so they say the same thing in fresher words without any listed phrase or a close variant. " +
+    "Copy every other sentence exactly, word for word, with the same formatting (*actions*, quotes, paragraphs). " +
+    "Do not add, remove or reorder anything else. Reply with the full rewritten text only, no notes.";
+  const user = `Phrases to remove:\n${phrases.map((p) => `- ${p}`).join("\n")}\n\nText:\n${text}`;
+  return ask([{ role: "system", content: system }, { role: "user", content: user }],
+    { bot, maxTokens: Math.min(8000, Math.ceil(text.length / 3) + 400), temperature: 0.5, signal, prose: true });
+}
+
 // ---------- Reply suggestions ----------
 
 export async function suggestReplies({ bot, names, persona, lines, signal }) {

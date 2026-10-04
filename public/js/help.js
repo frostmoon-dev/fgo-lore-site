@@ -9,6 +9,12 @@ export const APP_VERSION = "2026.09.25.1";
 // Newest first. Each item says what it is and where it lives.
 export const NEWS = [
   {
+    version: "2026.10.04.1",
+    items: [
+      ["Phrases to avoid", "Replies are told never to use the phrases models overuse, like \"shivers down\" or \"barely above a whisper\". Any that slip in are marked, and the \"overused phrases\" chip under the reply rewrites only those sentences as a new version. Edit the list in Settings → Phrases to avoid."],
+    ],
+  },
+  {
     version: "2026.10.03.4",
     items: [
       ["Read mode follows your font", "Read mode now uses the chat font, message size and action style you picked in Chat look or Settings → Appearance, instead of always switching to Book."],

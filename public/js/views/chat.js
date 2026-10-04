@@ -7,10 +7,11 @@ import { registerCommands } from "../palette.js";
 import { chatCompletion, listModels } from "../api.js";
 import {
   buildPrompt, generationParams, currentText, applyMacros, readBond, readMood, guessMood, stripBond, cleanImpersonation, contentLevel,
+  avoidedIn, markAvoided,
 } from "../prompt.js";
 import {
   summarize, suggestLore, checkCharacter, transcript, suggestReplies, translate, updateScene, recap, storyFrom, nameChat,
-  journalEntry, surpriseEvent, writeChapter,
+  journalEntry, surpriseEvent, writeChapter, rewriteAvoiding,
 } from "../ai.js";
 import {
   memoryContext, liveChapters, windowStart as memoryWindowStart, autoChapters, pendingChapters,
@@ -524,9 +525,10 @@ export async function render(main, [botId, chatId, jumpTo]) {
     const think = meta.reasoning
       ? `<details class="thinking"><summary>Model's reasoning</summary><div>${esc(meta.reasoning)}</div></details>` : "";
     const clean = stripBond(text);
-    const content = clean.trim()
+    let content = clean.trim()
       ? renderMarkdown(applyMacros(clean, namesFor(speakerOf(m) ?? bot)))
       : (streaming ? "" : "<p><em>(empty)</em></p>");
+    if (m.role === "assistant" && !streaming) content = markAvoided(content, settings);
     return think + content + (streaming ? '<span class="caret" aria-hidden="true"></span>' : "");
   }
 
@@ -575,6 +577,10 @@ export async function render(main, [botId, chatId, jumpTo]) {
         : `<button type="button" class="check-chip bad" data-action="show-check">Out of character?</button>`);
     }
     if (meta.note) info.push(`<span class="chip" title="${esc(meta.note)}">directed</span>`);
+    const avoided = isBot && !streaming ? avoidedIn(stripBond(text), settings) : [];
+    if (avoided.length) {
+      info.push(`<button type="button" class="chip avoid-chip" data-action="fix-avoided" title="${esc(avoided.join(", "))}">${avoided.length} overused phrase${avoided.length === 1 ? "" : "s"}</button>`);
+    }
     if (meta.lore?.length) info.push(meta.lore.map((t) => `<span class="chip" title="Lore used">${esc(t)}</span>`).join(""));
     if (meta.usage) {
       const cached = cachedTokens(meta.usage);
@@ -1104,6 +1110,44 @@ export async function render(main, [botId, chatId, jumpTo]) {
       dlg.close();
       generate("swipe", { note: `Stay true to ${speaker.name}'s character. Avoid these problems from the last attempt: ${c.issues.join("; ")}. ${c.fix}` });
     });
+  }
+
+  // ---------- Phrases to avoid ----------
+  // Rewrites only the sentences with a listed phrase, as a new version of
+  // the reply; the old version stays one swipe back.
+  async function fixAvoided(m) {
+    if (busy) return;
+    const idx = m.swipeIndex ?? 0;
+    const text = stripBond(currentText(m));
+    const phrases = avoidedIn(text, settings);
+    if (!phrases.length) return;
+    const ok = await confirmDialog({
+      title: "Rewrite the overused phrases?",
+      body: `Found: ${phrases.join(", ")}. Only those sentences are rewritten, as a new version of this reply. The current version stays one swipe back. One request.`,
+      confirm: "Rewrite",
+    });
+    if (!ok) return;
+    const speaker = speakerOf(m);
+    setActivity(`avoid-${m.id}`, "Rewriting overused phrases");
+    try {
+      const fresh = (await rewriteAvoiding({ bot: speaker, text, phrases })).trim();
+      if (!fresh) throw new Error("The model returned nothing.");
+      if (!m.swipes) { m.swipes = [currentText(m)]; m.meta = [{}]; delete m.content; }
+      const { check, usage, reasoning, ...keep } = m.meta?.[idx] ?? {};
+      m.swipes.push(fresh);
+      m.meta = m.meta ?? [];
+      while (m.meta.length < m.swipes.length - 1) m.meta.push({});
+      m.meta.push({ ...keep, rewrote: phrases });
+      m.swipeIndex = m.swipes.length - 1;
+      await persist();
+      paintLog({ scroll: false });
+      const left = avoidedIn(fresh, settings);
+      toast(left.length ? `Rewritten, but ${left.join(", ")} is still there. Try again or edit it.` : "Rewritten. Swipe back for the old version.");
+    } catch (err) {
+      toast(err.message, "error");
+    } finally {
+      setActivity(`avoid-${m.id}`, null);
+    }
   }
 
   // ---------- Rewind ----------
@@ -2068,6 +2112,8 @@ export async function render(main, [botId, chatId, jumpTo]) {
       runCheck(m);
     } else if (action === "show-check") {
       showCheck(m);
+    } else if (action === "fix-avoided") {
+      fixAvoided(m);
     } else if (action === "branch") {
       if (busy) return;
       branchFrom(i);

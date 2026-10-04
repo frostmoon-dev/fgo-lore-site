@@ -968,6 +968,10 @@ body.in-chat .site-footer { display: none; }
 /* Narrow columns justify into gaps; ragged right reads better there. */
 @media (max-width: 600px) { :root[data-chat-read="on"] .msg-body { text-align: left; } }
 
+/* Phrases on the avoid list, marked in a reply. */
+mark.avoided { background: color-mix(in srgb, var(--accent) 18%, transparent); color: inherit; border-radius: 3px; padding: 0 1px; text-decoration: underline wavy color-mix(in srgb, var(--accent) 60%, transparent); text-underline-offset: 3px; }
+:root[data-chat-read="on"] mark.avoided { background: none; text-decoration: none; padding: 0; }
+
 /* ---------- Bond meter ---------- */
 .bond {
   display: flex; align-items: center; gap: var(--s2); flex: none; height: 36px;

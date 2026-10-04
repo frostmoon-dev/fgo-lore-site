@@ -70,6 +70,7 @@ async function baseCommands() {
     set("Bond settings", "bond", "relationship meter"),
     set("Languages and translation", "languages", "translate"),
     set("Memory settings", "memory", "summary"),
+    set("Phrases to avoid", "avoid", "banned slop overused words cliche shivers"),
     set("Chat settings", "chat", "enter send journal recap confirm retry busy overloaded"),
     set("Usage and cost", "usage", "tokens price spend"),
     set("Back up or restore your data", "data", "backup export import restore download"),

@@ -23,6 +23,40 @@ const CONTENT_RULES = {
 
 export const contentRule = (level) => (CONTENT_RULES[level] ? `## Content\n${CONTENT_RULES[level]}` : "");
 
+// ---------- Phrases to avoid ----------
+const avoidList = (settings) => (settings?.avoid?.enabled === false ? [] : (settings?.avoid?.phrases ?? []).map((p) => String(p).trim()).filter(Boolean));
+
+// Matches a phrase however the reply spells its spaces, apostrophes and
+// quotes, including as they appear in escaped HTML. Whole words at the edges.
+function avoidSource(phrase) {
+  const body = phrase.toLowerCase().split("").map((ch) => {
+    if (/\s/.test(ch)) return "\\s+";
+    if (ch === "'" || ch === "’") return "(?:'|’|&#39;)";
+    if (ch === '"' || ch === "“" || ch === "”") return '(?:"|“|”|&quot;)';
+    return ch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }).join("");
+  return `${/^\w/.test(phrase) ? "\\b" : ""}${body}${/\w$/.test(phrase) ? "\\b" : ""}`;
+}
+
+export function avoidedIn(text, settings) {
+  const src = String(text ?? "");
+  return avoidList(settings).filter((p) => new RegExp(avoidSource(p), "i").test(src));
+}
+
+// Wraps each match in <mark>, in text only, never inside a tag.
+export function markAvoided(htmlText, settings) {
+  const list = avoidList(settings);
+  if (!list.length) return htmlText;
+  const re = new RegExp(list.map(avoidSource).join("|"), "gi");
+  return htmlText.split(/(<[^>]+>)/).map((part) => (part.startsWith("<") ? part
+    : part.replace(re, (m) => `<mark class="avoided" title="On your list of phrases to avoid">${m}</mark>`))).join("");
+}
+
+function avoidRule(settings) {
+  const list = avoidList(settings);
+  return list.length ? `Never use these overused phrases, or close variants of them: ${list.map((p) => `"${p}"`).join(", ")}. Write something fresher instead.` : "";
+}
+
 export const estimateTokens = (text) => Math.ceil((text?.length ?? 0) / 4);
 
 export function applyMacros(text, { char = "Character", user = "User" } = {}) {
@@ -233,6 +267,7 @@ export function buildPrompt({
     post = [post, `At the very end of your reply, on its own line, add a tag like <mood:${moods[0]}> naming ${names.char}'s expression ` +
       `as the reply ends, one of: ${moods.join(", ")}. Never mention the tag in the story.`].filter(Boolean).join("\n\n");
   }
+  post = [post, avoidRule(settings)].filter(Boolean).join("\n\n");
   if (note?.trim()) post = [post, `For this reply only: ${m(note)}`].filter(Boolean).join("\n\n");
   if (bond) {
     post = [post, "After your reply, on its own last line, rate how this exchange went for the bond " +

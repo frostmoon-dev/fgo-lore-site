@@ -203,6 +203,19 @@ export async function render(main) {
         </details>
       </div>
 
+      <div class="card" id="set-avoid">
+        <h2 class="card-title">Phrases to avoid</h2>
+        <p class="lead">Words and phrases models overuse. Every reply is told never to use them; any that still slip in are marked,
+          and the "overused phrases" chip under the reply rewrites just those sentences.</p>
+        <div class="form-grid">
+          <label class="check"><input type="checkbox" id="avoid-on" ${settings.avoid.enabled ? "checked" : ""}>
+            <span>Avoid these phrases<small>Adds one line to every request.</small></span></label>
+          <div class="field"><label for="avoid-list">One per line</label>
+            <textarea id="avoid-list" class="tall" spellcheck="false">${esc(settings.avoid.phrases.join("\n"))}</textarea>
+            <p class="hint">Not case-sensitive. Short, distinctive phrases work best; a common word like "smile" would be marked everywhere.</p></div>
+        </div>
+      </div>
+
       <h2 class="sub" id="usage-title">Usage</h2>
       <div class="card" id="set-usage" aria-labelledby="usage-title">
         <p class="lead">Tokens sent to and received from your API by this browser: replies and every extra task, like memory and ideas.</p>
@@ -252,6 +265,14 @@ export async function render(main) {
         <button class="btn btn-danger" type="button" id="wipe">Delete all data</button>
       </div>
     </div>`;
+
+  // ---------- Phrases to avoid ----------
+  $("#avoid-on", main).addEventListener("change", (e) => saveSettings({ avoid: { enabled: e.target.checked } }));
+  const saveAvoid = debounce(() => {
+    const phrases = [...new Set($("#avoid-list", main).value.split("\n").map((x) => x.trim()).filter(Boolean))];
+    saveSettings({ avoid: { phrases } });
+  }, 500);
+  $("#avoid-list", main).addEventListener("input", saveAvoid);
 
   async function paintUsage() {
     if (!navigator.storage?.estimate) return;
