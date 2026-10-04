@@ -370,11 +370,27 @@ export async function render(main, [botId, chatId, jumpTo]) {
   paintToggle();
 
   // Read mode: only the story and the message box, for privacy. Remembered on this device.
+  // Switching hides or shows names, tools and bars, so the text reflows. Keep
+  // the reader on the same line: at the end stays at the end; otherwise the
+  // message at the top of the view stays there, the same share of the way in.
+  function keepPlace(change) {
+    if (nearBottom()) { change(); toBottom(); return; }
+    const top = log.getBoundingClientRect().top;
+    const el = $$(".msg[data-id]", logInner).find((m) => m.getBoundingClientRect().bottom > top);
+    if (!el) { change(); return; }
+    const r = el.getBoundingClientRect();
+    const share = r.height ? (top - r.top) / r.height : 0;
+    change();
+    const after = el.getBoundingClientRect();
+    log.scrollTop += after.top + share * after.height - log.getBoundingClientRect().top;
+  }
   function toggleRead() {
     const on = !readOn();
     try { on ? localStorage.setItem("chatRead", "on") : localStorage.removeItem("chatRead"); } catch { /* private mode */ }
-    if (on) document.documentElement.dataset.chatRead = "on";
-    else delete document.documentElement.dataset.chatRead;
+    keepPlace(() => {
+      if (on) document.documentElement.dataset.chatRead = "on";
+      else delete document.documentElement.dataset.chatRead;
+    });
     paintHeader();
     (on ? input : $("#read-enter", main)).focus({ preventScroll: true });
   }
