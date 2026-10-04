@@ -946,7 +946,8 @@ body.in-chat .site-footer { display: none; }
 :root[data-chat-read="on"] .msg > .avatar,
 :root[data-chat-read="on"] .msg > .avatar-link,
 :root[data-chat-read="on"] .msg-head,
-:root[data-chat-read="on"] .msg-foot,
+:root[data-chat-read="on"] .msg[data-id] .msg-foot,
+:root[data-chat-read="on"] .earlier .hint,
 :root[data-chat-read="on"] .milestone,
 :root[data-chat-read="on"] .composer-foot,
 :root[data-chat-read="on"] .composer-tool { display: none !important; }
