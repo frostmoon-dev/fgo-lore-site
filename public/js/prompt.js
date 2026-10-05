@@ -66,7 +66,9 @@ const FILLER = new Set(("a an the and or but of to in on at for with by from as 
 const wordsOf = (t) => (stripBond(t).replace(/[*_]/g, " ").toLowerCase().replace(/’/g, "'").match(/[a-z']+/g) ?? []);
 const lastSentence = (t) => (stripBond(t).replace(/[*_]/g, "").trim().match(/[^.!?…]*[.!?…]+["”’')\]]*\s*$/) ?? [""])[0].trim();
 
-export function repetitionHints(replies) {
+// userTexts: the person's recent messages. A word pair they use too is part
+// of the story ("the fish tank"), not a habit of the bot's.
+export function repetitionHints(replies, { userTexts = [] } = {}) {
   const recent = replies.map((r) => String(r ?? "")).filter((r) => r.trim()).slice(-5);
   if (recent.length < 3) return [];
   const hints = [];
@@ -119,6 +121,28 @@ export function repetitionHints(replies) {
   const shapes = [...frames].filter(([, f]) => f.replies.size >= 3 && f.fillers.size >= 2).map(([k]) => k)
     .filter((k) => !phrases.some((p) => k.replace(" … ", " ").includes(p))).slice(0, 3);
   if (shapes.length) hints.push(`This sentence shape keeps coming back with one word swapped; avoid it entirely: ${shapes.map((s) => `"${s}"`).join(", ")}.`);
+
+  // Descriptive pairs worn thin: "gray eyes", "heavy-lidded gaze" in four of
+  // the last six replies, and not in the person's own recent messages.
+  const six = replies.map((r) => String(r ?? "")).filter((r) => r.trim()).slice(-6);
+  if (six.length >= 4) {
+    const theirs = new Map();
+    userTexts.slice(-10).forEach((u) => new Set(wordsOf(u)).forEach((w) => theirs.set(w, (theirs.get(w) ?? 0) + 1)));
+    const pairs = new Map();
+    six.forEach((r) => {
+      const w = wordsOf(r);
+      const mine = new Set();
+      for (let j = 0; j + 1 < w.length; j++) {
+        const [a, b] = [w[j], w[j + 1]];
+        if (FILLER.has(a) || FILLER.has(b) || a.length < 4 || b.length < 4 || a.includes("'") || b.includes("'")) continue;
+        if ((theirs.get(a) ?? 0) >= 2 || (theirs.get(b) ?? 0) >= 2) continue;
+        mine.add(`${a} ${b}`);
+      }
+      mine.forEach((p) => pairs.set(p, (pairs.get(p) ?? 0) + 1));
+    });
+    const worn = [...pairs].filter(([p, n]) => n >= 4 && !phrases.some((x) => x.includes(p))).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([p]) => p);
+    if (worn.length) hints.push(`These descriptions are in almost every recent reply; leave them out or describe something else: ${worn.map((p) => `"${p}"`).join(", ")}.`);
+  }
 
   const ends = recent.slice(-4).map(lastSentence);
   if (ends.filter((e) => /\?["”’')\]]*$/.test(e)).length >= 3) hints.push("Recent replies all ended on a question. End this one another way.");
