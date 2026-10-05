@@ -841,16 +841,32 @@ export async function render(main, [botId, chatId, jumpTo]) {
     let ok = false;
 
     try {
-      const res = await chatCompletion(conn, body, {
+      const ask = (b) => chatCompletion(conn, b, {
         signal: controller.signal,
         onRetry: ({ attempt, max }) => setActivity("reply", `The model is busy. Trying again (${attempt} of ${max})…`),
         onDelta: (r) => {
-          if (r.content && activity.get("reply")?.startsWith("The model is busy")) setActivity("reply", `${speaker.name} is writing…`);
+          if (r.content && /^The (model is busy|reply came back empty)/.test(activity.get("reply") ?? "")) setActivity("reply", `${speaker.name} is writing…`);
           target.swipes[si] = kind === "continue" ? join(r.content) : r.content;
           if (kind !== "continue") target.meta[si].reasoning = r.reasoning;
           frame ||= requestAnimationFrame(paintStream);
         },
       });
+      let res = await ask(body);
+      // An empty reply is asked for once more. Thinking models can spend the
+      // whole length limit thinking (finish "length", no text): that retry
+      // gets more room. Otherwise it is usually a one-off from the host.
+      let roomy = false;
+      if (!stripBond(res.content).trim() && !controller.signal.aborted) {
+        roomy = res.finishReason === "length";
+        const more = roomy ? { max_tokens: Math.min(8000, Math.ceil((Number(body.max_tokens) || 600) * 2.5)) } : {};
+        setActivity("reply", roomy ? `The reply ran out of room while thinking. Asking again with more…` : "The reply came back empty. Asking again…");
+        res = await ask({ ...body, ...more });
+      }
+      if (!stripBond(res.content).trim()) {
+        throw new Error(res.finishReason === "length"
+          ? `The model used its whole reply length thinking and wrote nothing${roomy ? ", even with more room" : ""}. Raise Max reply tokens on the Prompt page (thinking models need 1500 or more), then try again.`
+          : "The model sent back an empty reply twice. Try again in a moment, or pick another model or provider on the Connection page.");
+      }
       const mood = readMood(res.content, moodsOf(speaker)) ?? guessMood(res.content, moodsOf(speaker));
       const parsed = withBond ? readBond(res.content) : { text: stripBond(res.content), delta: 0 };
       // In a group scene models sometimes label their own line.

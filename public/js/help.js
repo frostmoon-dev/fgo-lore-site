@@ -12,6 +12,7 @@ export const NEWS = [
     version: "2026.10.05.2",
     items: [
       ["Cheaper Kimi on OpenRouter", "Connection → Extra request fields sends provider options with every request. With OpenRouter and a Kimi model, one button keeps requests on Moonshot's own servers, where repeated prompt text is cached and costs a tenth."],
+      ["Fewer empty replies", "An empty reply is asked for again once by itself. When a thinking model used the whole length limit on thinking, the second try gets more room, and if it still fails the message says to raise Max reply tokens."],
       ["Catches swapped-word habits", "The repetition guard now also spots a sentence shape that keeps coming back with one word changed, like \"the flat patience of a man…\" and \"the flat disinterest of a man…\"."],
     ],
   },
