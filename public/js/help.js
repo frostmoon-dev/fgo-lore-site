@@ -9,6 +9,12 @@ export const APP_VERSION = "2026.09.25.1";
 // Newest first. Each item says what it is and where it lives.
 export const NEWS = [
   {
+    version: "2026.10.05.3",
+    items: [
+      ["Turn up the heat", "With mature content on, the + menu adds Turn up the heat: an idea that moves the story toward romance and intimacy, grown from where it already is. It follows your level: kept implied on Mature, explicit allowed on Explicit. Hidden when content is off or the bot is safe for work."],
+    ],
+  },
+  {
     version: "2026.10.05.2",
     items: [
       ["Cheaper Kimi on OpenRouter", "Connection → Extra request fields sends provider options with every request. With OpenRouter and a Kimi model, one button keeps requests on Moonshot's own servers, where repeated prompt text is cached and costs a tenth."],
