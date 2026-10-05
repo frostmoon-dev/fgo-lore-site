@@ -71,7 +71,7 @@ async function baseCommands() {
     set("Languages and translation", "languages", "translate"),
     set("Memory settings", "memory", "summary"),
     set("Phrases to avoid", "avoid", "banned slop overused words cliche shivers"),
-    set("Chat settings", "chat", "enter send journal recap confirm retry busy overloaded"),
+    set("Chat settings", "chat", "repetition repeat varied fresh enter send journal recap confirm retry busy overloaded"),
     set("Usage and cost", "usage", "tokens price spend"),
     set("Back up or restore your data", "data", "backup export import restore download"),
     { group: "Help", title: "Welcome tour", keywords: "help guide start how", run: async () => (await import("./help.js")).showTour() },

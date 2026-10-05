@@ -102,6 +102,10 @@ server-side storage of your key.
   "past tense", "short replies"), sent with every reply and with Write my reply until removed. A
   pill above the message box shows it is on. Branches keep it. For one reply only, use the scene
   director (Alt+D).
+- **Repetition guard**: before each reply, `repetitionHints` (prompt.js) reads the speaker's last
+  five replies for habits (same opening words, four-word phrases in three or more replies, ending
+  on a question or the same words) and the request asks to vary them. Local, no extra request.
+  Replies it shaped show "kept fresh". Settings → Chat turns it off.
 - **Liked replies**: the heart under a reply saves it on the bot that wrote it. The bot's latest 3
   liked replies, from any chat, are sent as examples of the style, voice and length you want
   (never content to reuse). ⋯ → Liked replies lists and removes them.

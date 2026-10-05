@@ -7,7 +7,7 @@ import { registerCommands } from "../palette.js";
 import { chatCompletion, listModels } from "../api.js";
 import {
   buildPrompt, generationParams, currentText, applyMacros, readBond, readMood, guessMood, stripBond, cleanImpersonation, contentLevel,
-  avoidedIn, markAvoided,
+  avoidedIn, markAvoided, repetitionHints,
 } from "../prompt.js";
 import {
   summarize, suggestLore, checkCharacter, transcript, suggestReplies, translate, updateScene, recap, storyFrom, nameChat,
@@ -579,6 +579,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
         : `<button type="button" class="check-chip bad" data-action="show-check">Out of character?</button>`);
     }
     if (meta.note) info.push(`<span class="chip" title="${esc(meta.note)}">directed</span>`);
+    if (meta.varied?.length) info.push(`<span class="chip" title="Asked to vary: ${esc(meta.varied.join(" "))}">kept fresh</span>`);
     const avoided = isBot && !streaming ? avoidedIn(stripBond(text), settings) : [];
     if (avoided.length) {
       info.push(`<button type="button" class="chip avoid-chip" data-action="fix-avoided" title="${esc(avoided.join(", "))}">${avoided.length} overused phrase${avoided.length === 1 ? "" : "s"}</button>`);
@@ -801,13 +802,18 @@ export async function render(main, [botId, chatId, jumpTo]) {
     const fullNote = [directed, note, shiftNote, continueNote, rollNote].filter(Boolean).join(" ");
 
     const [freshSettings, preset, loreEntries] = await Promise.all([getSettings(), getActivePreset(), loreForBot(speaker)]);
+    // Habits in this character's last replies, to vary this time. Not for
+    // "continue", which finishes the same reply.
+    const varied = kind !== "continue" && freshSettings.repetition?.enabled !== false
+      ? repetitionHints(chat.messages.filter((x) => x !== target && spokeBy(x, speaker)).slice(-5).map((x) => currentText(x)))
+      : [];
     const beforeBond = bondFor(speaker);
     const hist = withSpeakers(chat.messages.slice(0, chat.messages.indexOf(target) + (kind === "continue" ? 1 : 0)));
     const prompt = buildPrompt({
       bot: speaker, persona: persona(), preset, settings: freshSettings, loreEntries, history: hist,
       bond: withBond ? beforeBond : null,
       ...memoryArgs(hist), scene: chat.scene?.text ?? "", authorNote: chat.authorNote ?? "", note: fullNote, cast: group() ? others(speaker) : [],
-      liked: likedFor(speaker, target.id),
+      liked: likedFor(speaker, target.id), repetition: varied,
     });
     const body = {
       model: chat.model || speaker.model || conn.model || undefined,
@@ -867,6 +873,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
           // Only the person's own direction or nudge earns the "directed" label.
           ...(directed || note ? { note: [directed, note].filter(Boolean).join(" ") } : {}),
           ...(directed ? { direction: directed } : {}),
+          ...(varied.length ? { varied } : {}),
         };
       }
       if (!parsed.text.trim()) throw new Error("The model sent back an empty reply. Try again, or check the model name on the Connection page.");
@@ -2573,6 +2580,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
       bond: bondOnFor(speaker) ? bondFor(speaker) : null,
       ...memoryArgs(hist), scene: chat.scene?.text ?? "", authorNote: chat.authorNote ?? "", note: direction(), cast: group() ? others(speaker) : [],
       liked: likedFor(speaker),
+      repetition: s.repetition?.enabled !== false ? repetitionHints(chat.messages.filter((x) => spokeBy(x, speaker)).slice(-5).map((x) => currentText(x))) : [],
     });
     const params = generationParams(s, speaker);
     openDialog(`<div class="dialog-body">

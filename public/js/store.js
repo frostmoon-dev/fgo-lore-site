@@ -52,6 +52,9 @@ export const DEFAULT_SETTINGS = {
   journal: { auto: true, every: 12 },
   // A busy or overloaded model is tried again this many times (0 = never).
   retry: { tries: 3 },
+  // Spot habits in a bot's recent replies (same opening, phrases, endings)
+  // and ask the next reply to vary them. Local, no extra request.
+  repetition: { enabled: true },
   // Phrases models overuse. Sent as "never write these"; any that still
   // appear are marked in the reply and can be rewritten in one tap.
   avoid: {
@@ -285,7 +288,7 @@ function emit(what) { listeners.forEach((fn) => fn(what)); }
 
 function merge(base, extra) {
   const out = { ...base, ...extra };
-  for (const k of ["gen", "lore", "bond", "memory", "check", "translate", "recap", "confirm", "content", "usage", "journal", "retry", "avoid"]) out[k] = { ...base[k], ...(extra?.[k] ?? {}) };
+  for (const k of ["gen", "lore", "bond", "memory", "check", "translate", "recap", "confirm", "content", "usage", "journal", "retry", "avoid", "repetition"]) out[k] = { ...base[k], ...(extra?.[k] ?? {}) };
   return out;
 }
 

@@ -57,6 +57,57 @@ function avoidRule(settings) {
   return list.length ? `Never use these overused phrases, or close variants of them: ${list.map((p) => `"${p}"`).join(", ")}. Write something fresher instead.` : "";
 }
 
+// ---------- Repetition ----------
+// Finds habits in a character's recent replies: the same opening, the same
+// phrases again and again, always ending on a question or the same words.
+// Runs here, costs nothing; the next reply is told to vary them.
+const FILLER = new Set(("a an the and or but of to in on at for with by from as is was are were be been it its it's he she they his her hers " +
+  "their him them i you we me my your our this that these those not no so then than just into onto up down out over").split(" "));
+const wordsOf = (t) => (stripBond(t).replace(/[*_]/g, " ").toLowerCase().replace(/’/g, "'").match(/[a-z']+/g) ?? []);
+const lastSentence = (t) => (stripBond(t).replace(/[*_]/g, "").trim().match(/[^.!?…]*[.!?…]+["”’')\]]*\s*$/) ?? [""])[0].trim();
+
+export function repetitionHints(replies) {
+  const recent = replies.map((r) => String(r ?? "")).filter((r) => r.trim()).slice(-5);
+  if (recent.length < 3) return [];
+  const hints = [];
+
+  // Two words ("he smirks"), or three when both are filler ("it was quiet").
+  const openings = recent.map((r) => {
+    const w = wordsOf(r);
+    return w.slice(0, w.slice(0, 2).every((x) => FILLER.has(x)) ? 3 : 2).join(" ");
+  }).filter((o) => o.includes(" "));
+  const openCount = openings.reduce((c, o) => c.set(o, (c.get(o) ?? 0) + 1), new Map());
+  const [topOpen, openN] = [...openCount].sort((a, b) => b[1] - a[1])[0] ?? [];
+  if (openN >= 3 || (openings.length >= 2 && openings.at(-1) === openings.at(-2))) hints.push(`Do not open the reply with "${topOpen}…" again; start differently.`);
+
+  // Four-word phrases found in at least three different replies, longest-spread first.
+  const seen = new Map();
+  recent.forEach((r, i) => {
+    const w = wordsOf(r);
+    const mine = new Set();
+    for (let j = 0; j + 4 <= w.length; j++) {
+      const gram = w.slice(j, j + 4);
+      if (gram.filter((x) => !FILLER.has(x)).length < 2) continue;
+      mine.add(gram.join(" "));
+    }
+    mine.forEach((g) => seen.set(g, (seen.get(g) ?? new Set()).add(i)));
+  });
+  const phrases = [];
+  for (const [g] of [...seen].filter(([, s]) => s.size >= 3).sort((a, b) => b[1].size - a[1].size)) {
+    const gw = g.split(" ");
+    if (phrases.some((p) => p.split(" ").filter((x) => gw.includes(x)).length >= 3)) continue; // overlaps one already chosen
+    phrases.push(g);
+    if (phrases.length >= 5) break;
+  }
+  if (phrases.length) hints.push(`These phrases keep coming back; do not use them this time: ${phrases.map((p) => `"${p}"`).join(", ")}.`);
+
+  const ends = recent.slice(-4).map(lastSentence);
+  if (ends.filter((e) => /\?["”’')\]]*$/.test(e)).length >= 3) hints.push("Recent replies all ended on a question. End this one another way.");
+  const endWords = recent.slice(-4).map((r) => wordsOf(lastSentence(r)).slice(-3).join(" ")).filter((e) => e.split(" ").length === 3);
+  if (endWords.length >= 2 && endWords.at(-1) === endWords.at(-2)) hints.push(`Do not end with "…${endWords.at(-1)}" again.`);
+  return hints;
+}
+
 export const estimateTokens = (text) => Math.ceil((text?.length ?? 0) / 4);
 
 export function applyMacros(text, { char = "Character", user = "User" } = {}) {
@@ -163,7 +214,7 @@ export function cleanImpersonation(text, userName) {
 export function buildPrompt({
   bot, persona, preset, settings, history, loreEntries = [], bond = null,
   mode = "reply", hint = "", memory = "", note = "", cast = [], scene = "",
-  facts = "", chapters = [], recalled = [], windowStart = 0, authorNote = "", liked = [],
+  facts = "", chapters = [], recalled = [], windowStart = 0, authorNote = "", liked = [], repetition = [],
 }) {
   const asUser = mode === "impersonate";
   if (asUser) bond = null;
@@ -276,6 +327,7 @@ export function buildPrompt({
       `as the reply ends, one of: ${moods.join(", ")}. Never mention the tag in the story.`].filter(Boolean).join("\n\n");
   }
   post = [post, avoidRule(settings)].filter(Boolean).join("\n\n");
+  if (!asUser && repetition.length) post = [post, `Vary your writing. In ${names.char}'s recent replies:\n${repetition.map((h) => `- ${h}`).join("\n")}`].join("\n\n");
   if (note?.trim()) post = [post, `For this reply only: ${m(note)}`].filter(Boolean).join("\n\n");
   if (bond) {
     post = [post, "After your reply, on its own last line, rate how this exchange went for the bond " +
