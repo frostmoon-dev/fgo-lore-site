@@ -10,6 +10,7 @@ const P = {
   right: '<path d="m9 6 6 6-6 6"/>',
   send: '<path d="M5 12h13M13 6l6 6-6 6"/>',
   stop: '<rect x="7" y="7" width="10" height="10" rx="1.5" fill="currentColor"/>',
+  heart: '<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10Z"/>',
   menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
   sidebar: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/>',
   upload: '<path d="M12 16V4M7 9l5-5 5 5M4 20h16"/>',

@@ -158,12 +158,12 @@ export function cleanImpersonation(text, userName) {
 // (a scene direction or a nudge like "shorter"). cast is the other bots in
 // a group scene; history messages then carry the botId of who spoke.
 // scene is the tracked state of the scene right now. authorNote is a lasting
-// instruction for this chat. Pinned messages in
+// instruction for this chat. liked holds replies the person liked, as style examples. Pinned messages in
 // history are always included, even after they fall out of the context.
 export function buildPrompt({
   bot, persona, preset, settings, history, loreEntries = [], bond = null,
   mode = "reply", hint = "", memory = "", note = "", cast = [], scene = "",
-  facts = "", chapters = [], recalled = [], windowStart = 0, authorNote = "",
+  facts = "", chapters = [], recalled = [], windowStart = 0, authorNote = "", liked = [],
 }) {
   const asUser = mode === "impersonate";
   if (asUser) bond = null;
@@ -226,6 +226,11 @@ export function buildPrompt({
   }
   if (preset.includeExamples !== false && bot.examples?.trim()) {
     parts.push(`## Example dialogue (style reference only)\n${m(bot.examples.replace(/<START>\s*/gi, "---\n"))}`);
+  }
+  // Replies the person liked: the voice and quality to aim for, never content to reuse.
+  if (!asUser && liked.length) {
+    parts.push(`## Replies ${names.user} liked (match their style, voice, length and quality; never reuse their events, wording or content)\n` +
+      liked.map((t) => `---\n${m(clip(stripBond(t), 1200))}`).join("\n"));
   }
   parts.push(contentRule(contentLevel(settings, bot)));
   if (memory?.trim()) parts.push(`## Story so far (memory of earlier events)\n${m(memory)}`);

@@ -129,6 +129,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
 
   // ---------- Who is in the scene ----------
   const botById = new Map(allBots.map((b) => [b.id, b]));
+  botById.set(bot.id, bot); // one object for this chat's bot, so a change through either is never lost
   const cast = () => chat.castIds.map((id) => botById.get(id)).filter(Boolean);
   const group = () => cast().length > 0;
   const everyone = () => [bot, ...cast()];
@@ -622,6 +623,8 @@ export async function render(main, [botId, chatId, jumpTo]) {
           <span class="msg-tools">
             <button class="icon-btn" type="button" data-action="edit" aria-label="Edit message" title="Edit" ${busy ? "disabled" : ""}>${icon("edit")}</button>
             ${isLastBot ? `<button class="icon-btn" type="button" data-action="regenerate" aria-label="Regenerate reply, with options" aria-haspopup="menu" aria-expanded="false" title="Regenerate" ${busy ? "disabled" : ""}>${icon("refresh")}</button>` : ""}
+            ${isBot ? `<button class="icon-btn${isLiked(m) ? " is-on" : ""}" type="button" data-action="like" aria-pressed="${isLiked(m)}"
+              aria-label="${isLiked(m) ? "Unlike" : "Like: use this reply as an example of the style you want"}" title="${isLiked(m) ? "Liked: a style example" : "Like this reply"}" ${streaming ? "disabled" : ""}>${icon("heart")}</button>` : ""}
             <button class="icon-btn${m.pinned ? " is-on" : ""}" type="button" data-action="pin" aria-pressed="${m.pinned ? "true" : "false"}"
               aria-label="${m.pinned ? "Unpin" : "Pin this moment so it is always remembered"}" title="${m.pinned ? "Unpin" : "Pin"}">${icon("pin")}</button>
             <button class="icon-btn" type="button" data-action="msg-menu" aria-label="More message actions" aria-haspopup="menu" aria-expanded="false" title="More" ${streaming ? "disabled" : ""}>${icon("dots")}</button>
@@ -804,6 +807,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
       bot: speaker, persona: persona(), preset, settings: freshSettings, loreEntries, history: hist,
       bond: withBond ? beforeBond : null,
       ...memoryArgs(hist), scene: chat.scene?.text ?? "", authorNote: chat.authorNote ?? "", note: fullNote, cast: group() ? others(speaker) : [],
+      liked: likedFor(speaker, target.id),
     });
     const body = {
       model: chat.model || speaker.model || conn.model || undefined,
@@ -1558,6 +1562,59 @@ export async function render(main, [botId, chatId, jumpTo]) {
     return true;
   }
 
+  // ---------- Liked replies ----------
+  // Liking a reply saves a copy on the bot that wrote it. Its latest liked
+  // replies, from any chat, go into the prompt as examples of the style you want.
+  const LIKED_IN_PROMPT = 3;
+  const LIKED_KEPT = 30;
+  const likeKey = (m) => `${m.id}:${m.swipeIndex ?? 0}`;
+  function isLiked(m) {
+    const who = speakerOf(m);
+    return !!who?.liked?.some((e) => e.key === likeKey(m));
+  }
+  function likedFor(who, exceptMsg = null) {
+    return (who?.liked ?? []).filter((e) => !exceptMsg || !e.key.startsWith(`${exceptMsg}:`)).slice(-LIKED_IN_PROMPT).map((e) => e.text);
+  }
+  async function toggleLike(m) {
+    const who = speakerOf(m);
+    if (!who || !botById.has(who.id)) return;
+    const key = likeKey(m);
+    const list = who.liked ?? [];
+    const on = !list.some((e) => e.key === key);
+    const next = on
+      ? [...list, { key, chatId: chat.id, text: stripBond(currentText(m)), at: now() }].slice(-LIKED_KEPT)
+      : list.filter((e) => e.key !== key);
+    await bots.setLiked(who, next);
+    paintLog({ scroll: false });
+    toast(on ? `Liked. ${who.name}'s next replies use your latest ${Math.min(next.length, LIKED_IN_PROMPT)} liked repl${Math.min(next.length, LIKED_IN_PROMPT) === 1 ? "y" : "ies"} as a style example.` : "Unliked.");
+  }
+  function openLiked() {
+    const dlg = openDialog(`<div class="dialog-body">
+      <h2>Liked replies</h2>
+      <p class="hint">Replies you liked, from any chat with ${esc(bot.name)}. The latest ${LIKED_IN_PROMPT} are sent with every reply as an example of the style,
+        voice and length you want; their events are never reused. Like replies with the heart under them.</p>
+      <div id="liked-list"></div>
+      <form method="dialog" class="dialog-actions"><button class="btn btn-primary">Close</button></form>
+    </div>`, { wide: true });
+    const paint = () => {
+      const list = [...(bot.liked ?? [])].reverse();
+      $("#liked-list", dlg).innerHTML = list.length ? `<ul class="pin-list">${list.map((e, i) => `
+        <li class="pin-row">
+          <div class="grow">${i < LIKED_IN_PROMPT ? `<span class="chip">sent</span> ` : ""}<p>${previewHTML(e.text, 220)}</p></div>
+          <button class="btn btn-sm btn-quiet" type="button" data-unlike="${esc(e.key)}">Remove</button>
+        </li>`).join("")}</ul>`
+        : `<p class="note">${icon("info")}<span>Nothing liked yet. Tap the heart under a reply you think is written just right.</span></p>`;
+    };
+    paint();
+    dlg.addEventListener("click", async (e) => {
+      const un = e.target.closest("[data-unlike]");
+      if (!un) return;
+      await bots.setLiked(bot, (bot.liked ?? []).filter((x) => x.key !== un.dataset.unlike));
+      paint();
+      paintLog({ scroll: false });
+    });
+  }
+
   function openPinned() {
     const pins = chat.messages.filter((m) => m.pinned);
     const dlg = openDialog(`<div class="dialog-body">
@@ -2141,6 +2198,8 @@ export async function render(main, [botId, chatId, jumpTo]) {
         "-",
         { label: "Delete message", danger: true, disabled: busy, onSelect: () => deleteMessage(m) },
       ], { align: "start" });
+    } else if (action === "like") {
+      await toggleLike(m);
     } else if (action === "pin") {
       m.pinned = !m.pinned;
       await persist(); paintLog({ scroll: false });
@@ -2513,6 +2572,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
       bot: speaker, persona: persona(), preset, settings: s, history: withSpeakers(hist), loreEntries: entries,
       bond: bondOnFor(speaker) ? bondFor(speaker) : null,
       ...memoryArgs(hist), scene: chat.scene?.text ?? "", authorNote: chat.authorNote ?? "", note: direction(), cast: group() ? others(speaker) : [],
+      liked: likedFor(speaker),
     });
     const params = generationParams(s, speaker);
     openDialog(`<div class="dialog-body">
@@ -2539,6 +2599,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
     ] : []),
     { heading: "Story" },
     { label: `Pinned moments (${chat.messages.filter((m) => m.pinned).length})`, hint: "Always remembered by the model", onSelect: openPinned },
+    { label: `Liked replies (${(bot.liked ?? []).length})`, hint: "Style examples for this bot", onSelect: openLiked },
     { label: `${bot.name}'s journal (${chat.journal.length})`, hint: "Private diary entries about you", onSelect: openJournal },
     { label: "Recap so far", hint: "A few lines on what has happened", onSelect: showRecap },
     { label: "Author's note", hint: chat.authorNote?.trim() ? clipText(chat.authorNote, 40) : "A lasting instruction for this chat", onSelect: openAuthorNote },
@@ -2588,6 +2649,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
       c(`Translate my message into ${chatLanguage()}`, translateOutgoing, "language", "Alt+T"),
       c("See the prompt", previewPrompt, "debug context"),
       c("Usage in this chat", openChatUsage, "tokens cost"),
+      c("Liked replies", openLiked, "heart favourite style examples best"),
       c("Author's note", openAuthorNote, "instruction direction style rule lasting always steer"),
       c("Chat look", openLook, "background font text size appearance wallpaper avatar picture resize layout novel hide"),
       c(readOn() ? "Leave read mode" : "Read mode", toggleRead, "novel book privacy hide reading prose", "Alt+B"),

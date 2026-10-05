@@ -374,6 +374,8 @@ export const bots = {
   async touch(bot) { bot.lastChatAt = now(); await db.put("bots", bot); },
   // Favourites sit first on the home page. Not an edit either.
   async setFavorite(bot, on) { bot.favorite = !!on; await db.put("bots", bot); emit("bots"); },
+  // Replies you liked, used as style examples for this bot. Not an edit.
+  async setLiked(bot, liked) { bot.liked = liked; await db.put("bots", bot); emit("bots"); },
   async remove(id) {
     for (const c of await chats.forBot(id)) await db.delete("chats", c.id);
     await db.delete("bots", id);
