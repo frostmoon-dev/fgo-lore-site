@@ -148,7 +148,9 @@ server-side storage of your key.
   threads already in the story (a forced decision, a discovery, a plan set in motion, a shift
   between the characters, a time skip), not random accidents. *A lighter moment* and *Raise the
   tension* ask for those moods on purpose. It reads the author's note and key facts, lands in the
-  direction bar to edit or re-roll, and a re-roll avoids the ideas just turned down.
+  direction bar to edit or re-roll, and a re-roll avoids the ideas just turned down. With mature
+  content on, *Turn up the heat* moves the story toward romance and intimacy (implied on Mature,
+  explicit allowed on Explicit); it is hidden when content is off or the bot is safe for work.
 - **Usage**: Settings → Usage shows tokens for today, 7 and 30 days, a 14-day chart and
   a table by model, with a cost estimate if you enter prices. Counts the provider does
   not report are estimated and labelled as such. Each chat's ⋯ menu shows its own total.

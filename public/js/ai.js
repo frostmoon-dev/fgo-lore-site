@@ -362,11 +362,26 @@ const STORY_MOVES = {
   tension:
     "Suggest a development that raises the tension: a confrontation, a hard choice, a deadline, a rival, a lie close to coming out, " +
     "or a cost to something earlier. Keep it grounded in what is already in the story; no random disasters.",
+  // Only offered when the chat's content level allows it (mature or explicit).
+  heat: {
+    mature:
+      "Suggest a development that moves the story toward romance and physical intimacy: a charged moment, closeness that lingers, " +
+      "a confession, a near-kiss or a kiss, a reason for the two to be alone. Grow it from the attraction and tension already in the story. " +
+      "Keep any sexual content implied, not explicit.",
+    explicit:
+      "Suggest a development that moves the story toward sex: rising sexual tension, a charged moment, a reason for the two to be alone, " +
+      "touch that escalates, or a scene that turns sexual. Grow it from the attraction, history and dynamic already in the story, " +
+      "true to how these characters are. It may be explicit.",
+  },
 };
 
-export async function surpriseEvent({ bot, names, lines, scene, facts = "", note = "", avoid = [], kind = "plot", signal }) {
+export async function surpriseEvent({ bot, names, lines, scene, facts = "", note = "", avoid = [], kind = "plot", level = "off", signal }) {
+  if (kind === "heat" && level === "off") throw new Error("Mature content is off for this chat. Turn it on in Settings → Mature content.");
+  const move = kind === "heat"
+    ? `${STORY_MOVES.heat[level] ?? STORY_MOVES.heat.mature} Both characters are adults. It sets up the moment; ${names.user} stays free to respond however they choose.`
+    : STORY_MOVES[kind] ?? STORY_MOVES.plot;
   const system =
-    `You help steer a roleplay between ${names.user} and ${names.char}. ${STORY_MOVES[kind] ?? STORY_MOVES.plot} ` +
+    `You help steer a roleplay between ${names.user} and ${names.char}. ${move} ` +
     "It must fit the characters, the setting and the current scene, and leave room for both characters to react. " +
     `Do not decide what ${names.user} does, says or feels. Answer with one or two short sentences describing what happens, written as an instruction, ` +
     'for example "Time skips to the next morning, when the letter he has been avoiding arrives." No preamble.';

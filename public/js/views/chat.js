@@ -736,7 +736,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
     $("#direct-reroll", main).classList.add("is-loading");
     try {
       const text = await surpriseEvent({
-        bot, names: namesFor(), scene: chat.scene?.text ?? "", kind: storyKind, avoid: turnedDown,
+        bot, names: namesFor(), scene: chat.scene?.text ?? "", kind: storyKind, avoid: turnedDown, level: contentLevel(settings, bot),
         note: chat.authorNote ?? "", facts: memoryContext(chat).facts ?? "",
         lines: transcript(chat.messages.slice(-10), nameOf, namesFor()),
       });
@@ -2098,6 +2098,12 @@ export async function render(main, [botId, chatId, jumpTo]) {
     { label: "Move the plot", hint: "What happens next, from threads already in the story", onSelect: () => surprise("plot") },
     { label: "A lighter moment", hint: "Humour, warmth or comfort that still moves things on", onSelect: () => surprise("light") },
     { label: "Raise the tension", hint: "A confrontation, a hard choice, a lie close to coming out", onSelect: () => surprise("tension") },
+    // Only when this chat allows mature content; it follows the level (implied or explicit).
+    ...(contentLevel(settings, bot) !== "off" ? [{
+      label: "Turn up the heat",
+      hint: contentLevel(settings, bot) === "explicit" ? "18+: toward sexual tension and sex, from where the story is" : "18+: toward romance and intimacy, kept implied",
+      onSelect: () => surprise("heat"),
+    }] : []),
     { label: "Roll dice", hint: "A fair roll the reply has to respect · /roll d20", onSelect: openDice },
     { label: `Translate my message into ${chatLanguage()}`, hint: "Write in any language, check, then send · Alt+T", onSelect: translateOutgoing },
   ], { align: "end" }));
@@ -2703,6 +2709,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
       c("Move the plot", () => surprise("plot"), "surprise twist next event story forward"),
       c("A lighter moment", () => surprise("light"), "surprise funny warm comfort"),
       c("Raise the tension", () => surprise("tension"), "surprise drama conflict"),
+      ...(contentLevel(settings, bot) !== "off" ? [c("Turn up the heat", () => surprise("heat"), "18+ nsfw romance intimacy sex spicy")] : []),
       c("Roll dice", openDice, "d20 roll random"),
       c(`Translate my message into ${chatLanguage()}`, translateOutgoing, "language", "Alt+T"),
       c("See the prompt", previewPrompt, "debug context"),
