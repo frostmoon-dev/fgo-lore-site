@@ -9,6 +9,13 @@ export const APP_VERSION = "2026.09.25.1";
 // Newest first. Each item says what it is and where it lives.
 export const NEWS = [
   {
+    version: "2026.10.05.2",
+    items: [
+      ["Cheaper Kimi on OpenRouter", "Connection → Extra request fields sends provider options with every request. With OpenRouter and a Kimi model, one button keeps requests on Moonshot's own servers, where repeated prompt text is cached and costs a tenth."],
+      ["Catches swapped-word habits", "The repetition guard now also spots a sentence shape that keeps coming back with one word changed, like \"the flat patience of a man…\" and \"the flat disinterest of a man…\"."],
+    ],
+  },
+  {
     version: "2026.10.05.1",
     items: [
       ["Author's note", "A lasting instruction for one chat, like \"slow burn\" or \"keep it in past tense\", sent with every reply until you remove it. ⋯ → Author's note. A small pill above the message box shows it is on; tap it to edit."],

@@ -103,8 +103,8 @@ server-side storage of your key.
   pill above the message box shows it is on. Branches keep it. For one reply only, use the scene
   director (Alt+D).
 - **Repetition guard**: before each reply, `repetitionHints` (prompt.js) reads the speaker's last
-  five replies for habits (same opening words, four-word phrases in three or more replies, ending
-  on a question or the same words) and the request asks to vary them. Local, no extra request.
+  five replies for habits (same opening words, four-word phrases in three or more replies, a
+  six-word shape repeated with one word swapped, ending on a question or the same words) and the request asks to vary them. Local, no extra request.
   Replies it shaped show "kept fresh". Settings → Chat turns it off.
 - **Liked replies**: the heart under a reply saves it on the bot that wrote it. The bot's latest 3
   liked replies, from any chat, are sent as examples of the style, voice and length you want
@@ -169,7 +169,9 @@ server-side storage of your key.
   message, delete with undo, several chats per bot (named Chat 1, Chat 2, … until you rename them), export a chat as text, Markdown or
   JSON, and a per-message view of which lore was used and how many tokens were spent.
 - **Connection**: as many API profiles as you like, a model list fetched from the
-  provider, a test button, and custom headers for fussy proxies.
+  provider, a test button, custom headers for fussy proxies, and extra request fields (JSON
+  merged into every chat request, e.g. OpenRouter's `provider` routing). With OpenRouter and a
+  Kimi model, a button pins requests to Moonshot's own servers so prompt caching works.
 - Light and dark theme, keyboard shortcuts, and a full backup/restore of your data.
 
 ## Running it locally

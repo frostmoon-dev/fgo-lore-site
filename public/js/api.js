@@ -11,6 +11,17 @@ export function normalizeBaseUrl(url) {
     .replace(/\/+$/, "");
 }
 
+// Extra fields sent in every chat request body, as a JSON object: for
+// provider options like OpenRouter's {"provider": {...}}. The site's own
+// fields (model, messages, temperature…) always win over these.
+export function parseExtraBody(text) {
+  const src = String(text ?? "").trim();
+  if (!src) return {};
+  const v = JSON.parse(src);
+  if (!v || typeof v !== "object" || Array.isArray(v)) throw new Error("Use a JSON object, like {\"provider\": {\"order\": [\"moonshotai\"]}}.");
+  return v;
+}
+
 export function parseHeaders(text) {
   const out = {};
   const src = String(text ?? "").trim();
@@ -164,7 +175,9 @@ export async function chatCompletion(conn, body, { signal, onDelta = () => {}, o
 }
 
 async function completeOnce(conn, body, { signal, onDelta }) {
-  const payload = { ...body };
+  let extra = {};
+  try { extra = parseExtraBody(conn.extraBody); } catch { /* shown on the Connection page */ }
+  const payload = { ...extra, ...body };
   if (conn.model) payload.model ??= conn.model;
   if (!payload.model && conn.mode !== "server") throw new Error("No model chosen. Pick one on the Connection page.");
 
