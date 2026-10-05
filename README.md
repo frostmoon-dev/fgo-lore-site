@@ -115,7 +115,9 @@ server-side storage of your key.
   one stays a swipe back).
 - **Read mode**: the scroll button in a chat's top bar (or Alt+B) leaves only the story and the
   message box, for privacy: no site header, chat list, top bar, names, pictures, tools or tags, and
-  the tab shows only the chat's name. The same button inside the message box turns it off.
+  the tab shows only the chat's name. The same button inside the message box turns it off. The
+  message box keeps + (Direct the next reply, Surprise, Dice), Write my reply, and a Regenerate
+  button for the last reply (new version, nudges, previous and next version, Continue).
   Remembered on this device.
 - **Hide chats**: on a wide screen, the button left of the chat name folds the chat list away.
   Click it again to bring it back. The choice is remembered on this device.

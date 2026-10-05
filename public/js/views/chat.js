@@ -283,6 +283,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
               <button class="icon-btn composer-tool hide-narrow" type="button" id="suggest" aria-label="Ideas for what to say next" title="Ideas for what to say (Alt+S)">${icon("bulb")}</button>
               <button class="icon-btn composer-tool" type="button" id="impersonate"
                 aria-label="Write my reply. Uses what you typed as the idea." title="Write my reply (Alt+W)">${icon("quill")}</button>
+              <button class="icon-btn" type="button" id="read-regen" aria-label="Regenerate the last reply, or switch between its versions" aria-haspopup="menu" title="Regenerate">${icon("refresh")}</button>
               <button class="icon-btn" type="button" id="read-exit" aria-label="Leave read mode (Alt+B)" title="Leave read mode (Alt+B)">${icon("scroll")}</button>
               <button class="send-btn" type="submit" id="send" aria-label="Send message">${icon("send")}</button>
             </div>
@@ -1569,6 +1570,33 @@ export async function render(main, [botId, chatId, jumpTo]) {
     return true;
   }
 
+  // The Regenerate menu: another version, with or without the direction, or nudged.
+  // Read mode adds moving between versions, since the arrows under the reply are hidden there.
+  function regenItems(m, { versions = false } = {}) {
+    const count = m.swipes?.length ?? 1;
+    const at = (m.swipeIndex ?? 0) + 1;
+    const go = async (i) => { m.swipeIndex = i; await persist(); paintLog({ scroll: false }); };
+    return [
+      { label: "Regenerate", hint: directionOf(m.meta?.[m.swipeIndex ?? 0]) ? "Another version, with the same direction" : "Another version, same instructions", onSelect: () => generate("swipe") },
+      ...(directionOf(m.meta?.[m.swipeIndex ?? 0]) ? [{ label: "Regenerate without the direction", hint: "A plain new version", onSelect: () => generate("swipe", { keepDirection: false }) }] : []),
+      "-",
+      ...NUDGES.map((n) => ({ label: n.label, onSelect: () => generate("swipe", { note: n.note }) })),
+      ...(versions && count > 1 ? [
+        "-",
+        { label: "Previous version", hint: `${at} of ${count}`, disabled: at <= 1, onSelect: () => go(at - 2) },
+        { label: "Next version", hint: `${at} of ${count}`, disabled: at >= count, onSelect: () => go(at) },
+      ] : []),
+      ...(versions ? ["-", { label: "Continue this reply", hint: "Write more from where it ends", onSelect: () => generate("continue") }] : []),
+    ];
+  }
+  // Read mode's own Regenerate button, for the last reply.
+  $("#read-regen", main).addEventListener("click", (e) => {
+    const last = chat.messages.at(-1);
+    if (busy) return;
+    if (last?.role !== "assistant") { toast("There is no reply to regenerate yet. Send a message first."); return; }
+    openMenu(e.currentTarget, regenItems(last, { versions: true }), { align: "end" });
+  });
+
   // ---------- Liked replies ----------
   // Liking a reply saves a copy on the bot that wrote it. Its latest liked
   // replies, from any chat, go into the prompt as examples of the style you want.
@@ -2186,12 +2214,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
       } else generate("swipe");
     } else if (action === "regenerate") {
       if (busy) return;
-      openMenu(btn, [
-        { label: "Regenerate", hint: directionOf(m.meta?.[m.swipeIndex ?? 0]) ? "Another version, with the same direction" : "Another version, same instructions", onSelect: () => generate("swipe") },
-        ...(directionOf(m.meta?.[m.swipeIndex ?? 0]) ? [{ label: "Regenerate without the direction", hint: "A plain new version", onSelect: () => generate("swipe", { keepDirection: false }) }] : []),
-        "-",
-        ...NUDGES.map((n) => ({ label: n.label, onSelect: () => generate("swipe", { note: n.note }) })),
-      ], { align: "start" });
+      openMenu(btn, regenItems(m), { align: "start" });
     } else if (action === "msg-menu") {
       const isBot = m.role === "assistant";
       const hasTr = isBot ? m.meta?.[m.swipeIndex ?? 0]?.translation : m.translation;

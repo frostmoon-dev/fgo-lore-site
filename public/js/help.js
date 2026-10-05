@@ -12,6 +12,7 @@ export const NEWS = [
     version: "2026.10.05.1",
     items: [
       ["Author's note", "A lasting instruction for one chat, like \"slow burn\" or \"keep it in past tense\", sent with every reply until you remove it. ⋯ → Author's note. A small pill above the message box shows it is on; tap it to edit."],
+      ["More in Read mode", "Read mode's message box now keeps + (Direct the next reply, Surprise, Dice) and Write my reply, and gains a Regenerate button for the last reply: another version, the nudges, earlier and later versions, and Continue."],
       ["Replies that do not repeat", "Before each reply, MoonPaper looks at the bot's last few replies for habits: the same opening, phrases that keep coming back, always ending on a question. The next reply is asked to vary them, at no extra cost. Replies it helped show \"kept fresh\". Turn it off in Settings → Chat."],
       ["Liked replies", "Tap the heart under a reply that is written just right. A bot's latest liked replies, from any chat, are sent as examples of the style, voice and length you want. See or remove them from ⋯ → Liked replies."],
       ["Phrases to avoid", "Replies are told never to use the phrases models overuse, like \"shivers down\" or \"barely above a whisper\". Any that slip in are marked, and the \"overused phrases\" chip under the reply rewrites only those sentences as a new version. Edit the list in Settings → Phrases to avoid."],
