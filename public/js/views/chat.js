@@ -81,6 +81,14 @@ const NUDGES = [
   { label: "More dialogue", note: "Make this reply mostly spoken dialogue, with little narration." },
 ];
 
+// The scene direction a reply was written with. Older replies saved it only
+// inside note, together with any nudge; the nudge's own text is taken out.
+function directionOf(meta) {
+  if (!meta) return "";
+  if (typeof meta.direction === "string") return meta.direction;
+  return NUDGES.reduce((t, n) => t.replace(n.note, ""), meta.note ?? "").trim();
+}
+
 export async function render(main, [botId, chatId, jumpTo]) {
   const bot = await bots.get(botId);
   if (!bot) {
@@ -733,7 +741,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
   });
 
   // ---------- Generation ----------
-  async function generate(kind = "new", { note = "", speaker: chosen = null } = {}) {
+  async function generate(kind = "new", { note = "", speaker: chosen = null, keepDirection = true } = {}) {
     if (busy) return;
     const conn = await getActiveConnection();
     if (!conn) {
@@ -762,7 +770,10 @@ export async function render(main, [botId, chatId, jumpTo]) {
     const si = target.swipeIndex;
     const speaker = speakerOf(target);
     const withBond = bondOnFor(speaker);
-    const directed = direction();
+    // The bar is cleared once a directed reply arrives, so another version of
+    // that reply reuses the direction it was written with (unless asked not to).
+    const typed = direction();
+    const directed = typed || (kind === "swipe" && keepDirection ? directionOf(target.meta?.[prevIndex]) : "");
     // After the bond changes level, the next reply is asked to show it.
     const shift = withBond && milestonesFor(speaker) && kind === "new" ? chat.pendingMilestones[speaker.id] ?? null : null;
     const shiftNote = shift
@@ -844,6 +855,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
           ...(mood ? { mood } : {}),
           // Only the person's own direction or nudge earns the "directed" label.
           ...(directed || note ? { note: [directed, note].filter(Boolean).join(" ") } : {}),
+          ...(directed ? { direction: directed } : {}),
         };
       }
       if (!parsed.text.trim()) throw new Error("The model sent back an empty reply. Try again, or check the model name on the Connection page.");
@@ -863,7 +875,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
         chat.warnedTrim = true;
         toast(`The chat is longer than the context size, so the oldest ${prompt.dropped} messages were left out. Memory keeps a summary of them.`);
       }
-      if (directed) setDirecting(false);
+      if (typed) setDirecting(false);
       ok = true;
     } catch (err) {
       const aborted = err.name === "AbortError";
@@ -2026,7 +2038,8 @@ export async function render(main, [botId, chatId, jumpTo]) {
     } else if (action === "regenerate") {
       if (busy) return;
       openMenu(btn, [
-        { label: "Regenerate", hint: "Another version, same instructions", onSelect: () => generate("swipe") },
+        { label: "Regenerate", hint: directionOf(m.meta?.[m.swipeIndex ?? 0]) ? "Another version, with the same direction" : "Another version, same instructions", onSelect: () => generate("swipe") },
+        ...(directionOf(m.meta?.[m.swipeIndex ?? 0]) ? [{ label: "Regenerate without the direction", hint: "A plain new version", onSelect: () => generate("swipe", { keepDirection: false }) }] : []),
         "-",
         ...NUDGES.map((n) => ({ label: n.label, onSelect: () => generate("swipe", { note: n.note }) })),
       ], { align: "start" });
