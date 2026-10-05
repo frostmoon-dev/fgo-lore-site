@@ -12,6 +12,7 @@ export const NEWS = [
     version: "2026.10.05.2",
     items: [
       ["Cheaper Kimi on OpenRouter", "Connection → Extra request fields sends provider options with every request. With OpenRouter and a Kimi model, one button keeps requests on Moonshot's own servers, where repeated prompt text is cached and costs a tenth."],
+      ["Move the plot", "Surprise me is now Move the plot: it suggests what happens next from threads already in the story (a decision, a discovery, a plan, a shift between the characters) instead of random accidents. A lighter moment and Raise the tension sit beside it in the + menu. Re-roll never repeats an idea you just turned down."],
       ["Fewer empty replies", "An empty reply is asked for again once by itself. When a thinking model used the whole length limit on thinking, the second try gets more room, and if it still fails the message says to raise Max reply tokens."],
       ["Catches swapped-word habits", "The repetition guard now also spots a sentence shape that keeps coming back with one word changed, like \"the flat patience of a man…\" and \"the flat disinterest of a man…\"."],
     ],

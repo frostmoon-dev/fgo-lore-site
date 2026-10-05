@@ -939,7 +939,7 @@ body.in-chat .site-footer { display: none; }
    chat list, top bar, names, pictures, bubbles, tools or tags. The button in the
    box (or Alt+B) brings everything back. Notes that need you, like a missing
    connection or a reply cut off, still show. The message box keeps + (Direct
-   the next reply, Surprise, Dice), Write my reply, and a Regenerate button for
+   the next reply, Move the plot, Dice), Write my reply, and a Regenerate button for
    the last reply with its versions; Ideas stays out. */
 :root[data-chat-read="on"] body.in-chat .site-header,
 :root[data-chat-read="on"] .chat-sidebar,
