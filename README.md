@@ -104,7 +104,8 @@ server-side storage of your key.
   director (Alt+D).
 - **Repetition guard**: before each reply, `repetitionHints` (prompt.js) reads the speaker's last
   five replies for habits (same opening words, four-word phrases in three or more replies, a
-  six-word shape repeated with one word swapped, ending on a question or the same words) and the request asks to vary them. Local, no extra request.
+  six-word shape repeated with one word swapped, a descriptive word pair in four of the last six
+  replies that the person does not use, ending on a question or the same words) and the request asks to vary them. Local, no extra request.
   Replies it shaped show "kept fresh". Settings → Chat turns it off.
 - **Liked replies**: the heart under a reply saves it on the bot that wrote it. The bot's latest 3
   liked replies, from any chat, are sent as examples of the style, voice and length you want

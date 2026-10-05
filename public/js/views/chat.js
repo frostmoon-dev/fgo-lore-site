@@ -813,7 +813,8 @@ export async function render(main, [botId, chatId, jumpTo]) {
     // Habits in this character's last replies, to vary this time. Not for
     // "continue", which finishes the same reply.
     const varied = kind !== "continue" && freshSettings.repetition?.enabled !== false
-      ? repetitionHints(chat.messages.filter((x) => x !== target && spokeBy(x, speaker)).slice(-5).map((x) => currentText(x)))
+      ? repetitionHints(chat.messages.filter((x) => x !== target && spokeBy(x, speaker)).slice(-6).map((x) => currentText(x)),
+        { userTexts: chat.messages.filter((x) => x.role === "user").slice(-10).map((x) => currentText(x)) })
       : [];
     const beforeBond = bondFor(speaker);
     const hist = withSpeakers(chat.messages.slice(0, chat.messages.indexOf(target) + (kind === "continue" ? 1 : 0)));
@@ -2634,7 +2635,8 @@ export async function render(main, [botId, chatId, jumpTo]) {
       bond: bondOnFor(speaker) ? bondFor(speaker) : null,
       ...memoryArgs(hist), scene: chat.scene?.text ?? "", authorNote: chat.authorNote ?? "", note: direction(), cast: group() ? others(speaker) : [],
       liked: likedFor(speaker),
-      repetition: s.repetition?.enabled !== false ? repetitionHints(chat.messages.filter((x) => spokeBy(x, speaker)).slice(-5).map((x) => currentText(x))) : [],
+      repetition: s.repetition?.enabled !== false ? repetitionHints(chat.messages.filter((x) => spokeBy(x, speaker)).slice(-6).map((x) => currentText(x)),
+        { userTexts: chat.messages.filter((x) => x.role === "user").slice(-10).map((x) => currentText(x)) }) : [],
     });
     const params = generationParams(s, speaker);
     openDialog(`<div class="dialog-body">
