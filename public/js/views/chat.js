@@ -265,7 +265,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
               <label for="direction" class="direct-label" id="direct-label">Direction</label>
               <input type="text" id="direction" autocomplete="off"
                 placeholder="For the next reply only, e.g. time skip to nightfall" aria-describedby="direct-hint">
-              <button class="icon-btn" type="button" id="direct-reroll" aria-label="Another surprise" title="Another surprise" hidden>${icon("refresh")}</button>
+              <button class="icon-btn" type="button" id="direct-reroll" aria-label="Another idea" title="Another idea" hidden>${icon("refresh")}</button>
               <button class="icon-btn" type="button" id="direct-clear" aria-label="Remove direction" title="Remove">${icon("x")}</button>
               <span class="sr-only" id="direct-hint">Sent to the model with the next reply, then cleared. It does not appear in the chat.</span>
             </div>
@@ -711,29 +711,36 @@ export async function render(main, [botId, chatId, jumpTo]) {
   function setDirecting(open, { surprise = false } = {}) {
     directBar.hidden = !open;
     $("#composer-more", main).classList.toggle("has-dot", open);
-    $("#direct-label", main).textContent = surprise ? "Surprise" : "Direction";
+    $("#direct-label", main).textContent = surprise ? "Next" : "Direction";
     $("#direct-reroll", main).hidden = !surprise;
     input.placeholder = placeholderText();
     if (open) directInput.focus();
     else { directInput.value = ""; }
   }
 
-  // ---------- Surprise me ----------
-  // A random event that fits the scene, placed in the direction bar so it
-  // can be read, edited or re-rolled before it shapes the next reply.
-  async function surprise() {
+  // ---------- Move the story ----------
+  // An idea for what happens next, placed in the direction bar to check,
+  // edit or re-roll before it shapes the next reply. Re-rolls remember the
+  // ideas turned down, so the next one is different.
+  let storyKind = "plot";
+  let turnedDown = [];
+  async function surprise(kind) {
     if (busy) return;
+    const reroll = typeof kind !== "string";
+    if (!reroll) { storyKind = kind; turnedDown = []; }
+    else if (directInput.value.trim()) turnedDown = [...turnedDown, directInput.value.trim()].slice(-5);
     setDirecting(true, { surprise: true });
     directInput.value = "";
-    directInput.placeholder = "Thinking of something…";
-    setActivity("surprise", "Thinking of a surprise…");
+    directInput.placeholder = "Thinking of what happens next…";
+    setActivity("surprise", "Thinking of what happens next…");
     $("#direct-reroll", main).classList.add("is-loading");
     try {
       const text = await surpriseEvent({
-        bot, names: namesFor(), scene: chat.scene?.text ?? "",
-        lines: transcript(chat.messages.slice(-8), nameOf, namesFor()),
+        bot, names: namesFor(), scene: chat.scene?.text ?? "", kind: storyKind, avoid: turnedDown,
+        note: chat.authorNote ?? "", facts: memoryContext(chat).facts ?? "",
+        lines: transcript(chat.messages.slice(-10), nameOf, namesFor()),
       });
-      if (!text) throw new Error("No surprise came back. Try again.");
+      if (!text) throw new Error("No idea came back. Try again.");
       directInput.value = text;
       input.focus();
     } catch (err) {
@@ -745,7 +752,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
       $("#direct-reroll", main).classList.remove("is-loading");
     }
   }
-  $("#direct-reroll", main).addEventListener("click", surprise);
+  $("#direct-reroll", main).addEventListener("click", () => surprise());
   $("#direct-clear", main).addEventListener("click", () => { setDirecting(false); input.focus(); });
   directInput.addEventListener("keydown", (e) => {
     if (e.key === "Escape") { e.stopPropagation(); setDirecting(false); input.focus(); }
@@ -841,16 +848,32 @@ export async function render(main, [botId, chatId, jumpTo]) {
     let ok = false;
 
     try {
-      const res = await chatCompletion(conn, body, {
+      const ask = (b) => chatCompletion(conn, b, {
         signal: controller.signal,
         onRetry: ({ attempt, max }) => setActivity("reply", `The model is busy. Trying again (${attempt} of ${max})…`),
         onDelta: (r) => {
-          if (r.content && activity.get("reply")?.startsWith("The model is busy")) setActivity("reply", `${speaker.name} is writing…`);
+          if (r.content && /^The (model is busy|reply came back empty)/.test(activity.get("reply") ?? "")) setActivity("reply", `${speaker.name} is writing…`);
           target.swipes[si] = kind === "continue" ? join(r.content) : r.content;
           if (kind !== "continue") target.meta[si].reasoning = r.reasoning;
           frame ||= requestAnimationFrame(paintStream);
         },
       });
+      let res = await ask(body);
+      // An empty reply is asked for once more. Thinking models can spend the
+      // whole length limit thinking (finish "length", no text): that retry
+      // gets more room. Otherwise it is usually a one-off from the host.
+      let roomy = false;
+      if (!stripBond(res.content).trim() && !controller.signal.aborted) {
+        roomy = res.finishReason === "length";
+        const more = roomy ? { max_tokens: Math.min(8000, Math.ceil((Number(body.max_tokens) || 600) * 2.5)) } : {};
+        setActivity("reply", roomy ? `The reply ran out of room while thinking. Asking again with more…` : "The reply came back empty. Asking again…");
+        res = await ask({ ...body, ...more });
+      }
+      if (!stripBond(res.content).trim()) {
+        throw new Error(res.finishReason === "length"
+          ? `The model used its whole reply length thinking and wrote nothing${roomy ? ", even with more room" : ""}. Raise Max reply tokens on the Prompt page (thinking models need 1500 or more), then try again.`
+          : "The model sent back an empty reply twice. Try again in a moment, or pick another model or provider on the Connection page.");
+      }
       const mood = readMood(res.content, moodsOf(speaker)) ?? guessMood(res.content, moodsOf(speaker));
       const parsed = withBond ? readBond(res.content) : { text: stripBond(res.content), delta: 0 };
       // In a group scene models sometimes label their own line.
@@ -2072,7 +2095,9 @@ export async function render(main, [botId, chatId, jumpTo]) {
     // On a phone the Ideas button lives here, to leave room for typing.
     ...(narrow.matches ? [{ label: "Ideas for what to say", hint: "Three options for your next move · Alt+S", onSelect: showIdeas }] : []),
     { label: directBar.hidden ? "Direct the next reply" : "Remove the direction", hint: "A hidden note for the next reply only · Alt+D", onSelect: () => setDirecting(directBar.hidden) },
-    { label: "Surprise me", hint: "A random twist; check it, then send to see the bot react", onSelect: surprise },
+    { label: "Move the plot", hint: "What happens next, from threads already in the story", onSelect: () => surprise("plot") },
+    { label: "A lighter moment", hint: "Humour, warmth or comfort that still moves things on", onSelect: () => surprise("light") },
+    { label: "Raise the tension", hint: "A confrontation, a hard choice, a lie close to coming out", onSelect: () => surprise("tension") },
     { label: "Roll dice", hint: "A fair roll the reply has to respect · /roll d20", onSelect: openDice },
     { label: `Translate my message into ${chatLanguage()}`, hint: "Write in any language, check, then send · Alt+T", onSelect: translateOutgoing },
   ], { align: "end" }));
@@ -2675,7 +2700,9 @@ export async function render(main, [botId, chatId, jumpTo]) {
       c("Ideas for what to say", showIdeas, "suggest replies", "Alt+S"),
       c("Write my reply", () => impersonate(), "impersonate draft", "Alt+W"),
       c("Direct the next reply", () => setDirecting(true), "note instruction", "Alt+D"),
-      c("Surprise me", surprise, "twist random event"),
+      c("Move the plot", () => surprise("plot"), "surprise twist next event story forward"),
+      c("A lighter moment", () => surprise("light"), "surprise funny warm comfort"),
+      c("Raise the tension", () => surprise("tension"), "surprise drama conflict"),
       c("Roll dice", openDice, "d20 roll random"),
       c(`Translate my message into ${chatLanguage()}`, translateOutgoing, "language", "Alt+T"),
       c("See the prompt", previewPrompt, "debug context"),

@@ -101,6 +101,25 @@ export function repetitionHints(replies) {
   }
   if (phrases.length) hints.push(`These phrases keep coming back; do not use them this time: ${phrases.map((p) => `"${p}"`).join(", ")}.`);
 
+  // The same frame with one word swapped: "the flat patience of a man",
+  // "the flat disinterest of a man". Six words, the third one changing.
+  const frames = new Map();
+  recent.forEach((r, i) => {
+    const w = wordsOf(r);
+    for (let j = 0; j + 6 <= w.length; j++) {
+      const fixed = [w[j], w[j + 1], w[j + 3], w[j + 4], w[j + 5]];
+      if (fixed.filter((x) => !FILLER.has(x)).length < 2) continue;
+      const key = `${w[j]} ${w[j + 1]} … ${w[j + 3]} ${w[j + 4]} ${w[j + 5]}`;
+      const f = frames.get(key) ?? { replies: new Set(), fillers: new Set() };
+      f.replies.add(i);
+      f.fillers.add(w[j + 2]);
+      frames.set(key, f);
+    }
+  });
+  const shapes = [...frames].filter(([, f]) => f.replies.size >= 3 && f.fillers.size >= 2).map(([k]) => k)
+    .filter((k) => !phrases.some((p) => k.replace(" … ", " ").includes(p))).slice(0, 3);
+  if (shapes.length) hints.push(`This sentence shape keeps coming back with one word swapped; avoid it entirely: ${shapes.map((s) => `"${s}"`).join(", ")}.`);
+
   const ends = recent.slice(-4).map(lastSentence);
   if (ends.filter((e) => /\?["”’')\]]*$/.test(e)).length >= 3) hints.push("Recent replies all ended on a question. End this one another way.");
   const endWords = recent.slice(-4).map((r) => wordsOf(lastSentence(r)).slice(-3).join(" ")).filter((e) => e.split(" ").length === 3);

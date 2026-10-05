@@ -1,5 +1,5 @@
 import { getConnections, saveConnections, getSettings, saveSettings, newConnection, PROVIDERS } from "../store.js";
-import { listModels, chatCompletion, serverConfig, normalizeBaseUrl, parseHeaders } from "../api.js";
+import { listModels, chatCompletion, serverConfig, normalizeBaseUrl, parseHeaders, parseExtraBody } from "../api.js";
 import { $, esc, icon, confirmDialog, debounce } from "../ui.js";
 
 export async function render(main) {
@@ -117,6 +117,19 @@ export async function render(main) {
           </div>
         </details>
 
+        <details class="more" ${conn.extraBody?.trim() ? "open" : ""}>
+          <summary>Extra request fields</summary>
+          <div class="form-grid">
+            <div class="field">
+              <label for="c-extra">Added to every request (JSON)</label>
+              <textarea id="c-extra" class="mono" placeholder='{"provider": {"order": ["moonshotai"], "allow_fallbacks": true}}' spellcheck="false">${esc(conn.extraBody ?? "")}</textarea>
+              <p class="hint">For options your provider documents, like OpenRouter's provider routing. MoonPaper's own settings (model, temperature, length) always win.</p>
+              <p class="error-text" id="c-extra-err" hidden></p>
+              <div class="actions" id="c-presets"></div>
+            </div>
+          </div>
+        </details>
+
         <div class="save-bar">
           <span class="save-state" id="c-state" aria-live="polite"></span>
           <div class="actions">
@@ -128,8 +141,28 @@ export async function render(main) {
     wire();
   }
 
+  // One-click fields for OpenRouter. Kimi models are cached on Moonshot's own
+  // servers; pinning them there (with fallbacks) keeps the cache warm.
+  function paintPresets() {
+    const box = $("#c-presets", root);
+    if (!box) return;
+    const openrouter = /openrouter\.ai/i.test(conn.baseUrl ?? "");
+    const kimi = /^moonshotai\//i.test(conn.model ?? "");
+    box.innerHTML = openrouter && kimi
+      ? `<button class="btn btn-sm" type="button" data-preset="moonshot">Keep Kimi on Moonshot's servers (cheaper with caching)</button>`
+      : "";
+  }
   function wire() {
     const form = $("#c-form", root);
+    paintPresets();
+    $("#c-presets", root).addEventListener("click", (e) => {
+      if (!e.target.closest('[data-preset="moonshot"]')) return;
+      let cur = {};
+      try { cur = parseExtraBody($("#c-extra", root).value); } catch { /* replace invalid text */ }
+      cur.provider = { ...(cur.provider ?? {}), order: ["moonshotai"], allow_fallbacks: true };
+      $("#c-extra", root).value = JSON.stringify(cur, null, 2);
+      $("#c-extra", root).dispatchEvent(new Event("input", { bubbles: true }));
+    });
     const read = () => {
       conn.name = $("#c-name", root).value.trim() || "Untitled";
       conn.mode = $('input[name="mode"]:checked', root)?.value ?? "relay";
@@ -138,6 +171,11 @@ export async function render(main) {
       conn.model = $("#c-model", root).value.trim();
       conn.headers = $("#c-headers", root).value;
       conn.accessCode = $("#c-code", root).value;
+      conn.extraBody = $("#c-extra", root).value;
+      const xerr = $("#c-extra-err", root);
+      try { parseExtraBody(conn.extraBody); xerr.hidden = true; }
+      catch (ex) { xerr.hidden = false; xerr.textContent = ex instanceof SyntaxError ? "That JSON is not valid." : ex.message; }
+      paintPresets();
       const err = $("#c-headers-err", root);
       try { parseHeaders(conn.headers); err.hidden = true; }
       catch { err.hidden = false; err.textContent = "That JSON is not valid."; }

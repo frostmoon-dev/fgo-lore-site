@@ -103,8 +103,8 @@ server-side storage of your key.
   pill above the message box shows it is on. Branches keep it. For one reply only, use the scene
   director (Alt+D).
 - **Repetition guard**: before each reply, `repetitionHints` (prompt.js) reads the speaker's last
-  five replies for habits (same opening words, four-word phrases in three or more replies, ending
-  on a question or the same words) and the request asks to vary them. Local, no extra request.
+  five replies for habits (same opening words, four-word phrases in three or more replies, a
+  six-word shape repeated with one word swapped, ending on a question or the same words) and the request asks to vary them. Local, no extra request.
   Replies it shaped show "kept fresh". Settings → Chat turns it off.
 - **Liked replies**: the heart under a reply saves it on the bot that wrote it. The bot's latest 3
   liked replies, from any chat, are sent as examples of the style, voice and length you want
@@ -116,7 +116,7 @@ server-side storage of your key.
 - **Read mode**: the scroll button in a chat's top bar (or Alt+B) leaves only the story and the
   message box, for privacy: no site header, chat list, top bar, names, pictures, tools or tags, and
   the tab shows only the chat's name. The same button inside the message box turns it off. The
-  message box keeps + (Direct the next reply, Surprise, Dice), Write my reply, and a Regenerate
+  message box keeps + (Direct the next reply, Move the plot, Dice), Write my reply, and a Regenerate
   button for the last reply (new version, nudges, previous and next version, Continue).
   Remembered on this device.
 - **Hide chats**: on a wide screen, the button left of the chat name folds the chat list away.
@@ -144,8 +144,11 @@ server-side storage of your key.
   Kept in backups; not included in exported character cards.
 - **Journal**: bots write a short private diary entry about the chat when you leave after
   12 or more new messages, or on demand. Read them from the chat's ⋯ menu.
-- **Surprise me**: in the message box's + menu, a random event that fits the scene,
-  placed in the direction bar to check, edit or re-roll before it shapes the next reply.
+- **Move the plot**: in the message box's + menu, an idea for what happens next, grown from
+  threads already in the story (a forced decision, a discovery, a plan set in motion, a shift
+  between the characters, a time skip), not random accidents. *A lighter moment* and *Raise the
+  tension* ask for those moods on purpose. It reads the author's note and key facts, lands in the
+  direction bar to edit or re-roll, and a re-roll avoids the ideas just turned down.
 - **Usage**: Settings → Usage shows tokens for today, 7 and 30 days, a 14-day chart and
   a table by model, with a cost estimate if you enter prices. Counts the provider does
   not report are estimated and labelled as such. Each chat's ⋯ menu shows its own total.
@@ -169,7 +172,9 @@ server-side storage of your key.
   message, delete with undo, several chats per bot (named Chat 1, Chat 2, … until you rename them), export a chat as text, Markdown or
   JSON, and a per-message view of which lore was used and how many tokens were spent.
 - **Connection**: as many API profiles as you like, a model list fetched from the
-  provider, a test button, and custom headers for fussy proxies.
+  provider, a test button, custom headers for fussy proxies, and extra request fields (JSON
+  merged into every chat request, e.g. OpenRouter's `provider` routing). With OpenRouter and a
+  Kimi model, a button pins requests to Moonshot's own servers so prompt caching works.
 - Light and dark theme, keyboard shortcuts, and a full backup/restore of your data.
 
 ## Running it locally

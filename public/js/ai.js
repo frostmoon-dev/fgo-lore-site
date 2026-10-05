@@ -346,14 +346,37 @@ export async function journalEntry({ bot, names, previous, lines, signal }) {
 
 // ---------- Surprise ----------
 
-export async function surpriseEvent({ bot, names, lines, scene, signal }) {
+// Ideas for where the story goes next. "plot" grows the next step out of
+// what is already in the story; "light" and "tension" are moods asked for
+// on purpose. avoid lists ideas just turned down, so a re-roll is different.
+const STORY_MOVES = {
+  plot:
+    "Suggest the next development that moves the story forward. Grow it from what is already there: an unresolved thread, " +
+    "something a character wants or is hiding, a promise, a plan, a place they could go, someone who could show up for a reason. " +
+    "Good moves: a decision is forced, an opportunity opens, a secret or truth comes out, a plan is set in motion, plans change, " +
+    "the relationship shifts a step, a quiet consequence of something earlier arrives, time skips to the next meaningful moment. " +
+    "Do not reach for accidents, injuries, deaths, disasters, attacks or bad news by default; use danger or misfortune only when the story is already heading there.",
+  light:
+    "Suggest a lighter moment that still moves the story: humour, warmth, an unexpected kindness, a small shared joy, " +
+    "a playful complication or a moment of comfort that changes how the characters see each other. Nothing tragic or dangerous.",
+  tension:
+    "Suggest a development that raises the tension: a confrontation, a hard choice, a deadline, a rival, a lie close to coming out, " +
+    "or a cost to something earlier. Keep it grounded in what is already in the story; no random disasters.",
+};
+
+export async function surpriseEvent({ bot, names, lines, scene, facts = "", note = "", avoid = [], kind = "plot", signal }) {
   const system =
-    `Invent one surprising event for the next moment of a roleplay between ${names.user} and ${names.char}: ` +
-    "an arrival, an interruption, a discovery, a change in weather, a secret slipping out, an accident. " +
-    "It must fit the setting and the current scene, raise the stakes or add interest, and leave room for both characters to react. " +
-    `Do not decide what ${names.user} does. Answer with one or two short sentences describing the event only, written as an instruction, ` +
-    'for example "A messenger bursts in with news of a fire in the east wing."';
-  const user = `${scene?.trim() ? `The scene right now:\n${scene.trim()}\n\n` : ""}Recent chat:\n\n${lines}`;
-  const out = await ask([{ role: "system", content: system }, { role: "user", content: user }], { bot, maxTokens: 120, temperature: 1, signal });
+    `You help steer a roleplay between ${names.user} and ${names.char}. ${STORY_MOVES[kind] ?? STORY_MOVES.plot} ` +
+    "It must fit the characters, the setting and the current scene, and leave room for both characters to react. " +
+    `Do not decide what ${names.user} does, says or feels. Answer with one or two short sentences describing what happens, written as an instruction, ` +
+    'for example "Time skips to the next morning, when the letter he has been avoiding arrives." No preamble.';
+  const user = [
+    note.trim() && `The author's note for this story (respect it, especially its pacing):\n${note.trim()}`,
+    facts.trim() && `Key facts so far:\n${facts.trim()}`,
+    scene?.trim() && `The scene right now:\n${scene.trim()}`,
+    avoid.length && `Already suggested and turned down; suggest something clearly different:\n${avoid.map((a) => `- ${a}`).join("\n")}`,
+    `Recent chat:\n\n${lines}`,
+  ].filter(Boolean).join("\n\n");
+  const out = await ask([{ role: "system", content: system }, { role: "user", content: user }], { bot, maxTokens: 160, temperature: 0.95, signal });
   return out.replace(/^["“]|["”]$/g, "").trim();
 }
