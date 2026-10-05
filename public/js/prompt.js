@@ -23,6 +23,91 @@ const CONTENT_RULES = {
 
 export const contentRule = (level) => (CONTENT_RULES[level] ? `## Content\n${CONTENT_RULES[level]}` : "");
 
+// ---------- Phrases to avoid ----------
+const avoidList = (settings) => (settings?.avoid?.enabled === false ? [] : (settings?.avoid?.phrases ?? []).map((p) => String(p).trim()).filter(Boolean));
+
+// Matches a phrase however the reply spells its spaces, apostrophes and
+// quotes, including as they appear in escaped HTML. Whole words at the edges.
+function avoidSource(phrase) {
+  const body = phrase.toLowerCase().split("").map((ch) => {
+    if (/\s/.test(ch)) return "\\s+";
+    if (ch === "'" || ch === "’") return "(?:'|’|&#39;)";
+    if (ch === '"' || ch === "“" || ch === "”") return '(?:"|“|”|&quot;)';
+    return ch.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }).join("");
+  return `${/^\w/.test(phrase) ? "\\b" : ""}${body}${/\w$/.test(phrase) ? "\\b" : ""}`;
+}
+
+export function avoidedIn(text, settings) {
+  const src = String(text ?? "");
+  return avoidList(settings).filter((p) => new RegExp(avoidSource(p), "i").test(src));
+}
+
+// Wraps each match in <mark>, in text only, never inside a tag.
+export function markAvoided(htmlText, settings) {
+  const list = avoidList(settings);
+  if (!list.length) return htmlText;
+  const re = new RegExp(list.map(avoidSource).join("|"), "gi");
+  return htmlText.split(/(<[^>]+>)/).map((part) => (part.startsWith("<") ? part
+    : part.replace(re, (m) => `<mark class="avoided" title="On your list of phrases to avoid">${m}</mark>`))).join("");
+}
+
+function avoidRule(settings) {
+  const list = avoidList(settings);
+  return list.length ? `Never use these overused phrases, or close variants of them: ${list.map((p) => `"${p}"`).join(", ")}. Write something fresher instead.` : "";
+}
+
+// ---------- Repetition ----------
+// Finds habits in a character's recent replies: the same opening, the same
+// phrases again and again, always ending on a question or the same words.
+// Runs here, costs nothing; the next reply is told to vary them.
+const FILLER = new Set(("a an the and or but of to in on at for with by from as is was are were be been it its it's he she they his her hers " +
+  "their him them i you we me my your our this that these those not no so then than just into onto up down out over").split(" "));
+const wordsOf = (t) => (stripBond(t).replace(/[*_]/g, " ").toLowerCase().replace(/’/g, "'").match(/[a-z']+/g) ?? []);
+const lastSentence = (t) => (stripBond(t).replace(/[*_]/g, "").trim().match(/[^.!?…]*[.!?…]+["”’')\]]*\s*$/) ?? [""])[0].trim();
+
+export function repetitionHints(replies) {
+  const recent = replies.map((r) => String(r ?? "")).filter((r) => r.trim()).slice(-5);
+  if (recent.length < 3) return [];
+  const hints = [];
+
+  // Two words ("he smirks"), or three when both are filler ("it was quiet").
+  const openings = recent.map((r) => {
+    const w = wordsOf(r);
+    return w.slice(0, w.slice(0, 2).every((x) => FILLER.has(x)) ? 3 : 2).join(" ");
+  }).filter((o) => o.includes(" "));
+  const openCount = openings.reduce((c, o) => c.set(o, (c.get(o) ?? 0) + 1), new Map());
+  const [topOpen, openN] = [...openCount].sort((a, b) => b[1] - a[1])[0] ?? [];
+  if (openN >= 3 || (openings.length >= 2 && openings.at(-1) === openings.at(-2))) hints.push(`Do not open the reply with "${topOpen}…" again; start differently.`);
+
+  // Four-word phrases found in at least three different replies, longest-spread first.
+  const seen = new Map();
+  recent.forEach((r, i) => {
+    const w = wordsOf(r);
+    const mine = new Set();
+    for (let j = 0; j + 4 <= w.length; j++) {
+      const gram = w.slice(j, j + 4);
+      if (gram.filter((x) => !FILLER.has(x)).length < 2) continue;
+      mine.add(gram.join(" "));
+    }
+    mine.forEach((g) => seen.set(g, (seen.get(g) ?? new Set()).add(i)));
+  });
+  const phrases = [];
+  for (const [g] of [...seen].filter(([, s]) => s.size >= 3).sort((a, b) => b[1].size - a[1].size)) {
+    const gw = g.split(" ");
+    if (phrases.some((p) => p.split(" ").filter((x) => gw.includes(x)).length >= 3)) continue; // overlaps one already chosen
+    phrases.push(g);
+    if (phrases.length >= 5) break;
+  }
+  if (phrases.length) hints.push(`These phrases keep coming back; do not use them this time: ${phrases.map((p) => `"${p}"`).join(", ")}.`);
+
+  const ends = recent.slice(-4).map(lastSentence);
+  if (ends.filter((e) => /\?["”’')\]]*$/.test(e)).length >= 3) hints.push("Recent replies all ended on a question. End this one another way.");
+  const endWords = recent.slice(-4).map((r) => wordsOf(lastSentence(r)).slice(-3).join(" ")).filter((e) => e.split(" ").length === 3);
+  if (endWords.length >= 2 && endWords.at(-1) === endWords.at(-2)) hints.push(`Do not end with "…${endWords.at(-1)}" again.`);
+  return hints;
+}
+
 export const estimateTokens = (text) => Math.ceil((text?.length ?? 0) / 4);
 
 export function applyMacros(text, { char = "Character", user = "User" } = {}) {
@@ -123,12 +208,13 @@ export function cleanImpersonation(text, userName) {
 // part of history begins. note is a one-reply instruction
 // (a scene direction or a nudge like "shorter"). cast is the other bots in
 // a group scene; history messages then carry the botId of who spoke.
-// scene is the tracked state of the scene right now. Pinned messages in
+// scene is the tracked state of the scene right now. authorNote is a lasting
+// instruction for this chat. liked holds replies the person liked, as style examples. Pinned messages in
 // history are always included, even after they fall out of the context.
 export function buildPrompt({
   bot, persona, preset, settings, history, loreEntries = [], bond = null,
   mode = "reply", hint = "", memory = "", note = "", cast = [], scene = "",
-  facts = "", chapters = [], recalled = [], windowStart = 0,
+  facts = "", chapters = [], recalled = [], windowStart = 0, authorNote = "", liked = [], repetition = [],
 }) {
   const asUser = mode === "impersonate";
   if (asUser) bond = null;
@@ -192,6 +278,11 @@ export function buildPrompt({
   if (preset.includeExamples !== false && bot.examples?.trim()) {
     parts.push(`## Example dialogue (style reference only)\n${m(bot.examples.replace(/<START>\s*/gi, "---\n"))}`);
   }
+  // Replies the person liked: the voice and quality to aim for, never content to reuse.
+  if (!asUser && liked.length) {
+    parts.push(`## Replies ${names.user} liked (match their style, voice, length and quality; never reuse their events, wording or content)\n` +
+      liked.map((t) => `---\n${m(clip(stripBond(t), 1200))}`).join("\n"));
+  }
   parts.push(contentRule(contentLevel(settings, bot)));
   if (memory?.trim()) parts.push(`## Story so far (memory of earlier events)\n${m(memory)}`);
   if (facts?.trim()) parts.push(`## Key facts (always true unless the story changes them)\n${m(facts)}`);
@@ -228,11 +319,15 @@ export function buildPrompt({
     post = [post, `This is a group scene. Write only ${names.char}'s next reply. Do not write lines or actions for ${names.user} ` +
       `or for ${cast.map((c) => c.name).join(", ")}. Do not start with a name label.`].filter(Boolean).join("\n\n");
   }
+  // A lasting instruction for this chat (the author's note), sent with every request.
+  if (authorNote?.trim()) post = [post, `Author's note for this story (keep following it): ${m(authorNote)}`].filter(Boolean).join("\n\n");
   const moods = asUser ? [] : moodsOf(bot);
   if (moods.length) {
     post = [post, `At the very end of your reply, on its own line, add a tag like <mood:${moods[0]}> naming ${names.char}'s expression ` +
       `as the reply ends, one of: ${moods.join(", ")}. Never mention the tag in the story.`].filter(Boolean).join("\n\n");
   }
+  post = [post, avoidRule(settings)].filter(Boolean).join("\n\n");
+  if (!asUser && repetition.length) post = [post, `Vary your writing. In ${names.char}'s recent replies:\n${repetition.map((h) => `- ${h}`).join("\n")}`].join("\n\n");
   if (note?.trim()) post = [post, `For this reply only: ${m(note)}`].filter(Boolean).join("\n\n");
   if (bond) {
     post = [post, "After your reply, on its own last line, rate how this exchange went for the bond " +

@@ -188,6 +188,8 @@ export async function render(main) {
           <span>Recap when I come back to a chat<small>After a break of 12 hours or more, a few lines on where the story stands. One request each time.</small></span></label>
         <label class="check"><input type="checkbox" id="retry-on" ${settings.retry.tries > 0 ? "checked" : ""}>
           <span>Try again when the model is busy<small>Free and shared models often answer "overloaded" or "try again". The reply is asked for up to 3 more times, waiting a little longer each time. Stop cancels it.</small></span></label>
+        <label class="check"><input type="checkbox" id="repetition-on" ${settings.repetition.enabled !== false ? "checked" : ""}>
+          <span>Keep replies from repeating themselves<small>Before each reply, the site looks for habits in the bot's last few replies (the same opening, the same phrases, always ending on a question) and asks it to vary them. Free: no extra request. Replies it helped show "kept fresh".</small></span></label>
         <label class="check"><input type="checkbox" id="check-auto" ${settings.check.auto ? "checked" : ""}>
           <span>Check every reply for staying in character<small>Flags replies that break the bot's definition. Each check is a second request to your API, so it costs more.</small></span></label>
         <details class="more">
@@ -201,6 +203,19 @@ export async function render(main) {
             <li><code>Ctrl+S</code> save in the bot editor</li>
           </ul>
         </details>
+      </div>
+
+      <div class="card" id="set-avoid">
+        <h2 class="card-title">Phrases to avoid</h2>
+        <p class="lead">Words and phrases models overuse. Every reply is told never to use them; any that still slip in are marked,
+          and the "overused phrases" chip under the reply rewrites just those sentences.</p>
+        <div class="form-grid">
+          <label class="check"><input type="checkbox" id="avoid-on" ${settings.avoid.enabled ? "checked" : ""}>
+            <span>Avoid these phrases<small>Adds one line to every request.</small></span></label>
+          <div class="field"><label for="avoid-list">One per line</label>
+            <textarea id="avoid-list" class="tall" spellcheck="false">${esc(settings.avoid.phrases.join("\n"))}</textarea>
+            <p class="hint">Not case-sensitive. Short, distinctive phrases work best; a common word like "smile" would be marked everywhere.</p></div>
+        </div>
       </div>
 
       <h2 class="sub" id="usage-title">Usage</h2>
@@ -252,6 +267,14 @@ export async function render(main) {
         <button class="btn btn-danger" type="button" id="wipe">Delete all data</button>
       </div>
     </div>`;
+
+  // ---------- Phrases to avoid ----------
+  $("#avoid-on", main).addEventListener("change", (e) => saveSettings({ avoid: { enabled: e.target.checked } }));
+  const saveAvoid = debounce(() => {
+    const phrases = [...new Set($("#avoid-list", main).value.split("\n").map((x) => x.trim()).filter(Boolean))];
+    saveSettings({ avoid: { phrases } });
+  }, 500);
+  $("#avoid-list", main).addEventListener("input", saveAvoid);
 
   async function paintUsage() {
     if (!navigator.storage?.estimate) return;
@@ -454,6 +477,7 @@ export async function render(main) {
   $("#confirm-on", main).addEventListener("change", (e) => saveSettings({ confirm: { enabled: e.target.checked } }).then(() => toast("Saved.", "ok")));
   $("#recap-auto", main).addEventListener("change", (e) => saveSettings({ recap: { auto: e.target.checked } }).then(() => toast("Saved.", "ok")));
   $("#retry-on", main).addEventListener("change", (e) => saveSettings({ retry: { tries: e.target.checked ? 3 : 0 } }).then(() => toast("Saved.", "ok")));
+  $("#repetition-on", main).addEventListener("change", (e) => saveSettings({ repetition: { enabled: e.target.checked } }).then(() => toast("Saved.", "ok")));
   $("#check-auto", main).addEventListener("change", (e) => saveSettings({ check: { auto: e.target.checked } }).then(() => toast("Saved.", "ok")));
   $("#bond-enabled", main).addEventListener("change", (e) => saveSettings({ bond: { ...settings.bond, enabled: e.target.checked } }).then(() => toast("Saved.", "ok")));
   const saveStart = debounce(() => saveSettings({ bond: { ...settings.bond, start: Number($("#bond-start", main).value) } }), 300);

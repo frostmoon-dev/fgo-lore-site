@@ -7,10 +7,11 @@ import { registerCommands } from "../palette.js";
 import { chatCompletion, listModels } from "../api.js";
 import {
   buildPrompt, generationParams, currentText, applyMacros, readBond, readMood, guessMood, stripBond, cleanImpersonation, contentLevel,
+  avoidedIn, markAvoided, repetitionHints,
 } from "../prompt.js";
 import {
   summarize, suggestLore, checkCharacter, transcript, suggestReplies, translate, updateScene, recap, storyFrom, nameChat,
-  journalEntry, surpriseEvent, writeChapter,
+  journalEntry, surpriseEvent, writeChapter, rewriteAvoiding,
 } from "../ai.js";
 import {
   memoryContext, liveChapters, windowStart as memoryWindowStart, autoChapters, pendingChapters,
@@ -128,6 +129,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
 
   // ---------- Who is in the scene ----------
   const botById = new Map(allBots.map((b) => [b.id, b]));
+  botById.set(bot.id, bot); // one object for this chat's bot, so a change through either is never lost
   const cast = () => chat.castIds.map((id) => botById.get(id)).filter(Boolean);
   const group = () => cast().length > 0;
   const everyone = () => [bot, ...cast()];
@@ -273,6 +275,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
               <button class="icon-btn" type="button" id="suggest-more" aria-label="Other ideas" title="Other ideas">${icon("refresh")}</button>
               <button class="icon-btn" type="button" id="suggest-close" aria-label="Close ideas" title="Close">${icon("x")}</button>
             </div>
+            <button class="note-pill" type="button" id="note-pill" hidden></button>
             <div class="composer-box">
               <label for="input" class="sr-only">Message</label>
               <textarea id="input" rows="1" placeholder="Message ${esc(bot.name)}…" enterkeyhint="send"></textarea>
@@ -280,6 +283,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
               <button class="icon-btn composer-tool hide-narrow" type="button" id="suggest" aria-label="Ideas for what to say next" title="Ideas for what to say (Alt+S)">${icon("bulb")}</button>
               <button class="icon-btn composer-tool" type="button" id="impersonate"
                 aria-label="Write my reply. Uses what you typed as the idea." title="Write my reply (Alt+W)">${icon("quill")}</button>
+              <button class="icon-btn" type="button" id="read-regen" aria-label="Regenerate the last reply, or switch between its versions" aria-haspopup="menu" title="Regenerate">${icon("refresh")}</button>
               <button class="icon-btn" type="button" id="read-exit" aria-label="Leave read mode (Alt+B)" title="Leave read mode (Alt+B)">${icon("scroll")}</button>
               <button class="send-btn" type="submit" id="send" aria-label="Send message">${icon("send")}</button>
             </div>
@@ -524,9 +528,10 @@ export async function render(main, [botId, chatId, jumpTo]) {
     const think = meta.reasoning
       ? `<details class="thinking"><summary>Model's reasoning</summary><div>${esc(meta.reasoning)}</div></details>` : "";
     const clean = stripBond(text);
-    const content = clean.trim()
+    let content = clean.trim()
       ? renderMarkdown(applyMacros(clean, namesFor(speakerOf(m) ?? bot)))
       : (streaming ? "" : "<p><em>(empty)</em></p>");
+    if (m.role === "assistant" && !streaming) content = markAvoided(content, settings);
     return think + content + (streaming ? '<span class="caret" aria-hidden="true"></span>' : "");
   }
 
@@ -575,6 +580,11 @@ export async function render(main, [botId, chatId, jumpTo]) {
         : `<button type="button" class="check-chip bad" data-action="show-check">Out of character?</button>`);
     }
     if (meta.note) info.push(`<span class="chip" title="${esc(meta.note)}">directed</span>`);
+    if (meta.varied?.length) info.push(`<span class="chip" title="Asked to vary: ${esc(meta.varied.join(" "))}">kept fresh</span>`);
+    const avoided = isBot && !streaming ? avoidedIn(stripBond(text), settings) : [];
+    if (avoided.length) {
+      info.push(`<button type="button" class="chip avoid-chip" data-action="fix-avoided" title="${esc(avoided.join(", "))}">${avoided.length} overused phrase${avoided.length === 1 ? "" : "s"}</button>`);
+    }
     if (meta.lore?.length) info.push(meta.lore.map((t) => `<span class="chip" title="Lore used">${esc(t)}</span>`).join(""));
     if (meta.usage) {
       const cached = cachedTokens(meta.usage);
@@ -615,6 +625,8 @@ export async function render(main, [botId, chatId, jumpTo]) {
           <span class="msg-tools">
             <button class="icon-btn" type="button" data-action="edit" aria-label="Edit message" title="Edit" ${busy ? "disabled" : ""}>${icon("edit")}</button>
             ${isLastBot ? `<button class="icon-btn" type="button" data-action="regenerate" aria-label="Regenerate reply, with options" aria-haspopup="menu" aria-expanded="false" title="Regenerate" ${busy ? "disabled" : ""}>${icon("refresh")}</button>` : ""}
+            ${isBot ? `<button class="icon-btn${isLiked(m) ? " is-on" : ""}" type="button" data-action="like" aria-pressed="${isLiked(m)}"
+              aria-label="${isLiked(m) ? "Unlike" : "Like: use this reply as an example of the style you want"}" title="${isLiked(m) ? "Liked: a style example" : "Like this reply"}" ${streaming ? "disabled" : ""}>${icon("heart")}</button>` : ""}
             <button class="icon-btn${m.pinned ? " is-on" : ""}" type="button" data-action="pin" aria-pressed="${m.pinned ? "true" : "false"}"
               aria-label="${m.pinned ? "Unpin" : "Pin this moment so it is always remembered"}" title="${m.pinned ? "Unpin" : "Pin"}">${icon("pin")}</button>
             <button class="icon-btn" type="button" data-action="msg-menu" aria-label="More message actions" aria-haspopup="menu" aria-expanded="false" title="More" ${streaming ? "disabled" : ""}>${icon("dots")}</button>
@@ -791,12 +803,18 @@ export async function render(main, [botId, chatId, jumpTo]) {
     const fullNote = [directed, note, shiftNote, continueNote, rollNote].filter(Boolean).join(" ");
 
     const [freshSettings, preset, loreEntries] = await Promise.all([getSettings(), getActivePreset(), loreForBot(speaker)]);
+    // Habits in this character's last replies, to vary this time. Not for
+    // "continue", which finishes the same reply.
+    const varied = kind !== "continue" && freshSettings.repetition?.enabled !== false
+      ? repetitionHints(chat.messages.filter((x) => x !== target && spokeBy(x, speaker)).slice(-5).map((x) => currentText(x)))
+      : [];
     const beforeBond = bondFor(speaker);
     const hist = withSpeakers(chat.messages.slice(0, chat.messages.indexOf(target) + (kind === "continue" ? 1 : 0)));
     const prompt = buildPrompt({
       bot: speaker, persona: persona(), preset, settings: freshSettings, loreEntries, history: hist,
       bond: withBond ? beforeBond : null,
-      ...memoryArgs(hist), scene: chat.scene?.text ?? "", note: fullNote, cast: group() ? others(speaker) : [],
+      ...memoryArgs(hist), scene: chat.scene?.text ?? "", authorNote: chat.authorNote ?? "", note: fullNote, cast: group() ? others(speaker) : [],
+      liked: likedFor(speaker, target.id), repetition: varied,
     });
     const body = {
       model: chat.model || speaker.model || conn.model || undefined,
@@ -856,6 +874,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
           // Only the person's own direction or nudge earns the "directed" label.
           ...(directed || note ? { note: [directed, note].filter(Boolean).join(" ") } : {}),
           ...(directed ? { direction: directed } : {}),
+          ...(varied.length ? { varied } : {}),
         };
       }
       if (!parsed.text.trim()) throw new Error("The model sent back an empty reply. Try again, or check the model name on the Connection page.");
@@ -1104,6 +1123,84 @@ export async function render(main, [botId, chatId, jumpTo]) {
       dlg.close();
       generate("swipe", { note: `Stay true to ${speaker.name}'s character. Avoid these problems from the last attempt: ${c.issues.join("; ")}. ${c.fix}` });
     });
+  }
+
+  // ---------- Author's note ----------
+  // A lasting instruction for this chat, sent with every reply until removed.
+  // The pill above the message box shows it is on and opens it.
+  const clipText = (t, n) => { const x = String(t).replace(/\s+/g, " ").trim(); return x.length > n ? `${x.slice(0, n - 1)}…` : x; };
+  const notePill = $("#note-pill", main);
+  function paintNotePill() {
+    const t = chat.authorNote?.trim();
+    notePill.hidden = !t;
+    if (!t) return;
+    notePill.innerHTML = `<span class="note-pill-label">Author's note</span> <span class="note-pill-text">${esc(clipText(t, 80))}</span>`;
+    notePill.title = `Author's note, sent with every reply: ${t}`;
+  }
+  notePill.addEventListener("click", () => openAuthorNote());
+  paintNotePill();
+  function openAuthorNote() {
+    const dlg = openDialog(`<form method="dialog" class="dialog-body">
+      <h2>Author's note</h2>
+      <p class="hint">A lasting instruction for this chat, sent with every reply until you remove it. For one reply only, use Direct the next reply (Alt+D) instead.</p>
+      <div class="field"><label for="an-text">Note</label>
+        <textarea id="an-text" class="tall" placeholder="e.g. Slow burn: no romance before chapter 5. Keep replies under 200 words. Write in past tense.">${esc(chat.authorNote ?? "")}</textarea></div>
+      <div class="dialog-actions">
+        ${chat.authorNote?.trim() ? `<button class="btn btn-ghost push" value="remove" formnovalidate>Remove</button>` : ""}
+        <button class="btn btn-ghost" value="cancel" formnovalidate>Cancel</button>
+        <button class="btn btn-primary" value="ok">Save</button>
+      </div></form>`, {
+      onClose: async (v) => {
+        if (v !== "ok" && v !== "remove") return;
+        const text = v === "remove" ? "" : $("#an-text", dlg).value.trim();
+        if (text === (chat.authorNote ?? "").trim()) return;
+        if (text) chat.authorNote = text; else delete chat.authorNote;
+        await persist();
+        paintNotePill();
+        toast(text ? "Author's note saved. Every reply follows it." : "Author's note removed.");
+      },
+    });
+    const ta = $("#an-text", dlg);
+    autosize(ta);
+    ta.focus();
+  }
+
+  // ---------- Phrases to avoid ----------
+  // Rewrites only the sentences with a listed phrase, as a new version of
+  // the reply; the old version stays one swipe back.
+  async function fixAvoided(m) {
+    if (busy) return;
+    const idx = m.swipeIndex ?? 0;
+    const text = stripBond(currentText(m));
+    const phrases = avoidedIn(text, settings);
+    if (!phrases.length) return;
+    const ok = await confirmDialog({
+      title: "Rewrite the overused phrases?",
+      body: `Found: ${phrases.join(", ")}. Only those sentences are rewritten, as a new version of this reply. The current version stays one swipe back. One request.`,
+      confirm: "Rewrite",
+    });
+    if (!ok) return;
+    const speaker = speakerOf(m);
+    setActivity(`avoid-${m.id}`, "Rewriting overused phrases");
+    try {
+      const fresh = (await rewriteAvoiding({ bot: speaker, text, phrases })).trim();
+      if (!fresh) throw new Error("The model returned nothing.");
+      if (!m.swipes) { m.swipes = [currentText(m)]; m.meta = [{}]; delete m.content; }
+      const { check, usage, reasoning, ...keep } = m.meta?.[idx] ?? {};
+      m.swipes.push(fresh);
+      m.meta = m.meta ?? [];
+      while (m.meta.length < m.swipes.length - 1) m.meta.push({});
+      m.meta.push({ ...keep, rewrote: phrases });
+      m.swipeIndex = m.swipes.length - 1;
+      await persist();
+      paintLog({ scroll: false });
+      const left = avoidedIn(fresh, settings);
+      toast(left.length ? `Rewritten, but ${left.join(", ")} is still there. Try again or edit it.` : "Rewritten. Swipe back for the old version.");
+    } catch (err) {
+      toast(err.message, "error");
+    } finally {
+      setActivity(`avoid-${m.id}`, null);
+    }
   }
 
   // ---------- Rewind ----------
@@ -1473,6 +1570,86 @@ export async function render(main, [botId, chatId, jumpTo]) {
     return true;
   }
 
+  // The Regenerate menu: another version, with or without the direction, or nudged.
+  // Read mode adds moving between versions, since the arrows under the reply are hidden there.
+  function regenItems(m, { versions = false } = {}) {
+    const count = m.swipes?.length ?? 1;
+    const at = (m.swipeIndex ?? 0) + 1;
+    const go = async (i) => { m.swipeIndex = i; await persist(); paintLog({ scroll: false }); };
+    return [
+      { label: "Regenerate", hint: directionOf(m.meta?.[m.swipeIndex ?? 0]) ? "Another version, with the same direction" : "Another version, same instructions", onSelect: () => generate("swipe") },
+      ...(directionOf(m.meta?.[m.swipeIndex ?? 0]) ? [{ label: "Regenerate without the direction", hint: "A plain new version", onSelect: () => generate("swipe", { keepDirection: false }) }] : []),
+      "-",
+      ...NUDGES.map((n) => ({ label: n.label, onSelect: () => generate("swipe", { note: n.note }) })),
+      ...(versions && count > 1 ? [
+        "-",
+        { label: "Previous version", hint: `${at} of ${count}`, disabled: at <= 1, onSelect: () => go(at - 2) },
+        { label: "Next version", hint: `${at} of ${count}`, disabled: at >= count, onSelect: () => go(at) },
+      ] : []),
+      ...(versions ? ["-", { label: "Continue this reply", hint: "Write more from where it ends", onSelect: () => generate("continue") }] : []),
+    ];
+  }
+  // Read mode's own Regenerate button, for the last reply.
+  $("#read-regen", main).addEventListener("click", (e) => {
+    const last = chat.messages.at(-1);
+    if (busy) return;
+    if (last?.role !== "assistant") { toast("There is no reply to regenerate yet. Send a message first."); return; }
+    openMenu(e.currentTarget, regenItems(last, { versions: true }), { align: "end" });
+  });
+
+  // ---------- Liked replies ----------
+  // Liking a reply saves a copy on the bot that wrote it. Its latest liked
+  // replies, from any chat, go into the prompt as examples of the style you want.
+  const LIKED_IN_PROMPT = 3;
+  const LIKED_KEPT = 30;
+  const likeKey = (m) => `${m.id}:${m.swipeIndex ?? 0}`;
+  function isLiked(m) {
+    const who = speakerOf(m);
+    return !!who?.liked?.some((e) => e.key === likeKey(m));
+  }
+  function likedFor(who, exceptMsg = null) {
+    return (who?.liked ?? []).filter((e) => !exceptMsg || !e.key.startsWith(`${exceptMsg}:`)).slice(-LIKED_IN_PROMPT).map((e) => e.text);
+  }
+  async function toggleLike(m) {
+    const who = speakerOf(m);
+    if (!who || !botById.has(who.id)) return;
+    const key = likeKey(m);
+    const list = who.liked ?? [];
+    const on = !list.some((e) => e.key === key);
+    const next = on
+      ? [...list, { key, chatId: chat.id, text: stripBond(currentText(m)), at: now() }].slice(-LIKED_KEPT)
+      : list.filter((e) => e.key !== key);
+    await bots.setLiked(who, next);
+    paintLog({ scroll: false });
+    toast(on ? `Liked. ${who.name}'s next replies use your latest ${Math.min(next.length, LIKED_IN_PROMPT)} liked repl${Math.min(next.length, LIKED_IN_PROMPT) === 1 ? "y" : "ies"} as a style example.` : "Unliked.");
+  }
+  function openLiked() {
+    const dlg = openDialog(`<div class="dialog-body">
+      <h2>Liked replies</h2>
+      <p class="hint">Replies you liked, from any chat with ${esc(bot.name)}. The latest ${LIKED_IN_PROMPT} are sent with every reply as an example of the style,
+        voice and length you want; their events are never reused. Like replies with the heart under them.</p>
+      <div id="liked-list"></div>
+      <form method="dialog" class="dialog-actions"><button class="btn btn-primary">Close</button></form>
+    </div>`, { wide: true });
+    const paint = () => {
+      const list = [...(bot.liked ?? [])].reverse();
+      $("#liked-list", dlg).innerHTML = list.length ? `<ul class="pin-list">${list.map((e, i) => `
+        <li class="pin-row">
+          <div class="grow">${i < LIKED_IN_PROMPT ? `<span class="chip">sent</span> ` : ""}<p>${previewHTML(e.text, 220)}</p></div>
+          <button class="btn btn-sm btn-quiet" type="button" data-unlike="${esc(e.key)}">Remove</button>
+        </li>`).join("")}</ul>`
+        : `<p class="note">${icon("info")}<span>Nothing liked yet. Tap the heart under a reply you think is written just right.</span></p>`;
+    };
+    paint();
+    dlg.addEventListener("click", async (e) => {
+      const un = e.target.closest("[data-unlike]");
+      if (!un) return;
+      await bots.setLiked(bot, (bot.liked ?? []).filter((x) => x.key !== un.dataset.unlike));
+      paint();
+      paintLog({ scroll: false });
+    });
+  }
+
   function openPinned() {
     const pins = chat.messages.filter((m) => m.pinned);
     const dlg = openDialog(`<div class="dialog-body">
@@ -1770,7 +1947,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
     const prompt = buildPrompt({
       bot: partner, persona: persona(), preset, settings: freshSettings, loreEntries,
       history: hist, mode: "impersonate", hint,
-      ...memoryArgs(hist), scene: chat.scene?.text ?? "", cast: group() ? others(partner) : [],
+      ...memoryArgs(hist), scene: chat.scene?.text ?? "", authorNote: chat.authorNote ?? "", cast: group() ? others(partner) : [],
     });
     const body = {
       model: chat.model || partner.model || conn.model || undefined,
@@ -2037,12 +2214,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
       } else generate("swipe");
     } else if (action === "regenerate") {
       if (busy) return;
-      openMenu(btn, [
-        { label: "Regenerate", hint: directionOf(m.meta?.[m.swipeIndex ?? 0]) ? "Another version, with the same direction" : "Another version, same instructions", onSelect: () => generate("swipe") },
-        ...(directionOf(m.meta?.[m.swipeIndex ?? 0]) ? [{ label: "Regenerate without the direction", hint: "A plain new version", onSelect: () => generate("swipe", { keepDirection: false }) }] : []),
-        "-",
-        ...NUDGES.map((n) => ({ label: n.label, onSelect: () => generate("swipe", { note: n.note }) })),
-      ], { align: "start" });
+      openMenu(btn, regenItems(m), { align: "start" });
     } else if (action === "msg-menu") {
       const isBot = m.role === "assistant";
       const hasTr = isBot ? m.meta?.[m.swipeIndex ?? 0]?.translation : m.translation;
@@ -2056,6 +2228,8 @@ export async function render(main, [botId, chatId, jumpTo]) {
         "-",
         { label: "Delete message", danger: true, disabled: busy, onSelect: () => deleteMessage(m) },
       ], { align: "start" });
+    } else if (action === "like") {
+      await toggleLike(m);
     } else if (action === "pin") {
       m.pinned = !m.pinned;
       await persist(); paintLog({ scroll: false });
@@ -2068,6 +2242,8 @@ export async function render(main, [botId, chatId, jumpTo]) {
       runCheck(m);
     } else if (action === "show-check") {
       showCheck(m);
+    } else if (action === "fix-avoided") {
+      fixAvoided(m);
     } else if (action === "branch") {
       if (busy) return;
       branchFrom(i);
@@ -2425,7 +2601,9 @@ export async function render(main, [botId, chatId, jumpTo]) {
     const p = buildPrompt({
       bot: speaker, persona: persona(), preset, settings: s, history: withSpeakers(hist), loreEntries: entries,
       bond: bondOnFor(speaker) ? bondFor(speaker) : null,
-      ...memoryArgs(hist), scene: chat.scene?.text ?? "", note: direction(), cast: group() ? others(speaker) : [],
+      ...memoryArgs(hist), scene: chat.scene?.text ?? "", authorNote: chat.authorNote ?? "", note: direction(), cast: group() ? others(speaker) : [],
+      liked: likedFor(speaker),
+      repetition: s.repetition?.enabled !== false ? repetitionHints(chat.messages.filter((x) => spokeBy(x, speaker)).slice(-5).map((x) => currentText(x))) : [],
     });
     const params = generationParams(s, speaker);
     openDialog(`<div class="dialog-body">
@@ -2452,8 +2630,10 @@ export async function render(main, [botId, chatId, jumpTo]) {
     ] : []),
     { heading: "Story" },
     { label: `Pinned moments (${chat.messages.filter((m) => m.pinned).length})`, hint: "Always remembered by the model", onSelect: openPinned },
+    { label: `Liked replies (${(bot.liked ?? []).length})`, hint: "Style examples for this bot", onSelect: openLiked },
     { label: `${bot.name}'s journal (${chat.journal.length})`, hint: "Private diary entries about you", onSelect: openJournal },
     { label: "Recap so far", hint: "A few lines on what has happened", onSelect: showRecap },
+    { label: "Author's note", hint: chat.authorNote?.trim() ? clipText(chat.authorNote, 40) : "A lasting instruction for this chat", onSelect: openAuthorNote },
     { label: "Turn into a story", hint: "Rewrite the chat as prose", onSelect: openStory },
     { label: "Suggest lore from this chat", hint: "New entries from what happened", onSelect: openLoreSuggestions },
     { heading: "Behind the scenes" },
@@ -2500,6 +2680,8 @@ export async function render(main, [botId, chatId, jumpTo]) {
       c(`Translate my message into ${chatLanguage()}`, translateOutgoing, "language", "Alt+T"),
       c("See the prompt", previewPrompt, "debug context"),
       c("Usage in this chat", openChatUsage, "tokens cost"),
+      c("Liked replies", openLiked, "heart favourite style examples best"),
+      c("Author's note", openAuthorNote, "instruction direction style rule lasting always steer"),
       c("Chat look", openLook, "background font text size appearance wallpaper avatar picture resize layout novel hide"),
       c(readOn() ? "Leave read mode" : "Read mode", toggleRead, "novel book privacy hide reading prose", "Alt+B"),
       c(sidebarHidden() ? "Show chat list" : "Hide chat list", toggleChats, "sidebar panel history focus"),

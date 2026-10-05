@@ -98,9 +98,26 @@ server-side storage of your key.
   (Rounded, Book or Plain), the message size, the layout (Chat, or Novel with no pictures beside
   messages) and the picture size (Small, Medium, Large), live.
   The font, layout and picture size are also in Settings → Appearance.
+- **Author's note**: ⋯ → Author's note sets a lasting instruction for one chat ("slow burn",
+  "past tense", "short replies"), sent with every reply and with Write my reply until removed. A
+  pill above the message box shows it is on. Branches keep it. For one reply only, use the scene
+  director (Alt+D).
+- **Repetition guard**: before each reply, `repetitionHints` (prompt.js) reads the speaker's last
+  five replies for habits (same opening words, four-word phrases in three or more replies, ending
+  on a question or the same words) and the request asks to vary them. Local, no extra request.
+  Replies it shaped show "kept fresh". Settings → Chat turns it off.
+- **Liked replies**: the heart under a reply saves it on the bot that wrote it. The bot's latest 3
+  liked replies, from any chat, are sent as examples of the style, voice and length you want
+  (never content to reuse). ⋯ → Liked replies lists and removes them.
+- **Phrases to avoid**: Settings → Phrases to avoid holds phrases models overuse (a starter list
+  is included). Every request says never to use them; any that still appear are marked in the
+  reply, and the "overused phrases" chip rewrites only those sentences as a new version (the old
+  one stays a swipe back).
 - **Read mode**: the scroll button in a chat's top bar (or Alt+B) leaves only the story and the
   message box, for privacy: no site header, chat list, top bar, names, pictures, tools or tags, and
-  the tab shows only the chat's name. The same button inside the message box turns it off.
+  the tab shows only the chat's name. The same button inside the message box turns it off. The
+  message box keeps + (Direct the next reply, Surprise, Dice), Write my reply, and a Regenerate
+  button for the last reply (new version, nudges, previous and next version, Continue).
   Remembered on this device.
 - **Hide chats**: on a wide screen, the button left of the chat name folds the chat list away.
   Click it again to bring it back. The choice is remembered on this device.

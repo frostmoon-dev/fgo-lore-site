@@ -52,6 +52,19 @@ export const DEFAULT_SETTINGS = {
   journal: { auto: true, every: 12 },
   // A busy or overloaded model is tried again this many times (0 = never).
   retry: { tries: 3 },
+  // Spot habits in a bot's recent replies (same opening, phrases, endings)
+  // and ask the next reply to vary them. Local, no extra request.
+  repetition: { enabled: true },
+  // Phrases models overuse. Sent as "never write these"; any that still
+  // appear are marked in the reply and can be rewritten in one tap.
+  avoid: {
+    enabled: true,
+    phrases: [
+      "shivers down", "barely above a whisper", "a mix of", "can't help but", "maybe, just maybe",
+      "a testament to", "ministrations", "sparkling with mischief", "the air thick with", "breath hitches",
+      "little did", "padded over", "a dance of", "voice dripping with",
+    ],
+  },
   chatBackground: null,
   backgroundDim: 0.86,
   enterToSend: true,
@@ -275,7 +288,7 @@ function emit(what) { listeners.forEach((fn) => fn(what)); }
 
 function merge(base, extra) {
   const out = { ...base, ...extra };
-  for (const k of ["gen", "lore", "bond", "memory", "check", "translate", "recap", "confirm", "content", "usage", "journal"]) out[k] = { ...base[k], ...(extra?.[k] ?? {}) };
+  for (const k of ["gen", "lore", "bond", "memory", "check", "translate", "recap", "confirm", "content", "usage", "journal", "retry", "avoid", "repetition"]) out[k] = { ...base[k], ...(extra?.[k] ?? {}) };
   return out;
 }
 
@@ -364,6 +377,8 @@ export const bots = {
   async touch(bot) { bot.lastChatAt = now(); await db.put("bots", bot); },
   // Favourites sit first on the home page. Not an edit either.
   async setFavorite(bot, on) { bot.favorite = !!on; await db.put("bots", bot); emit("bots"); },
+  // Replies you liked, used as style examples for this bot. Not an edit.
+  async setLiked(bot, liked) { bot.liked = liked; await db.put("bots", bot); emit("bots"); },
   async remove(id) {
     for (const c of await chats.forBot(id)) await db.delete("chats", c.id);
     await db.delete("bots", id);
