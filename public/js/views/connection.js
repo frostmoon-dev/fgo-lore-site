@@ -117,6 +117,11 @@ export async function render(main) {
           </div>
         </details>
 
+        <label class="check"><input type="checkbox" id="c-cache" ${conn.cacheMarks === false ? "" : "checked"}>
+          <span>Mark prompts for caching on Claude models<small>Claude only reuses a repeated prompt when it is marked. With this on,
+            the unchanged front of each chat request costs about a tenth on later turns (a first write costs a quarter more).
+            Other models cache on their own. Turn off if a proxy rejects it; MoonPaper also drops the marks by itself when they cause an error.</small></span></label>
+
         <details class="more" ${conn.extraBody?.trim() ? "open" : ""}>
           <summary>Extra request fields</summary>
           <div class="form-grid">
@@ -172,6 +177,7 @@ export async function render(main) {
       conn.headers = $("#c-headers", root).value;
       conn.accessCode = $("#c-code", root).value;
       conn.extraBody = $("#c-extra", root).value;
+      conn.cacheMarks = $("#c-cache", root).checked;
       const xerr = $("#c-extra-err", root);
       try { parseExtraBody(conn.extraBody); xerr.hidden = true; }
       catch (ex) { xerr.hidden = false; xerr.textContent = ex instanceof SyntaxError ? "That JSON is not valid." : ex.message; }

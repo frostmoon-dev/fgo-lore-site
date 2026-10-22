@@ -580,6 +580,10 @@ dialog::backdrop { background: var(--scrim); }
 @media (max-width: 480px) {
   .dialog-actions:has(> :nth-child(3)) .push { order: 1; flex-basis: 100%; margin: var(--s1) 0 0; }
 }
+.token-split { margin-bottom: var(--s4); }
+.token-table { width: 100%; border-collapse: collapse; font-size: var(--t-ui); }
+.token-table th, .token-table td { padding: var(--s1) 0; border-bottom: 1px solid var(--line); text-align: left; font-weight: 400; }
+.token-table td { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); white-space: nowrap; padding-left: var(--s3); }
 .prompt-preview {
   white-space: pre-wrap; font-family: var(--mono); font-size: var(--t-sm); line-height: 1.65;
   background: var(--surface); border-radius: var(--r-md);

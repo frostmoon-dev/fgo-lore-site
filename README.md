@@ -179,6 +179,12 @@ server-side storage of your key.
 - **Chat**: streaming replies, stop, regenerate with swipes between versions, edit any
   message, delete with undo, several chats per bot (named Chat 1, Chat 2, … until you rename them), export a chat as text, Markdown or
   JSON, and a per-message view of which lore was used and how many tokens were spent.
+- **Token saver**: chat requests to a Claude model mark the system message and the newest chat
+  message with `cache_control`, so OpenRouter and Anthropic-style proxies reuse that prefix on the
+  next turn at about a tenth of the price (other providers cache without marks). A connection that
+  answers 400 to the marks is sent plain requests for the rest of the session; Connection → Mark
+  prompts for caching turns it off. Example dialogue stops being sent once a chat has 40 messages
+  (Prompt page; 20, 80 or never). The prompt preview lists each section's token count.
 - **Connection**: as many API profiles as you like, a model list fetched from the
   provider, a test button, custom headers for fussy proxies, and extra request fields (JSON
   merged into every chat request, e.g. OpenRouter's `provider` routing). With OpenRouter and a

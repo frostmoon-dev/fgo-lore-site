@@ -850,7 +850,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
 
     try {
       const ask = (b) => chatCompletion(conn, b, {
-        signal: controller.signal,
+        signal: controller.signal, cache: true,
         onRetry: ({ attempt, max }) => setActivity("reply", `The model is busy. Trying again (${attempt} of ${max})…`),
         onDelta: (r) => {
           if (r.content && /^The (model is busy|reply came back empty)/.test(activity.get("reply") ?? "")) setActivity("reply", `${speaker.name} is writing…`);
@@ -1989,7 +1989,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
     let text = "";
     try {
       const res = await chatCompletion(conn, body, {
-        signal: drafting.signal,
+        signal: drafting.signal, cache: true,
         onRetry: ({ attempt, max }) => showDraftBar(`The model is busy. Trying again (${attempt} of ${max})…`, { tools: false }),
         onDelta: (r) => { input.value = cleanImpersonation(r.content, who); fitInput(); },
       });

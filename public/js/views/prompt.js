@@ -70,6 +70,16 @@ export async function render(main) {
             <label class="check"><input type="checkbox" id="inc-scenario"><span>Scenario<small>The bot's scenario field.</small></span></label>
             <label class="check"><input type="checkbox" id="inc-persona"><span>Your persona<small>Your persona's description.</small></span></label>
             <label class="check"><input type="checkbox" id="inc-examples"><span>Example dialogue<small>Helps the voice, but costs tokens on every message.</small></span></label>
+            <div class="field">
+              <label for="examples-until">Stop sending example dialogue</label>
+              <select id="examples-until" aria-describedby="examples-until-hint">
+                <option value="0">Never: send it with every message</option>
+                <option value="20">Once a chat has 20 messages</option>
+                <option value="40">Once a chat has 40 messages</option>
+                <option value="80">Once a chat has 80 messages</option>
+              </select>
+              <p class="hint" id="examples-until-hint">By then the bot's own replies show its voice, and the examples only cost tokens.</p>
+            </div>
           </fieldset>
           <details class="more">
             <summary>Macros you can use</summary>
@@ -127,6 +137,8 @@ export async function render(main) {
     $("#inc-scenario", main).checked = preset.includeScenario !== false;
     $("#inc-persona", main).checked = preset.includePersona !== false;
     $("#inc-examples", main).checked = preset.includeExamples !== false;
+    $("#examples-until", main).value = String(preset.examplesUntil ?? 40);
+    $("#examples-until", main).disabled = preset.includeExamples === false;
     $("#p-del", main).disabled = presets.length < 2;
     counts();
     fits.forEach((f) => f());
@@ -145,6 +157,8 @@ export async function render(main) {
     preset.includeScenario = $("#inc-scenario", main).checked;
     preset.includePersona = $("#inc-persona", main).checked;
     preset.includeExamples = $("#inc-examples", main).checked;
+    preset.examplesUntil = Number($("#examples-until", main).value);
+    $("#examples-until", main).disabled = !preset.includeExamples;
     counts();
     state.classList.add("dirty"); state.textContent = "Saving…";
     savePreset();
@@ -227,6 +241,13 @@ export async function render(main) {
       <h2>${esc(bot.name)}'s prompt</h2>
       <p class="hint">About <strong>${p.tokens.toLocaleString()}</strong> tokens before you say anything ·
         ${Object.entries(generationParams(s, bot)).map(([k, v]) => `${k} ${v}`).join(", ")}</p>
+      <details class="more token-split">
+        <summary>Where the tokens go</summary>
+        <table class="token-table"><tbody>${p.breakdown.map((r) => `
+          <tr><th scope="row">${esc(r.label)}</th><td>~${r.tokens.toLocaleString()}</td></tr>`).join("")}</tbody></table>
+        <p class="hint">Sent with every message. The biggest rows are where trimming saves the most: a shorter definition,
+          fewer example lines, or lore entries with tighter keywords.</p>
+      </details>
       <div class="prompt-preview">${p.messages.map((m) => `<span class="role">${m.role}</span>\n${esc(m.content)}`).join("\n")}</div>
       <form method="dialog" class="dialog-actions"><button class="btn btn-primary">Close</button></form>
     </div>`, { wide: true });

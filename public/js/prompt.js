@@ -318,7 +318,8 @@ export function buildPrompt({
     parts.push("## World lore (use when relevant, never recite)\n\n" +
       constantLore.map((e) => `### ${e.title}\n${m(e.content)}`).join("\n\n"));
   }
-  if (preset.includeExamples !== false && bot.examples?.trim()) {
+  const examplesUntil = Number(preset.examplesUntil ?? 40);
+  if (preset.includeExamples !== false && bot.examples?.trim() && !(examplesUntil > 0 && history.length >= examplesUntil)) {
     parts.push(`## Example dialogue (style reference only)\n${m(bot.examples.replace(/<START>\s*/gi, "---\n"))}`);
   }
   // Replies the person liked: the voice and quality to aim for, never content to reuse.
@@ -377,6 +378,7 @@ export function buildPrompt({
       "as a tag like <bond:+1>, from -5 to +5. Use 0 when little changed. Never mention the tag, the number or the bond itself in the story."]
       .filter(Boolean).join("\n\n");
   }
+  const afterChat = post;
   post = [...late, post].filter(Boolean).join("\n\n");
 
   // If the recent part is still too long, drop its oldest messages in blocks
@@ -399,8 +401,18 @@ export function buildPrompt({
   const messages = [{ role: "system", content: system }, ...kept];
   if (post) messages.push({ role: "system", content: post });
 
+  // Where the tokens go, one row per section, largest first.
+  const section = (text, fallback) => ({ label: /^## ([^\n(]+)/.exec(text)?.[1].trim() ?? fallback, tokens: estimateTokens(text) });
+  const breakdown = [
+    ...parts.filter(Boolean).map((t, i) => section(t, i ? "Other" : "Instructions")),
+    ...late.map((t) => section(t, "Other")),
+    ...(afterChat ? [{ label: "Instructions after the chat", tokens: estimateTokens(afterChat) }] : []),
+    { label: `Chat messages (${kept.length})`, tokens: estimateTokens(kept.map((x) => x.content).join("")) },
+  ].sort((a, b) => b.tokens - a.tokens);
+
   return {
     messages,
+    breakdown,
     loreUsed: matched.map((e) => e.title),
     dropped: clean.length - kept.length,
     windowStart: Math.max(0, Math.min(windowStart, history.length - 1)),
@@ -410,6 +422,7 @@ export function buildPrompt({
 
 const clip = (s, n) => (s.length > n ? `${s.slice(0, n)}…` : s);
 const TRIM_STEP = 10;
+
 
 function impersonateInstruction(names, hint) {
   const draft = String(hint ?? "").trim();
