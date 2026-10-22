@@ -181,6 +181,9 @@ export const DEFAULT_PRESET = {
   postHistory: "",
   impersonate: DEFAULT_IMPERSONATE_PROMPT,
   includeExamples: true,
+  // Example dialogue stops being sent once a chat has this many messages
+  // (0 = always): by then the bot's own replies show its voice.
+  examplesUntil: 40,
   includeScenario: true,
   includePersona: true,
 };

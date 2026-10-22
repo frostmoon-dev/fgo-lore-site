@@ -9,6 +9,14 @@ export const APP_VERSION = "2026.09.25.1";
 // Newest first. Each item says what it is and where it lives.
 export const NEWS = [
   {
+    version: "2026.10.22.2",
+    items: [
+      ["Cheaper Claude chats", "Claude only reuses a repeated prompt when it is marked for caching. Chat replies and Write my reply to a Claude model now carry those marks, so the unchanged front of each request (instructions, character, memory, the chat so far) costs about a tenth on later turns. Connection → Mark prompts for caching turns it off; a proxy that rejects the marks gets plain requests instead."],
+      ["Example dialogue retires", "Once a chat has 40 messages, the bot's own replies show its voice, so example dialogue stops being sent. Change the point, or keep sending it, on the Prompt page under Include in the prompt."],
+      ["Where the tokens go", "The prompt preview on the Prompt page lists every part of the prompt by size, so you can see what is worth trimming."],
+    ],
+  },
+  {
     version: "2026.10.22.1",
     items: [
       ["Replace a bot from a card", "In a bot's editor, Replace from a character card takes a PNG or JSON card and overwrites the parts you tick: name, definition, scenario, openings, example dialogue, picture, settings, and the card's lorebook. Chats, expressions and the background stay. Pasting card JSON into Paste a definition does the same. Nothing is saved until you press Save bot, and Undo puts it back."],
