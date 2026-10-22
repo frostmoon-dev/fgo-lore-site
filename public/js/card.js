@@ -104,7 +104,8 @@ function fromCard(json) {
       enabled: e.enabled !== false,
       constant: !!e.constant,
     }));
-  return { bot, lore };
+  // Cards exported from this site also carry its own settings (model, bond…).
+  return { bot, lore, ownSettings: Object.keys(ext).length > 0 };
 }
 
 // What a file really is, from its first bytes rather than its name.

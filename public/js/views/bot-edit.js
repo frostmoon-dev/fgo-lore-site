@@ -1,9 +1,9 @@
-import { bots, newBot, getSettings, getLorebooks, loreForBot, BOND_KINDS, BOND_POINTS, bondLevels, EXPRESSIONS, MOOD_SUGGESTIONS, moodName } from "../store.js";
-import { toCard, cardPng } from "../card.js";
+import { bots, lore, newBot, newLorebook, getSettings, getLorebooks, saveLorebooks, loreForBot, BOND_KINDS, BOND_POINTS, bondLevels, EXPRESSIONS, MOOD_SUGGESTIONS, moodName } from "../store.js";
+import { toCard, cardPng, importCardFile, importCardBytes } from "../card.js";
 import { estimateTokens } from "../prompt.js";
 import { draftBot, sortDefinition } from "../ai.js";
 import {
-  $, $$, esc, icon, imagePicker, imagePickerHTML, avatarHTML, toast, confirmDialog,
+  $, $$, esc, icon, imagePicker, imagePickerHTML, avatarHTML, toast, confirmDialog, openDialog,
   download, slug, parseTags, autosize, sliderHTML, wireSlider,
 } from "../ui.js";
 
@@ -17,6 +17,24 @@ const TEXT_FIELDS = [
   { key: "examples", label: "Example dialogue", rows: "tall", mono: true,
     hint: "Sample exchanges that show their voice. Start each with <code>&lt;START&gt;</code>, then lines like <code>{{user}}: …</code> and <code>{{char}}: …</code>." },
 ];
+
+// What "Replace from a character card" can overwrite, in the order offered.
+// `fields` are the bot keys each part covers; `has` says the card fills it.
+const CARD_PARTS = [
+  { key: "identity", label: "Name, tagline and tags", fields: ["name", "tagline", "tags", "series"],
+    has: (c) => !!(c.tagline || c.tags.length) },
+  { key: "description", label: "Definition and personality summary", fields: ["description", "personality"], tokens: true },
+  { key: "scenario", label: "Scenario", fields: ["scenario"], tokens: true },
+  { key: "greetings", label: "First message and alternate openings", fields: ["greeting", "altGreetings"],
+    has: (c) => !!(c.greeting.trim() || c.altGreetings.length) },
+  { key: "examples", label: "Example dialogue", fields: ["examples"], tokens: true },
+  { key: "prompts", label: "System prompt and post-history overrides", fields: ["systemPrompt", "postHistory"] },
+  { key: "creatorNotes", label: "Creator notes", fields: ["creatorNotes"] },
+  { key: "avatar", label: "Picture", fields: ["avatar"], only: (c) => !!c.avatar },
+  { key: "settings", label: "Model, generation, bond and mature content settings",
+    fields: ["model", "gen", "bondKind", "bondLevels", "bondMilestones", "contentMode"], only: (c, r) => r.ownSettings },
+];
+const partHas = (p, c) => (p.has ? p.has(c) : p.fields.some((f) => String(c[f] ?? "").trim()));
 
 export async function render(main, [id]) {
   const existing = id ? await bots.get(id) : null;
@@ -83,6 +101,17 @@ export async function render(main, [id]) {
                   <button class="btn btn-primary" type="button" id="paste-go">Sort into fields</button>
                   <span class="hint" id="paste-state" aria-live="polite"></span>
                 </div>
+              </div>
+            </details>
+            <details class="more" id="card-box">
+              <summary>Replace from a character card</summary>
+              <div class="form-grid">
+                <p class="hint">Overwrite this bot with a PNG or JSON card, from Chub, SillyTavern or an export from here.
+                  You choose which parts to replace. Chats, expressions and the chat background stay as they are.
+                  Nothing is saved until you press Save bot.</p>
+                <button type="button" class="drop-zone" id="card-drop">
+                  ${icon("upload")}<span><strong>Choose a card file</strong><span class="drop-hint"> or drop it here</span></span>
+                </button>
               </div>
             </details>
           </div>
@@ -344,7 +373,9 @@ export async function render(main, [id]) {
     state.textContent = dirty ? "Unsaved changes" : isNew ? "" : "All changes saved";
   }
   let deleted = false;
-  const isDirty = () => { if (deleted) return false; collect(); return JSON.stringify(bot) !== saved; };
+  // A card's lorebook waits here until Save bot, like every other change.
+  let pendingLore = null;
+  const isDirty = () => { if (deleted) return false; collect(); return !!pendingLore || JSON.stringify(bot) !== saved; };
 
   paintAvatar = imagePicker($("#avatar", main), {
     get: () => bot.avatar,
@@ -475,6 +506,18 @@ export async function render(main, [id]) {
     $("#name-err", main).hidden = !bad;
     if (bad) { nameInput.focus(); toast("Give the bot a name before saving.", "error"); return false; }
     bot.altGreetings = bot.altGreetings.filter((g) => g.trim());
+    if (pendingLore) {
+      const books = await getLorebooks();
+      const book = newLorebook({ name: pendingLore.name, description: "Came with a character card." });
+      books.push(book);
+      await saveLorebooks(books);
+      for (const e of pendingLore.entries) await lore.save({ ...e, bookId: book.id });
+      // A ticked box, so later reads of the form keep the link.
+      $("#books", main).insertAdjacentHTML("beforeend", `<label class="check">
+        <input type="checkbox" data-book="${esc(book.id)}" checked><span>${esc(book.name)}<small>${esc(book.description)}</small></span></label>`);
+      bot.lorebookIds.push(book.id);
+      pendingLore = null;
+    }
     await bots.save(bot);
     saved = JSON.stringify(bot);
     toast(`${bot.name} saved.`, "ok");
@@ -527,6 +570,15 @@ export async function render(main, [id]) {
     const btn = $("#paste-go", main);
     const state = $("#paste-state", main);
     if (!text) { $("#paste", main).focus(); state.textContent = "Paste the character text first."; return; }
+    if (/^\{[\s\S]*\}$/.test(text)) {
+      let json = null;
+      try { json = JSON.parse(text); } catch { /* not JSON after all; the model sorts it */ }
+      if (json) {
+        state.textContent = "";
+        replaceFrom(() => importCardBytes(new TextEncoder().encode(text).buffer, "The pasted JSON", "application/json"));
+        return;
+      }
+    }
     collect();
     if ([bot.description, bot.greeting, bot.scenario, bot.examples].some((v) => v.trim())) {
       const ok = await confirmDialog({
@@ -559,6 +611,119 @@ export async function render(main, [id]) {
     }
   }
   $("#paste-go", main).addEventListener("click", sortPasted);
+
+  // ---- Replace from a character card ----
+  // Puts `src`'s values for the chosen parts into the form, as if typed.
+  function fill(src, keys) {
+    const set = (id, v) => { const el = $(`#${id}`, main); el.value = v ?? ""; el.dispatchEvent(new Event("input", { bubbles: true })); };
+    const on = (k) => keys.includes(k);
+    if (on("identity")) {
+      set("name", src.name); set("tagline", src.tagline); set("tags", src.tags.join(", ")); set("series", src.series);
+    }
+    if (on("description")) { set("description", src.description); set("personality", src.personality); }
+    for (const k of ["scenario", "examples", "creatorNotes"]) if (on(k)) set(k, src[k]);
+    if (on("prompts")) { set("systemPrompt", src.systemPrompt); set("postHistory", src.postHistory); }
+    if (on("greetings")) { set("greeting", src.greeting); bot.altGreetings = [...src.altGreetings]; paintAlts(); }
+    if (on("avatar")) { bot.avatar = src.avatar; paintAvatar(); }
+    if (on("settings")) {
+      set("model", src.model);
+      for (const k of ["temperature", "max_tokens", "top_k", "repetition_penalty"]) {
+        set(`g-${k}`, src.gen?.[k] ?? "");
+        $(`#g-${k}-range`, main).value = src.gen?.[k] ?? $(`#g-${k}-range`, main).min;
+      }
+      $("#content-mode", main).value = src.contentMode === "safe" ? "safe" : "site";
+      const kind = src.bondKind === "custom" || BOND_KINDS[src.bondKind] ? src.bondKind : "affection";
+      $("#bond-kind", main).value = kind;
+      paintBondLevels(bondLevels({ bondKind: kind, bondLevels: src.bondLevels }));
+      $("#bond-milestones", main).checked = src.bondMilestones !== false;
+      paintBondKind();
+    }
+    $$("textarea", main).forEach((t) => t.dispatchEvent(new Event("input"))); // refit heights
+    update();
+  }
+
+  // The card's values as this bot would hold them. A card with no series
+  // takes one you use that a tag names (the tag then goes), else keeps the bot's.
+  function fromCardBot(card) {
+    const named = seriesNames.find((n) => card.tags.some((t) => t.trim().toLowerCase() === n.toLowerCase()));
+    const series = card.series || named || bot.series;
+    const tags = card.tags.filter((t) => t.trim().toLowerCase() !== series.toLowerCase());
+    return { ...card, name: card.name || bot.name, tagline: card.tagline.slice(0, 140), series, tags };
+  }
+
+  async function offerCard(result) {
+    collect();
+    const card = fromCardBot(result.bot);
+    const parts = CARD_PARTS.filter((p) => !p.only || p.only(card, result));
+    const tok = (v) => `~${estimateTokens(v).toLocaleString()} tokens`;
+    const note = (p) => {
+      if (!partHas(p, card)) return "Empty in the card. Tick to clear it here.";
+      if (p.key === "identity") return `${card.name}${card.tagline ? ` · ${card.tagline}` : ""}`;
+      if (p.key === "greetings") return `First message${card.altGreetings.length ? ` and ${card.altGreetings.length} more opening${card.altGreetings.length === 1 ? "" : "s"}` : ""}. Replaces all openings here.`;
+      if (p.key === "avatar") return "The card's picture.";
+      if (p.tokens) {
+        const was = p.fields.map((f) => bot[f]).join("");
+        return `${tok(p.fields.map((f) => card[f]).join(""))}${was.trim() ? `, replacing ${tok(was)}` : ""}`;
+      }
+      return "";
+    };
+    const loreCount = result.lore.length;
+    const dlg = openDialog(`
+      <form method="dialog" class="dialog-body">
+        <h2>Replace from ${esc(card.name || "this card")}</h2>
+        <p class="hint">Ticked parts replace what this bot has now. Nothing is saved until you press Save bot.</p>
+        <fieldset class="field">
+          <legend class="sr-only">Parts to replace</legend>
+          ${parts.map((p) => `
+            <label class="check"><input type="checkbox" data-part="${p.key}" ${partHas(p, card) ? "checked" : ""}>
+              <span>${esc(p.label)}${note(p) ? `<small>${esc(note(p))}</small>` : ""}</span></label>`).join("")}
+          ${loreCount ? `
+            <label class="check"><input type="checkbox" data-part="lore" checked>
+              <span>Its lorebook<small>Adds the card's ${loreCount} lore ${loreCount === 1 ? "entry" : "entries"} as a new lorebook linked to this bot. Books already linked stay.</small></span></label>` : ""}
+        </fieldset>
+        <div class="dialog-actions">
+          <button class="btn btn-ghost" value="cancel" formnovalidate>Cancel</button>
+          <button class="btn btn-primary" value="ok" autofocus>Replace</button>
+        </div>
+      </form>`, {
+      onClose: (v) => {
+        if (v !== "ok") return;
+        const keys = $$("[data-part]", dlg).filter((c) => c.checked).map((c) => c.dataset.part);
+        if (!keys.length) return;
+        const before = structuredClone(bot);
+        const lorebefore = pendingLore;
+        fill(card, keys);
+        if (keys.includes("lore")) pendingLore = { name: `${card.name || bot.name} lore`, entries: result.lore };
+        update(); // shows "Unsaved changes" when only the lorebook was picked
+        const n = keys.length;
+        toast(`Replaced ${n} part${n === 1 ? "" : "s"} from ${card.name || "the card"}. Nothing is saved yet.`, "ok", {
+          action: "Undo", timeout: 10000,
+          onAction: () => { fill(before, keys); pendingLore = lorebefore; update(); toast("Put back as it was."); },
+        });
+      },
+    });
+    $("[autofocus]", dlg)?.focus();
+  }
+
+  async function replaceFrom(load) {
+    try { await offerCard(await load()); } catch (err) { toast(err.message, "error"); }
+  }
+  const cardDrop = $("#card-drop", main);
+  cardDrop.addEventListener("click", () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".png,.json,application/json,image/png";
+    input.onchange = () => { if (input.files[0]) replaceFrom(() => importCardFile(input.files[0])); };
+    input.click();
+  });
+  cardDrop.addEventListener("dragover", (e) => { e.preventDefault(); cardDrop.classList.add("is-over"); });
+  cardDrop.addEventListener("dragleave", () => cardDrop.classList.remove("is-over"));
+  cardDrop.addEventListener("drop", (e) => {
+    e.preventDefault();
+    cardDrop.classList.remove("is-over");
+    const file = e.dataTransfer.files[0];
+    if (file) replaceFrom(() => importCardFile(file));
+  });
   if (pasting) requestAnimationFrame(() => $("#paste", main).focus());
 
   $("#draft", main).addEventListener("click", draftFromIdea);
