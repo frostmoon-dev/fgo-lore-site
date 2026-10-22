@@ -9,6 +9,12 @@ export const APP_VERSION = "2026.09.25.1";
 // Newest first. Each item says what it is and where it lives.
 export const NEWS = [
   {
+    version: "2026.10.22.1",
+    items: [
+      ["Replace a bot from a card", "In a bot's editor, Replace from a character card takes a PNG or JSON card and overwrites the parts you tick: name, definition, scenario, openings, example dialogue, picture, settings, and the card's lorebook. Chats, expressions and the background stay. Pasting card JSON into Paste a definition does the same. Nothing is saved until you press Save bot, and Undo puts it back."],
+    ],
+  },
+  {
     version: "2026.10.05.4",
     items: [
       ["Fewer worn-out descriptions", "The repetition guard now also catches descriptions a bot puts in almost every reply, like \"gray eyes\" or \"his voice a low…\", as long as they are not words you use in your own messages."],

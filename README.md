@@ -19,6 +19,11 @@ server-side storage of your key.
 - **Import and export character cards** in the format other roleplay sites use
   (Character Card V2: PNG with the card embedded, or JSON). Lorebooks inside a card
   are imported too.
+- **Replace from a card**: in the bot editor, overwrite an existing bot with a PNG or JSON card
+  (or card JSON pasted into Paste a definition). Tick which parts to replace (name and tags,
+  definition, scenario, openings, example dialogue, prompt overrides, creator notes, picture,
+  settings, and the card's lorebook); chats, expressions and the background stay. Nothing is
+  saved until Save bot, and the toast's Undo puts the form back.
 - **Personas**: who you are in a chat, with a picture and description. Set a default
   and switch per chat.
 - **Prompt page**: the main prompt, post-history instructions, what to include,
