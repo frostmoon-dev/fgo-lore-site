@@ -96,8 +96,13 @@ server-side storage of your key.
 - **Favourites**: star a bot on the home page to keep it at the front of the list.
 - **Rename in place**: click a chat's name in the chat header to rename it. The ⋯ menu's
   Rename still offers a suggested title.
-- **Colours**: Moon Cell (violet and rose, after BB; the default) or Paper (warm cream and
-  clay), in light and dark. Settings → Appearance → Colours.
+- **Colours**: Moon Cell (violet and rose, after BB; the default), Paper (cream and clay), Avalon
+  (moss and gold), Chaldea (slate and blue), Sakura (blush and plum), Ember (charcoal and crimson) or
+  Mono, each in light and dark, with text at 7:1 contrast and the accent at 4.5:1. An accent colour of
+  your own can replace the set's. Corners: Sharp, Soft or Round. Settings → Appearance, or Chat look.
+- **Fonts**: fourteen chat fonts (sans, serif, typewriter, handwritten), five site fonts and six
+  heading fonts. Fonts not in `index.html` load from Google Fonts only once chosen; `looks.js`
+  caches the choice so `theme-init.js` applies it before the first paint.
 - **BB**: a built-in Moon Cancer bot, written from `bots/BB.md`.
 - **Chat look**: ⋯ → Chat look in a chat sets the bot's background, the dim amount, the font
   (Rounded, Book or Plain), the message size, the layout (Chat, or Novel with no pictures beside

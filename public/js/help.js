@@ -9,6 +9,15 @@ export const APP_VERSION = "2026.09.25.1";
 // Newest first. Each item says what it is and where it lives.
 export const NEWS = [
   {
+    version: "2026.10.26.1",
+    items: [
+      ["More colours", "Five new sets of colours beside Moon Cell and Paper: Avalon (moss and gold), Chaldea (slate and blue), Sakura (blush and plum), Ember (charcoal and crimson) and Mono. Each has a light and a dark version. Settings → Appearance, Chat look, or Ctrl+K → Switch to…"],
+      ["Your own accent", "Pick any accent colour in Settings → Appearance. It works with every set of colours, light and dark, and warns you when it is hard to see."],
+      ["More fonts", "Fourteen chat fonts, from Garamond and Literata to a typewriter and a handwritten one, plus a choice of site font and heading font (Cinzel for carved capitals). They load only once you pick them."],
+      ["Corners", "Sharp, Soft or Round corners on buttons, cards and fields."],
+    ],
+  },
+  {
     version: "2026.10.22.2",
     items: [
       ["Cheaper Claude chats", "Claude only reuses a repeated prompt when it is marked for caching. Chat replies and Write my reply to a Claude model now carry those marks, so the unchanged front of each request (instructions, character, memory, the chat so far) costs about a tenth on later turns. Connection → Mark prompts for caching turns it off; a proxy that rejects the marks gets plain requests instead."],

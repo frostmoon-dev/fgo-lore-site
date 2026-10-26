@@ -3,6 +3,7 @@
 // it. Views add their own commands while they are on screen.
 import { bots, seriesGroups } from "./store.js";
 import { $, $$, esc, openDialog } from "./ui.js";
+import { PALETTES, getLook, setLook } from "./looks.js";
 
 const providers = new Set();
 // fn() returns [{ title, hint, group, keywords, run }]; returns an unregister.
@@ -21,9 +22,7 @@ export function goToSettings(section) {
 
 const go = (hash) => () => { location.hash = hash; };
 function setPalette(value) {
-  try { value === "moon" ? localStorage.removeItem("palette") : localStorage.setItem("palette", value); } catch { /* private mode */ }
-  if (value === "paper") delete document.documentElement.dataset.palette;
-  else document.documentElement.dataset.palette = value;
+  setLook("palette", value);
   const radio = document.querySelector(`input[name="palette"][value="${value}"]`);
   if (radio) radio.checked = true;
 }
@@ -32,7 +31,6 @@ const GROUP_ORDER = ["This chat", "Go to", "Bots", "Settings", "Help"];
 async function baseCommands() {
   const allBots = await bots.all();
   const dark = document.documentElement.dataset.theme === "dark";
-  const moon = document.documentElement.dataset.palette === "moon";
   const set = (title, section, keywords = "") => ({ group: "Settings", title, keywords, run: () => goToSettings(section) });
   return [
     { group: "Go to", title: "Bots", hint: "Home", keywords: "home library", run: go("#/") },
@@ -63,7 +61,9 @@ async function baseCommands() {
     ]),
     set("Appearance and text size", "appearance", "theme font size larger smaller"),
     { group: "Settings", title: dark ? "Switch to light theme" : "Switch to dark theme", keywords: "theme mode colours", run: () => document.getElementById("theme-toggle")?.click() },
-    { group: "Settings", title: moon ? "Switch to Paper colours" : "Switch to Moon Cell colours", keywords: "palette colors colours bb violet purple theme", run: () => setPalette(moon ? "paper" : "moon") },
+    ...PALETTES.filter((p) => p.key !== getLook("palette")).map((p) => ({
+      group: "Settings", title: `Switch to ${p.label} colours`, hint: p.about, keywords: "palette colors colours theme", run: () => setPalette(p.key),
+    })),
     set("Install as an app", "install", "home screen pwa offline"),
     set("Mature content", "content", "nsfw explicit 18+ adult"),
     set("Chat background", "background", "picture image"),

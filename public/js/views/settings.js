@@ -2,6 +2,9 @@ import { getSettings, saveSettings, exportAll, importAll, wipeAll, getUsage, cle
 import { usageChartHTML, wireUsageChart, shortNumber } from "../chart.js";
 import { installState, promptInstall, onInstallChange } from "../install.js";
 import {
+  CHAT_FONTS, SITE_FONTS, HEAD_FONTS, CORNERS, PALETTES, getLook, setLook, fontSelectHTML, paletteSwatchesHTML, contrast, isHex,
+} from "../looks.js";
+import {
   $, $$, esc, icon, toast, confirmDialog, download, pickFile,
   imagePicker, imagePickerHTML, sliderHTML, wireSlider, debounce, timeAgo,
 } from "../ui.js";
@@ -57,9 +60,33 @@ export async function render(main) {
           </fieldset>
           <fieldset class="field">
             <legend class="field-label">Colours</legend>
-            ${segmentedHTML("palette", [["moon", "Moon Cell"], ["paper", "Paper"]], readPref("palette", "moon"))}
-            <p class="hint">Moon Cell is violet and rose, after BB. Paper is warm cream and clay.</p>
+            ${paletteSwatchesHTML("palette", getLook("palette"))}
+            <p class="hint" id="palette-about"></p>
           </fieldset>
+          <div class="field">
+            <label for="accent">Accent colour</label>
+            <div class="accent-row">
+              <input type="color" id="accent" value="${isHex(getLook("accent")) ? getLook("accent") : "#a8234b"}" aria-describedby="accent-hint">
+              <button class="btn btn-sm" type="button" id="accent-reset">Use the colours' own</button>
+            </div>
+            <p class="hint" id="accent-hint">Links, the current choice and focus rings. Leave it to the colours above, or pick your own.</p>
+          </div>
+          <fieldset class="field">
+            <legend class="field-label">Corners</legend>
+            ${segmentedHTML("corners", CORNERS, getLook("corners"))}
+          </fieldset>
+          <div class="form-row">
+            <div class="field">
+              <label for="site-font">Site font</label>
+              ${fontSelectHTML("site-font", SITE_FONTS, getLook("siteFont"))}
+              <p class="hint">Menus, forms and buttons.</p>
+            </div>
+            <div class="field">
+              <label for="head-font">Heading font</label>
+              ${fontSelectHTML("head-font", HEAD_FONTS, getLook("headFont"))}
+              <p class="hint">Page titles and names.</p>
+            </div>
+          </div>
           <fieldset class="field">
             <legend class="field-label">Text size</legend>
             ${segmentedHTML("text-size", SIZES, textPref)}
@@ -70,11 +97,12 @@ export async function render(main) {
             ${segmentedHTML("chat-text-size", SIZES, chatTextPref)}
             <p class="hint">Only the messages and the box you type in. Adds to the text size above.</p>
           </fieldset>
-          <fieldset class="field">
-            <legend class="field-label">Chat font</legend>
-            ${segmentedHTML("chat-font", [["rounded", "Rounded"], ["serif", "Book"], ["clear", "Clear"], ["plain", "Plain"]], readPref("chatFont", "rounded"))}
-            <p class="hint">Clear is made for low vision and tired eyes: letters like I, l and 1 never look alike.</p>
-          </fieldset>
+          <div class="field">
+            <label for="chat-font">Chat font</label>
+            ${fontSelectHTML("chat-font", CHAT_FONTS, getLook("chatFont"))}
+            <p class="hint">Messages and the box you type in. Clear is made for low vision and tired eyes: letters like I, l and 1 never look alike.
+              Fonts other than Rounded, Clear and your system's load the first time you pick them.</p>
+          </div>
           <fieldset class="field">
             <legend class="field-label">Chat actions</legend>
             ${segmentedHTML("chat-actions", [["italic", "Italic"], ["upright", "Upright"]], readPref("chatActions", "italic"))}
@@ -91,6 +119,7 @@ export async function render(main) {
             <p class="hint">Avatars and expressions beside each message.</p>
           </fieldset>
           <div class="text-preview" aria-hidden="true">
+            <h3 class="text-preview-head">The Lake at Dusk</h3>
             <div class="msg-body"><p>The tea has gone cold. <em>She sets the cup down without drinking.</em> “You came back later than you said.”</p></div>
           </div>
         </div>
@@ -291,11 +320,28 @@ export async function render(main) {
     document.documentElement.dataset.theme = dark ? "dark" : "light";
     $("#theme-toggle").setAttribute("aria-label", dark ? "Switch to light theme" : "Switch to dark theme");
   }));
-  $$('input[name="palette"]', main).forEach((r) => r.addEventListener("change", () => {
-    try { r.value === "moon" ? localStorage.removeItem("palette") : localStorage.setItem("palette", r.value); } catch {}
-    if (r.value === "paper") delete document.documentElement.dataset.palette;
-    else document.documentElement.dataset.palette = r.value;
-  }));
+  // Colours, accent, corners and fonts: looks.js stores and applies them.
+  const paintAbout = () => { $("#palette-about", main).textContent = PALETTES.find((p) => p.key === getLook("palette"))?.about ?? ""; };
+  // A home-made accent can vanish into some backgrounds; say so when it does.
+  function paintAccent() {
+    const own = isHex(getLook("accent"));
+    $("#accent-reset", main).hidden = !own;
+    const surface = getComputedStyle(document.documentElement).getPropertyValue("--surface").trim();
+    const weak = own && isHex(surface) && contrast(getLook("accent"), surface) < 3;
+    $("#accent-hint", main).textContent = weak
+      ? "This colour is hard to see on the current background. Links and the current choice may be hard to spot."
+      : own ? "Your own accent, used with every set of colours, light and dark." : "Links, the current choice and focus rings. Leave it to the colours above, or pick your own.";
+    $("#accent-hint", main).classList.toggle("error-text", weak);
+  }
+  $$('input[name="palette"]', main).forEach((r) => r.addEventListener("change", () => { setLook("palette", r.value); paintAbout(); paintAccent(); }));
+  $("#accent", main).addEventListener("input", (e) => { setLook("accent", e.target.value); paintAccent(); });
+  $("#accent-reset", main).addEventListener("click", () => { setLook("accent", ""); paintAccent(); });
+  $$('input[name="corners"]', main).forEach((r) => r.addEventListener("change", () => setLook("corners", r.value)));
+  $("#site-font", main).addEventListener("change", (e) => setLook("siteFont", e.target.value));
+  $("#head-font", main).addEventListener("change", (e) => setLook("headFont", e.target.value));
+  $("#chat-font", main).addEventListener("change", (e) => setLook("chatFont", e.target.value));
+  paintAbout();
+  paintAccent();
   // Text sizes live in localStorage so theme-init.js can apply them before paint.
   const sizePref = (name, storageKey, dataKey) => $$(`input[name="${name}"]`, main).forEach((r) => r.addEventListener("change", () => {
     try { r.value === "md" ? localStorage.removeItem(storageKey) : localStorage.setItem(storageKey, r.value); } catch {}
@@ -318,11 +364,6 @@ export async function render(main) {
     try { r.value === "italic" ? localStorage.removeItem("chatActions") : localStorage.setItem("chatActions", r.value); } catch {}
     if (r.value === "italic") delete document.documentElement.dataset.chatActions;
     else document.documentElement.dataset.chatActions = r.value;
-  }));
-  $$('input[name="chat-font"]', main).forEach((r) => r.addEventListener("change", () => {
-    try { r.value === "rounded" ? localStorage.removeItem("chatFont") : localStorage.setItem("chatFont", r.value); } catch {}
-    if (r.value === "rounded") delete document.documentElement.dataset.chatFont;
-    else document.documentElement.dataset.chatFont = r.value;
   }));
 
   $("#enter", main).addEventListener("change", (e) => saveSettings({ enterToSend: e.target.checked }).then(() => toast("Saved.", "ok")));

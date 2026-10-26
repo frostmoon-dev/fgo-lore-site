@@ -147,6 +147,239 @@
 }
 
 
+/* More colours (Settings → Appearance). Same roles as above; every pair
+   checked for contrast: text 7:1, muted text and the accent 4.5:1. */
+/* Avalon: moss green and old gold, a fairy forest. */
+:root[data-palette="avalon"] {
+  --bg: #eef1ea;
+  --surface: #f8faf5;
+  --raised: #ffffff;
+  --ink: #18201a;
+  --muted: #5b6659;
+  --narration: #4f5a4d;
+  --line: #dde4d7;
+  --line-strong: #7e8a7b;
+  --fill: #e6ebe0;
+  --fill-strong: #d8e0d0;
+  --primary: #1f3a2b;
+  --primary-hover: #2c4f3b;
+  --on-primary: #f8faf5;
+  --accent: #7a5000;
+  --accent-hover: #5f3e00;
+  --on-accent: #ffffff;
+  --accent-soft: #f1e6cc;
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, .06);
+  --shadow-2: 0 12px 32px rgba(0, 0, 0, .14);
+  --scrim: rgba(0, 0, 0, .45);
+}
+:root[data-palette="avalon"][data-theme="dark"] {
+  --bg: #101511;
+  --surface: #171d18;
+  --raised: #1d241e;
+  --ink: #e9efe6;
+  --muted: #9fab9c;
+  --narration: #ccd5c9;
+  --line: #263027;
+  --line-strong: #6c786a;
+  --fill: #222b23;
+  --fill-strong: #2d382e;
+  --primary: #e9efe6;
+  --primary-hover: #ffffff;
+  --on-primary: #18201a;
+  --accent: #e0b45a;
+  --accent-hover: #ecc77a;
+  --on-accent: #1a1406;
+  --accent-soft: #362c16;
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, .35);
+  --shadow-2: 0 12px 32px rgba(0, 0, 0, .55);
+  --scrim: rgba(0, 0, 0, .6);
+}
+/* Chaldea: slate and holographic blue. */
+:root[data-palette="chaldea"] {
+  --bg: #edf0f4;
+  --surface: #f8fafc;
+  --raised: #ffffff;
+  --ink: #141a24;
+  --muted: #5a6474;
+  --narration: #4e5868;
+  --line: #dce2ea;
+  --line-strong: #7b8595;
+  --fill: #e4e9f0;
+  --fill-strong: #d6dde7;
+  --primary: #172a45;
+  --primary-hover: #22395c;
+  --on-primary: #f8fafc;
+  --accent: #1d5fa8;
+  --accent-hover: #164c88;
+  --on-accent: #ffffff;
+  --accent-soft: #dbe7f5;
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, .06);
+  --shadow-2: 0 12px 32px rgba(0, 0, 0, .14);
+  --scrim: rgba(0, 0, 0, .45);
+}
+:root[data-palette="chaldea"][data-theme="dark"] {
+  --bg: #0f131a;
+  --surface: #161b24;
+  --raised: #1c222d;
+  --ink: #e8edf4;
+  --muted: #9ba6b6;
+  --narration: #cbd3de;
+  --line: #252d3a;
+  --line-strong: #6b7688;
+  --fill: #202835;
+  --fill-strong: #2a3443;
+  --primary: #e8edf4;
+  --primary-hover: #ffffff;
+  --on-primary: #141a24;
+  --accent: #6fb0f0;
+  --accent-hover: #8fc2f4;
+  --on-accent: #0b1420;
+  --accent-soft: #1a2b40;
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, .35);
+  --shadow-2: 0 12px 32px rgba(0, 0, 0, .55);
+  --scrim: rgba(0, 0, 0, .6);
+}
+/* Sakura: blush and plum. */
+:root[data-palette="sakura"] {
+  --bg: #f7eff1;
+  --surface: #fdf8f9;
+  --raised: #ffffff;
+  --ink: #2a1a20;
+  --muted: #735d66;
+  --narration: #67525b;
+  --line: #efdfe4;
+  --line-strong: #957d87;
+  --fill: #f2e5e9;
+  --fill-strong: #e9d6dc;
+  --primary: #4a1f35;
+  --primary-hover: #612a46;
+  --on-primary: #fdf8f9;
+  --accent: #b0306a;
+  --accent-hover: #922756;
+  --on-accent: #ffffff;
+  --accent-soft: #f8dde8;
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, .06);
+  --shadow-2: 0 12px 32px rgba(0, 0, 0, .14);
+  --scrim: rgba(0, 0, 0, .45);
+}
+:root[data-palette="sakura"][data-theme="dark"] {
+  --bg: #170f13;
+  --surface: #20161b;
+  --raised: #281c22;
+  --ink: #f6e9ee;
+  --muted: #b49da7;
+  --narration: #dccbd2;
+  --line: #33242b;
+  --line-strong: #84707a;
+  --fill: #2e2128;
+  --fill-strong: #3b2a33;
+  --primary: #f6e9ee;
+  --primary-hover: #ffffff;
+  --on-primary: #2a1a20;
+  --accent: #f39abf;
+  --accent-hover: #f7b3cf;
+  --on-accent: #22101a;
+  --accent-soft: #3d2130;
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, .35);
+  --shadow-2: 0 12px 32px rgba(0, 0, 0, .55);
+  --scrim: rgba(0, 0, 0, .6);
+}
+/* Ember: charcoal and crimson. */
+:root[data-palette="ember"] {
+  --bg: #f2efee;
+  --surface: #faf8f7;
+  --raised: #ffffff;
+  --ink: #1d1716;
+  --muted: #685e5b;
+  --narration: #5c5350;
+  --line: #e5dfdc;
+  --line-strong: #8a807c;
+  --fill: #ebe6e3;
+  --fill-strong: #dfd8d4;
+  --primary: #2a1d1b;
+  --primary-hover: #403028;
+  --on-primary: #faf8f7;
+  --accent: #b3261e;
+  --accent-hover: #921d17;
+  --on-accent: #ffffff;
+  --accent-soft: #f6dcd8;
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, .06);
+  --shadow-2: 0 12px 32px rgba(0, 0, 0, .14);
+  --scrim: rgba(0, 0, 0, .45);
+}
+:root[data-palette="ember"][data-theme="dark"] {
+  --bg: #141010;
+  --surface: #1c1716;
+  --raised: #231d1c;
+  --ink: #f3ecea;
+  --muted: #a9a09c;
+  --narration: #d6cdca;
+  --line: #2e2624;
+  --line-strong: #7a706c;
+  --fill: #2a2321;
+  --fill-strong: #362d2a;
+  --primary: #f3ecea;
+  --primary-hover: #ffffff;
+  --on-primary: #1d1716;
+  --accent: #ff8a7a;
+  --accent-hover: #ffa598;
+  --on-accent: #200c09;
+  --accent-soft: #3f1f1a;
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, .35);
+  --shadow-2: 0 12px 32px rgba(0, 0, 0, .55);
+  --scrim: rgba(0, 0, 0, .6);
+}
+/* Mono: black and white, nothing else. */
+:root[data-palette="mono"] {
+  --bg: #f4f4f4;
+  --surface: #fbfbfb;
+  --raised: #ffffff;
+  --ink: #111111;
+  --muted: #5c5c5c;
+  --narration: #4a4a4a;
+  --line: #e2e2e2;
+  --line-strong: #808080;
+  --fill: #ebebeb;
+  --fill-strong: #dedede;
+  --primary: #111111;
+  --primary-hover: #333333;
+  --on-primary: #fbfbfb;
+  --accent: #111111;
+  --accent-hover: #333333;
+  --on-accent: #fbfbfb;
+  --accent-soft: #e2e2e2;
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, .06);
+  --shadow-2: 0 12px 32px rgba(0, 0, 0, .14);
+  --scrim: rgba(0, 0, 0, .45);
+}
+:root[data-palette="mono"][data-theme="dark"] {
+  --bg: #0d0d0d;
+  --surface: #151515;
+  --raised: #1c1c1c;
+  --ink: #f0f0f0;
+  --muted: #a3a3a3;
+  --narration: #d0d0d0;
+  --line: #262626;
+  --line-strong: #737373;
+  --fill: #222222;
+  --fill-strong: #2d2d2d;
+  --primary: #f0f0f0;
+  --primary-hover: #ffffff;
+  --on-primary: #111111;
+  --accent: #f0f0f0;
+  --accent-hover: #ffffff;
+  --on-accent: #111111;
+  --accent-soft: #2e2e2e;
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, .35);
+  --shadow-2: 0 12px 32px rgba(0, 0, 0, .55);
+  --scrim: rgba(0, 0, 0, .6);
+}
+
+/* Corners (Settings → Appearance). Soft is the default above. */
+:root[data-corners="sharp"] { --r-sm: 2px; --r-md: 4px; --r-lg: 6px; --r-pill: 6px; }
+:root[data-corners="round"] { --r-sm: 12px; --r-md: 20px; --r-lg: 28px; }
+
+
 /* Text size (Settings > Appearance). Applied before paint by theme-init.js. */
 html { font-size: 100%; }
 :root[data-text="sm"] { font-size: 93.75%; }
@@ -342,6 +575,37 @@ h2.sub {
 .icon-btn:disabled { color: var(--line-strong); cursor: not-allowed; background: none; }
 .link-btn { background: none; border: 0; padding: 0; color: var(--accent); cursor: pointer; font-size: var(--t-ui); text-decoration: none; }
 @media (hover: hover) { .link-btn:hover { color: var(--accent-hover); text-decoration: underline; } }
+
+/* Colour swatches (Settings → Appearance, Chat look): a radio per palette. */
+.swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: var(--s2); }
+.swatch {
+  position: relative; display: grid; gap: var(--s2); padding: var(--s2);
+  border: 1.5px solid var(--line); border-radius: var(--r-md); cursor: pointer;
+  transition: border-color var(--dur) var(--ease);
+}
+.swatch input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; margin: 0; cursor: pointer; }
+.swatch-chip {
+  display: flex; align-items: flex-end; gap: 4px; height: 40px; padding: 6px;
+  border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--sw-bg);
+}
+.swatch-chip i { width: 14px; height: 14px; border-radius: 50%; background: var(--sw-ink); }
+.swatch-chip i + i { background: var(--sw-accent); }
+:root[data-theme="dark"] .swatch-chip { background: var(--sw-bg-dark); }
+:root[data-theme="dark"] .swatch-chip i { background: var(--sw-ink-dark); }
+:root[data-theme="dark"] .swatch-chip i + i { background: var(--sw-accent-dark); }
+.swatch-name { font-size: var(--t-sm); font-weight: 500; }
+@media (hover: hover) { .swatch:hover { border-color: var(--line-strong); } }
+.swatch:has(input:checked) { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+.swatch:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+.accent-row { display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap; }
+.accent-row input[type="color"] {
+  width: 40px; height: 40px; padding: 3px; border: 1.5px solid var(--ink); border-radius: var(--r-pill);
+  background: none; cursor: pointer;
+}
+.accent-row input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+.accent-row input[type="color"]::-webkit-color-swatch { border: 0; border-radius: var(--r-pill); }
+.accent-row input[type="color"]::-moz-color-swatch { border: 0; border-radius: var(--r-pill); }
+.text-preview-head { margin-bottom: var(--s2); }
 
 /* Segmented control: radios that look like one pill. */
 .segmented {

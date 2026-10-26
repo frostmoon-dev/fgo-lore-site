@@ -23,6 +23,16 @@ try {
   if (chatSidebar) root.dataset.chatSidebar = chatSidebar;
   const chatRead = localStorage.getItem("chatRead");
   if (chatRead) root.dataset.chatRead = chatRead;
+  const corners = localStorage.getItem("corners");
+  if (corners) root.dataset.corners = corners;
+  // Fonts and accent from looks.js: CSS variables, and font files to load.
+  const looks = JSON.parse(localStorage.getItem("looks") || "null");
+  for (const [k, v] of Object.entries(looks?.vars ?? {})) root.style.setProperty(k, v);
+  for (const href of looks?.links ?? []) {
+    const l = document.createElement("link");
+    l.rel = "stylesheet"; l.href = href; l.dataset.font = href;
+    document.head.append(l);
+  }
 } catch {
   root.dataset.theme = "light";
   root.dataset.palette = "moon";
