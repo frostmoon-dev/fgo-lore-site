@@ -242,6 +242,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
           <button class="icon-btn" type="button" id="more" aria-label="More chat actions" aria-haspopup="menu" aria-expanded="false" title="More">${icon("dots")}</button>
         </div>
 
+        <button class="scene-strip" type="button" id="scene-strip" hidden>${icon("map")}<span id="scene-strip-text"></span></button>
         <div class="chat-log" id="log" tabindex="0" aria-label="Messages">
           <div class="chat-log-inner" id="log-inner"></div>
         </div>
@@ -519,6 +520,21 @@ export async function render(main, [botId, chatId, jumpTo]) {
     const sc = $("#scene", main);
     sc.classList.toggle("has-dot", !!chat.scene?.text?.trim());
     sc.classList.toggle("is-loading", sceneBusy);
+    paintSceneStrip();
+  }
+
+  // Where and when the scene is, from the scene tracker, under the header.
+  function paintSceneStrip() {
+    const strip = $("#scene-strip", main);
+    const line = (label) => {
+      const v = new RegExp(`^\\s*${label}\\s*:\\s*(.+)$`, "im").exec(chat.scene?.text ?? "")?.[1].trim() ?? "";
+      return /^(unknown|n\/a|none|-)?$/i.test(v) ? "" : v;
+    };
+    const parts = [line("Location"), line("Time")].filter(Boolean);
+    strip.hidden = !parts.length;
+    $("#scene-strip-text", main).textContent = parts.join(" · ");
+    const mood = line("Mood");
+    strip.title = mood ? `Mood: ${mood}. Open the scene tracker.` : "Open the scene tracker.";
   }
 
   // ---------- Messages ----------
@@ -530,13 +546,25 @@ export async function render(main, [botId, chatId, jumpTo]) {
       ? `<details class="thinking"><summary>Model's reasoning</summary><div>${esc(meta.reasoning)}</div></details>` : "";
     const clean = stripBond(text);
     let content = clean.trim()
-      ? renderMarkdown(applyMacros(clean, namesFor(speakerOf(m) ?? bot)))
+      ? renderMarkdown(applyMacros(clean, namesFor(speakerOf(m) ?? bot)), { quotes: true })
       : (streaming ? "" : "<p><em>(empty)</em></p>");
     if (m.role === "assistant" && !streaming) content = markAvoided(content, settings);
-    return think + content + (streaming ? '<span class="caret" aria-hidden="true"></span>' : "");
+    // Before the first word arrives, three dots; then the caret follows the text.
+    const waiting = streaming && !clean.trim();
+    return think + content + (waiting ? '<span class="typing" aria-hidden="true"><i></i><i></i><i></i></span>'
+      : streaming ? '<span class="caret" aria-hidden="true"></span>' : "");
   }
 
   const meta0 = (m) => m.meta?.[m.swipeIndex ?? 0] ?? {};
+  // Messages and faces already on screen. A message drawn for the first time
+  // after the chat opened eases in; a face that changes fades across. The log
+  // is often redrawn a moment later, so a redraw resumes the animation where
+  // it was (a negative delay) instead of restarting or cutting it.
+  const drawnAt = new Map();
+  const faces = new Map(); // id → { src, at }
+  let opened = false;
+  const ANIM_MS = 320;
+  const animStyle = (at) => (at && performance.now() - at < ANIM_MS ? `--anim-delay:-${Math.round(performance.now() - at)}ms` : "");
 
   function messageHTML(m, i) {
     const isBot = m.role === "assistant";
@@ -551,6 +579,10 @@ export async function render(main, [botId, chatId, jumpTo]) {
       : face ? `<a class="avatar-link" href="#/bot/${speaker.id}" aria-label="Edit ${esc(speaker.name)}" title="${esc(speaker.name)}, ${esc(moodKey)}"><span class="expr-face"><img src="${esc(face)}" alt=""></span></a>`
       : botById.has(speaker.id) ? botAvatar(speaker, 96) : avatarHTML(null, name, 96);
     const text = currentText(m);
+    if (!drawnAt.has(m.id)) drawnAt.set(m.id, opened ? performance.now() : 0);
+    const arriving = animStyle(drawnAt.get(m.id));
+    if (face && faces.get(m.id)?.src !== face) faces.set(m.id, { src: face, at: opened ? performance.now() : 0 });
+    const faceChanged = face ? animStyle(faces.get(m.id).at) : "";
     const isLastBot = isBot && i === lastAssistantIndex() && i === chat.messages.length - 1;
     const streaming = busy && isLastBot;
     const meta = isBot ? m.meta?.[m.swipeIndex ?? 0] ?? {} : {};
@@ -613,7 +645,8 @@ export async function render(main, [botId, chatId, jumpTo]) {
           <span>Bond with ${esc(speaker.name)}: ${esc(meta.milestone.from)} → ${esc(meta.milestone.to)}</span></div>` : "";
 
     const cutOff = isLastBot && !busy && meta.finish === "length";
-    return `<article class="msg ${m.role} ${isLastBot ? "is-last" : ""}${face ? " has-face" : ""}${m.id === toolsFor ? " tools-open" : ""}" data-id="${m.id}" aria-label="${esc(name)}">
+    const opening = i === 0 && isBot ? " is-opening" : "";
+    return `<article class="msg ${m.role} ${isLastBot ? "is-last" : ""}${face ? " has-face" : ""}${faceChanged ? " face-changed" : ""}${arriving ? " is-arriving" : ""}${opening}${m.id === toolsFor ? " tools-open" : ""}" data-id="${m.id}" aria-label="${esc(name)}"${arriving || faceChanged ? ` style="${arriving || faceChanged}"` : ""}>
       ${av}
       <div style="min-width:0">
         <div class="msg-head"><span class="msg-name">${esc(name)}</span><time class="msg-time" datetime="${new Date(m.at).toISOString()}">${clock(m.at)}</time></div>
@@ -678,6 +711,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
         </div></div>` : "");
     }
     if (scroll) toBottom();
+    opened = true;
     paintBond();
     const box = $("#edit-box", logInner);
     if (box) { autosize(box); box.focus(); box.setSelectionRange(box.value.length, box.value.length); }
@@ -2410,6 +2444,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
   paintBackground();
 
   const LOOK_ACTIONS = [["italic", "Italic"], ["upright", "Upright"]];
+  const LOOK_QUOTES = [["tint", "Tinted"], ["plain", "Plain"]];
   const LOOK_SIZES = [["sm", "Small"], ["md", "Default"], ["lg", "Large"], ["xl", "Largest"]];
   const LOOK_PICS = [["sm", "Small"], ["md", "Medium"], ["lg", "Large"]];
   const LOOK_LAYOUTS = [["chat", "Chat"], ["novel", "Novel"]];
@@ -2443,6 +2478,10 @@ export async function render(main, [botId, chatId, jumpTo]) {
       <fieldset class="field"><legend class="field-label">Actions</legend>
         ${seg("look-actions", LOOK_ACTIONS, readLocal("chatActions", "italic"))}
         <p class="hint">How *actions* look. Upright is easier on long passages; they keep their softer colour.</p>
+      </fieldset>
+      <fieldset class="field"><legend class="field-label">Dialogue</legend>
+        ${seg("look-quotes", LOOK_QUOTES, readLocal("chatQuotes", "tint"))}
+        <p class="hint">Tinted gives "spoken lines" a touch of the accent colour, so speech stands apart from narration.</p>
       </fieldset>
       <fieldset class="field"><legend class="field-label">Message size</legend>
         ${seg("look-size", LOOK_SIZES, readLocal("chatTextSize", "md"))}
@@ -2483,6 +2522,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
     $("#look-font", dlg).addEventListener("change", (e) => setLook("chatFont", e.target.value));
     $$('input[name="look-palette"]', dlg).forEach((r) => r.addEventListener("change", () => setLook("palette", r.value)));
     $$('input[name="look-actions"]', dlg).forEach((r) => r.addEventListener("change", () => setLocal("chatActions", "chatActions", r.value, "italic")));
+    $$('input[name="look-quotes"]', dlg).forEach((r) => r.addEventListener("change", () => setLocal("chatQuotes", "chatQuotes", r.value, "tint")));
     $$('input[name="look-size"]', dlg).forEach((r) => r.addEventListener("change", () => setLocal("chatTextSize", "chatText", r.value, "md")));
     $$('input[name="look-layout"]', dlg).forEach((r) => r.addEventListener("change", () => setLocal("chatLayout", "chatLayout", r.value, "chat")));
     $$('input[name="look-pic"]', dlg).forEach((r) => r.addEventListener("change", () => setLocal("chatPic", "chatPic", r.value, "lg")));
@@ -2557,6 +2597,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
   $("#memory", main).addEventListener("click", openMemory);
   $("#cast", main).addEventListener("click", openCast);
   $("#scene", main).addEventListener("click", openScene);
+  $("#scene-strip", main).addEventListener("click", openScene);
   $("#model-chip", main).addEventListener("click", (e) => openModelMenu(e.currentTarget));
 
   function rename() {

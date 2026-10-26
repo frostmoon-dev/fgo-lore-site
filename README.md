@@ -100,6 +100,11 @@ server-side storage of your key.
   (moss and gold), Chaldea (slate and blue), Sakura (blush and plum), Ember (charcoal and crimson) or
   Mono, each in light and dark, with text at 7:1 contrast and the accent at 4.5:1. An accent colour of
   your own can replace the set's. Corners: Sharp, Soft or Round. Settings → Appearance, or Chat look.
+- **Chat touches**: spoken lines in quotes are tinted toward the accent (Settings → Appearance →
+  Chat dialogue: Tinted or Plain); a strip under the chat header shows the scene tracker's location
+  and time; three dots wait for the first word of a reply; new messages ease in and expression
+  pictures fade when the mood changes (redraws resume the animation rather than restart it; off with
+  reduced motion); Novel layout opens the first message with a drop cap.
 - **Fonts**: fourteen chat fonts (sans, serif, typewriter, handwritten), five site fonts and six
   heading fonts. Fonts not in `index.html` load from Google Fonts only once chosen; `looks.js`
   caches the choice so `theme-init.js` applies it before the first paint.

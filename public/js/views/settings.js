@@ -109,6 +109,11 @@ export async function render(main) {
             <p class="hint">How *actions* look. Upright is easier to read in long passages; they keep their softer colour.</p>
           </fieldset>
           <fieldset class="field">
+            <legend class="field-label">Chat dialogue</legend>
+            ${segmentedHTML("chat-quotes", [["tint", "Tinted"], ["plain", "Plain"]], readPref("chatQuotes", "tint"))}
+            <p class="hint">Tinted gives "spoken lines" a touch of the accent colour, so speech stands apart from narration.</p>
+          </fieldset>
+          <fieldset class="field">
             <legend class="field-label">Chat layout</legend>
             ${segmentedHTML("chat-layout", [["chat", "Chat"], ["novel", "Novel"]], readPref("chatLayout", "chat"))}
             <p class="hint">Novel hides the pictures beside each message and leaves names and text, like a book.</p>
@@ -120,7 +125,7 @@ export async function render(main) {
           </fieldset>
           <div class="text-preview" aria-hidden="true">
             <h3 class="text-preview-head">The Lake at Dusk</h3>
-            <div class="msg-body"><p>The tea has gone cold. <em>She sets the cup down without drinking.</em> “You came back later than you said.”</p></div>
+            <div class="msg-body"><p>The tea has gone cold. <em>She sets the cup down without drinking.</em> <span class="q">“You came back later than you said.”</span></p></div>
           </div>
         </div>
       </div>
@@ -359,6 +364,11 @@ export async function render(main) {
     try { r.value === "lg" ? localStorage.removeItem("chatPic") : localStorage.setItem("chatPic", r.value); } catch {}
     if (r.value === "lg") delete document.documentElement.dataset.chatPic;
     else document.documentElement.dataset.chatPic = r.value;
+  }));
+  $$('input[name="chat-quotes"]', main).forEach((r) => r.addEventListener("change", () => {
+    try { r.value === "tint" ? localStorage.removeItem("chatQuotes") : localStorage.setItem("chatQuotes", r.value); } catch {}
+    if (r.value === "tint") delete document.documentElement.dataset.chatQuotes;
+    else document.documentElement.dataset.chatQuotes = r.value;
   }));
   $$('input[name="chat-actions"]', main).forEach((r) => r.addEventListener("change", () => {
     try { r.value === "italic" ? localStorage.removeItem("chatActions") : localStorage.setItem("chatActions", r.value); } catch {}
