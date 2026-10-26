@@ -9,6 +9,15 @@ export const APP_VERSION = "2026.09.25.1";
 // Newest first. Each item says what it is and where it lives.
 export const NEWS = [
   {
+    version: "2026.10.26.2",
+    items: [
+      ["Dialogue stands out", "Spoken lines in \"quotes\" now carry a touch of the accent colour, so speech and narration read apart at a glance. Settings → Appearance → Chat dialogue, or Chat look, switches it back to Plain."],
+      ["Where are we?", "When the scene tracker knows the place and time, a slim line under the chat header shows them. Click it to open the tracker."],
+      ["Little signs of life", "Three dots while a reply is on its way, new messages ease in, and an expression picture fades across when the mood changes. All of it stops if your device asks for reduced motion."],
+      ["Chapter opening", "In Novel layout, the story's first message opens with a drop cap, like the first page of a book."],
+    ],
+  },
+  {
     version: "2026.10.26.1",
     items: [
       ["More colours", "Five new sets of colours beside Moon Cell and Paper: Avalon (moss and gold), Chaldea (slate and blue), Sakura (blush and plum), Ember (charcoal and crimson) and Mono. Each has a light and a dark version. Settings → Appearance, Chat look, or Ctrl+K → Switch to…"],
