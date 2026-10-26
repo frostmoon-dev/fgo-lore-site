@@ -17,6 +17,7 @@ import {
   memoryContext, liveChapters, windowStart as memoryWindowStart, autoChapters, pendingChapters,
   chaptersToFold, recallFor, parseChapter, cachedTokens, trimMemory, KEEP_RECENT,
 } from "../memory.js";
+import { CHAT_FONTS, getLook, setLook, fontSelectHTML, paletteSwatchesHTML } from "../looks.js";
 import { bondChartHTML, wireBondChart } from "../chart.js";
 import { renderMarkdown, previewHTML } from "../markdown.js";
 import {
@@ -2408,7 +2409,6 @@ export async function render(main, [botId, chatId, jumpTo]) {
   }
   paintBackground();
 
-  const LOOK_FONTS = [["rounded", "Rounded"], ["serif", "Book"], ["clear", "Clear"], ["plain", "Plain"]];
   const LOOK_ACTIONS = [["italic", "Italic"], ["upright", "Upright"]];
   const LOOK_SIZES = [["sm", "Small"], ["md", "Default"], ["lg", "Large"], ["xl", "Largest"]];
   const LOOK_PICS = [["sm", "Small"], ["md", "Medium"], ["lg", "Large"]];
@@ -2432,10 +2432,14 @@ export async function render(main, [botId, chatId, jumpTo]) {
         <p class="hint">${settings.chatBackground ? "Without one, this chat uses the default background from Settings." : "Only chats with this bot use it. The default for every bot is in Settings."}</p>
       </div>
       ${sliderHTML({ id: "look-dim", label: "Dim behind the text", min: 0.4, max: 0.98, step: 0.02, value: settings.backgroundDim ?? 0.86, hint: "Higher hides more of the picture. Applies to every chat." })}
-      <fieldset class="field"><legend class="field-label">Font</legend>
-        ${seg("look-font", LOOK_FONTS, readLocal("chatFont", "rounded"))}
-        <p class="hint">For messages and the box you type in. Clear is made for low vision and tired eyes.</p>
+      <fieldset class="field"><legend class="field-label">Colours</legend>
+        ${paletteSwatchesHTML("look-palette", getLook("palette"))}
+        <p class="hint">For the whole site. More in Settings: your own accent, fonts and corners.</p>
       </fieldset>
+      <div class="field"><label for="look-font">Font</label>
+        ${fontSelectHTML("look-font", CHAT_FONTS, getLook("chatFont"))}
+        <p class="hint">For messages and the box you type in. Clear is made for low vision and tired eyes.</p>
+      </div>
       <fieldset class="field"><legend class="field-label">Actions</legend>
         ${seg("look-actions", LOOK_ACTIONS, readLocal("chatActions", "italic"))}
         <p class="hint">How *actions* look. Upright is easier on long passages; they keep their softer colour.</p>
@@ -2476,7 +2480,8 @@ export async function render(main, [botId, chatId, jumpTo]) {
       paintBackground();
       saveDim();
     });
-    $$('input[name="look-font"]', dlg).forEach((r) => r.addEventListener("change", () => setLocal("chatFont", "chatFont", r.value, "rounded")));
+    $("#look-font", dlg).addEventListener("change", (e) => setLook("chatFont", e.target.value));
+    $$('input[name="look-palette"]', dlg).forEach((r) => r.addEventListener("change", () => setLook("palette", r.value)));
     $$('input[name="look-actions"]', dlg).forEach((r) => r.addEventListener("change", () => setLocal("chatActions", "chatActions", r.value, "italic")));
     $$('input[name="look-size"]', dlg).forEach((r) => r.addEventListener("change", () => setLocal("chatTextSize", "chatText", r.value, "md")));
     $$('input[name="look-layout"]', dlg).forEach((r) => r.addEventListener("change", () => setLocal("chatLayout", "chatLayout", r.value, "chat")));
