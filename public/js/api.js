@@ -154,14 +154,30 @@ const sleep = (ms, signal) => new Promise((resolve, reject) => {
   signal?.addEventListener("abort", () => { clearTimeout(t); reject(new DOMException("Stopped", "AbortError")); }, { once: true });
 });
 
+// ---------- Prompt caching ----------
+// Most providers reuse a repeated prompt front on their own. Claude only
+// caches up to a block marked with cache_control (OpenRouter passes the mark
+// on), so chat requests to a Claude model mark two places: the end of the
+// system message, and the newest chat message. The next turn then pays a
+// tenth of the price for everything up to there.
+export const wantsCacheMarks = (conn, model) => conn?.cacheMarks !== false && /claude|anthropic/i.test(String(model ?? ""));
+const unmarkable = new Set(); // connections that rejected the marks this session
+
+export function withCacheMarks(messages) {
+  const mark = (m) => ({ ...m, content: [{ type: "text", text: String(m.content ?? ""), cache_control: { type: "ephemeral" } }] });
+  const last = messages.findLastIndex((m, i) => i > 0 && m.role !== "system");
+  return messages.map((m, i) => ((i === 0 && m.role === "system") || i === last ? mark(m) : m));
+}
+
 // retries: how many more tries after the first; defaults to the setting.
 // onRetry({ attempt, max, delay, message }) runs before each wait.
-export async function chatCompletion(conn, body, { signal, onDelta = () => {}, onRetry = () => {}, retries } = {}) {
+// cache: mark the prompt for caching when the model needs it (chat replies).
+export async function chatCompletion(conn, body, { signal, onDelta = () => {}, onRetry = () => {}, retries, cache = false } = {}) {
   const max = retries ?? (await getSettings()).retry?.tries ?? 3;
   for (let attempt = 0; ; attempt++) {
     let started = false;
     try {
-      return await completeOnce(conn, body, { signal, onDelta: (r) => { started ||= !!(r.content || r.reasoning); onDelta(r); } });
+      return await completeOnce(conn, body, { signal, cache, onDelta: (r) => { started ||= !!(r.content || r.reasoning); onDelta(r); } });
     } catch (err) {
       if (err.name === "AbortError" || !err.busy || started || attempt >= max) {
         if (err.busy && attempt > 0) err.message = `${err.message} Tried ${attempt + 1} times; try again in a minute, or pick another model.`;
@@ -174,14 +190,21 @@ export async function chatCompletion(conn, body, { signal, onDelta = () => {}, o
   }
 }
 
-async function completeOnce(conn, body, { signal, onDelta }) {
+async function completeOnce(conn, body, { signal, onDelta, cache }) {
   let extra = {};
   try { extra = parseExtraBody(conn.extraBody); } catch { /* shown on the Connection page */ }
   const payload = { ...extra, ...body };
   if (conn.model) payload.model ??= conn.model;
   if (!payload.model && conn.mode !== "server") throw new Error("No model chosen. Pick one on the Connection page.");
 
-  const r = await request(conn, "chat/completions", payload, signal);
+  const marked = cache && wantsCacheMarks(conn, payload.model) && !unmarkable.has(conn.id);
+  let r = await request(conn, "chat/completions", marked ? { ...payload, messages: withCacheMarks(payload.messages) } : payload, signal);
+  // A proxy that does not understand the marks: send it plain from now on.
+  if (marked && r.status === 400) {
+    const plain = await request(conn, "chat/completions", payload, signal);
+    if (plain.ok) unmarkable.add(conn.id);
+    r = plain;
+  }
   if (!r.ok) {
     const text = friendly(r.status, await r.text());
     // The site's relay marks its own errors; a wrong base URL is not busy.
