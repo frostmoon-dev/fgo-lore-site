@@ -9,6 +9,13 @@ export const APP_VERSION = "2026.09.25.1";
 // Newest first. Each item says what it is and where it lives.
 export const NEWS = [
   {
+    version: "2026.10.28.1",
+    items: [
+      ["Horror Story", "A whole new look after American Horror Story, not just colours: typewritten labels, antique print for headings and the story, hand-inked borders, square corners, film grain, a vignette, faded photographs, a blood-red first letter and a title that flickers now and then. Case-file paper in light, a dark house in dark. Settings → Appearance → Colours, or Chat look."],
+      ["Proper quotes", "Spoken lines in chats now use curly quotes, so book fonts never open a line with a closing mark."],
+    ],
+  },
+  {
     version: "2026.10.26.2",
     items: [
       ["Dialogue stands out", "Spoken lines in \"quotes\" now carry a touch of the accent colour, so speech and narration read apart at a glance. Settings → Appearance → Chat dialogue, or Chat look, switches it back to Plain."],

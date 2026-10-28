@@ -326,7 +326,10 @@ export async function render(main) {
     $("#theme-toggle").setAttribute("aria-label", dark ? "Switch to light theme" : "Switch to dark theme");
   }));
   // Colours, accent, corners and fonts: looks.js stores and applies them.
-  const paintAbout = () => { $("#palette-about", main).textContent = PALETTES.find((p) => p.key === getLook("palette"))?.about ?? ""; };
+  const paintAbout = () => {
+    const p = PALETTES.find((x) => x.key === getLook("palette"));
+    $("#palette-about", main).textContent = `${p?.about ?? ""}${p?.fonts ? " It brings its own fonts while the font choices below stay at Rounded and Fraunces, and keeps its corners square." : ""}`;
+  };
   // A home-made accent can vanish into some backgrounds; say so when it does.
   function paintAccent() {
     const own = isHex(getLook("accent"));

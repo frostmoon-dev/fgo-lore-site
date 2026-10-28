@@ -17,7 +17,9 @@ function inline(s, { quotes }) {
     // An action whose closing * never came (a cut-off or still-streaming
     // reply) runs in italics to the end of the line instead of showing a *.
     .replace(/(^|[^*\w])\*(?=[^\s*])([^*]+)$/, "$1<em>$2</em>");
-  if (quotes) s = s.replace(/(&quot;|“)(.+?)(&quot;|”)/g, '<span class="q">$1$2$3</span>');
+  // Spoken lines, with straight quotes turned into curly ones (many book
+  // fonts draw " as a closing quote, so a line would open with ”).
+  if (quotes) s = s.replace(/(&quot;|“)(.+?)(&quot;|”)/g, '<span class="q">“$2”</span>');
   return s.replace(/\u0000(\d+)\u0000/g, (_, i) => `<code>${codes[i]}</code>`);
 }
 
