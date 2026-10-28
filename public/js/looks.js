@@ -45,6 +45,16 @@ export const PALETTES = [
   { key: "sakura", label: "Sakura", about: "Blush and plum.", swatch: ["#f7eff1", "#4a1f35", "#b0306a"], dark: ["#170f13", "#f6e9ee", "#f39abf"] },
   { key: "ember", label: "Ember", about: "Charcoal and crimson.", swatch: ["#f2efee", "#2a1d1b", "#b3261e"], dark: ["#141010", "#f3ecea", "#ff8a7a"] },
   { key: "mono", label: "Mono", about: "Black and white, nothing else.", swatch: ["#f4f4f4", "#111111", "#111111"], dark: ["#0d0d0d", "#f0f0f0", "#f0f0f0"] },
+  // A whole look rather than colours alone: its fonts replace the defaults
+  // (a font picked in Settings still wins), and style.css adds the borders,
+  // square corners, grain and faded photographs.
+  { key: "horror", label: "Horror Story", about: "After American Horror Story: case-file paper by day, a dark house by night. Typewritten labels, antique print, hand-inked borders and film grain.",
+    swatch: ["#e6dcc8", "#1b1311", "#8f1218"], dark: ["#0d0b0a", "#e9dfcc", "#e2463e"],
+    fonts: {
+      site: { stack: '"Special Elite", "Courier New", monospace', href: gf("Special+Elite") },
+      chat: { stack: `"IM Fell English", ${SERIF}`, href: gf("IM+Fell+English:ital@0;1") },
+      head: { stack: `"IM Fell English SC", ${SERIF}`, href: gf("IM+Fell+English+SC") },
+    } },
 ];
 
 export const CORNERS = [["sharp", "Sharp"], ["soft", "Soft"], ["round", "Round"]];
@@ -87,9 +97,11 @@ function accentVars(hex) {
 export function applyLooks() {
   const root = document.documentElement;
   const pick = (list, key) => list.find((f) => f.key === getLook(key)) ?? list[0];
-  const chat = pick(CHAT_FONTS, "chatFont");
-  const site = pick(SITE_FONTS, "siteFont");
-  const head = pick(HEAD_FONTS, "headFont");
+  // A palette with fonts of its own fills every font left at its default.
+  const own = PALETTES.find((p) => p.key === getLook("palette"))?.fonts;
+  const chat = own && getLook("chatFont") === DEFAULTS.chatFont ? { key: "theme", ...own.chat } : pick(CHAT_FONTS, "chatFont");
+  const site = own && getLook("siteFont") === DEFAULTS.siteFont ? { key: "theme", ...own.site } : pick(SITE_FONTS, "siteFont");
+  const head = own && getLook("headFont") === DEFAULTS.headFont ? { key: "theme", ...own.head } : pick(HEAD_FONTS, "headFont");
 
   const vars = {};
   if (site.key !== "rounded") vars["--font"] = site.stack;
@@ -103,7 +115,7 @@ export function applyLooks() {
 
   const palette = getLook("palette");
   if (palette === "paper") delete root.dataset.palette; else root.dataset.palette = palette;
-  if (chat.key === "rounded") delete root.dataset.chatFont; else root.dataset.chatFont = chat.key;
+  if (chat.key === "rounded" || chat.key === "theme") delete root.dataset.chatFont; else root.dataset.chatFont = chat.key;
   const corners = getLook("corners");
   if (corners === "soft") delete root.dataset.corners; else root.dataset.corners = corners;
 

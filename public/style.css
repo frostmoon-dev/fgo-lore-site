@@ -1809,3 +1809,79 @@ html { -webkit-tap-highlight-color: transparent; }
 .drop-overlay svg { width: 28px; height: 28px; }
 .import-help { padding-top: var(--s4); border-top: 1px solid var(--line); }
 .import-help .steps-list { margin: var(--s3) 0; font-size: var(--t-ui); }
+
+/* ---------- Horror Story ----------
+   A whole look, not only colours, after American Horror Story: aged case-file
+   paper by day, a dark house by night. Typewritten labels (Special Elite),
+   antique print for headings and the story (IM Fell English), hand-inked
+   borders, square corners, film grain, a vignette, faded photographs, and a
+   title that flickers now and then. Fonts load with the theme (looks.js), and
+   a font picked in Settings still wins. Text 7:1, muted text and accent 4.5:1. */
+:root[data-palette="horror"] {
+  --bg: #e6dcc8; --surface: #efe7d6; --raised: #f6f0e3;
+  --ink: #1b1311; --muted: #5e4f45; --narration: #4d4039;
+  --line: #cfc2a9; --line-strong: #7c6b5c; --fill: #ddd1ba; --fill-strong: #d2c4aa;
+  --primary: #7d0d12; --primary-hover: #5e090d; --on-primary: #f6efe2;
+  --accent: #8f1218; --accent-hover: #6d0d12; --on-accent: #ffffff; --accent-soft: #ecc9c0;
+  --danger: #8f1218; --ok: #3f5a2c;
+  --shadow-1: 3px 3px 0 rgba(125, 13, 18, .16);
+  --shadow-2: 6px 6px 0 rgba(27, 19, 17, .2), 0 18px 40px rgba(27, 19, 17, .25);
+  --scrim: rgba(20, 8, 6, .55);
+  --r-sm: 0px; --r-md: 0px; --r-lg: 0px; --r-pill: 0px;
+  --rough: url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2748%27 height=%2748%27 viewBox=%270 0 48 48%27 fill=%27none%27 stroke=%27%234a3a32%27 stroke-linecap=%27round%27%3E %3Cpath stroke-width=%271.7%27 d=%27M.6 4.6C9 3.7 17 5.4 25 4.4S39 5 47.4 3.9%27/%3E %3Cpath stroke-width=%27.7%27 d=%27M2 6.2C14 5.6 30 6.6 46 5.7%27 opacity=%27.55%27/%3E %3Cpath stroke-width=%271.5%27 d=%27M4.3.6C3.5 10 5.2 19 4.2 28S4.9 40 3.8 47.4%27/%3E %3Cpath stroke-width=%271.7%27 d=%27M.6 43.5C10 44.6 20 42.9 31 44.2S42 43.3 47.4 44.4%27/%3E %3Cpath stroke-width=%271.5%27 d=%27M43.6.6C44.5 11 43 22 44.3 32S43.4 41 44.5 47.4%27/%3E %3Cpath stroke-width=%27.6%27 d=%27M41.5 2.2l4.6 3.9M2.4 41.6l3.7 4.4%27 opacity=%27.6%27/%3E %3C/svg%3E");
+  --grain: url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27180%27 height=%27180%27%3E%3Cfilter id=%27n%27%3E%3CfeTurbulence type=%27fractalNoise%27 baseFrequency=%27.85%27 numOctaves=%272%27 stitchTiles=%27stitch%27/%3E%3CfeColorMatrix values=%270 0 0 0 0.1 0 0 0 0 0.05 0 0 0 0 0.03 0 0 0 0.5 0%27/%3E%3C/filter%3E%3Crect width=%27100%25%27 height=%27100%25%27 filter=%27url%28%23n%29%27/%3E%3C/svg%3E");
+  --vignette: radial-gradient(ellipse at center, transparent 55%, rgba(70, 30, 15, .22) 100%);
+}
+:root[data-palette="horror"][data-theme="dark"] {
+  --bg: #0d0b0a; --surface: #15110f; --raised: #1c1714;
+  --ink: #e9dfcc; --muted: #a39783; --narration: #cbbfa9;
+  --line: #2c2420; --line-strong: #75685a; --fill: #221c18; --fill-strong: #2e2520;
+  --primary: #a3161c; --primary-hover: #c01f26; --on-primary: #f3ead9;
+  --accent: #e2463e; --accent-hover: #ee6a5f; --on-accent: #120707; --accent-soft: #3a1513;
+  --danger: #ff6b5e; --ok: #9db88a;
+  --shadow-1: 3px 3px 0 rgba(163, 22, 28, .28);
+  --shadow-2: 6px 6px 0 rgba(163, 22, 28, .25), 0 18px 48px rgba(0, 0, 0, .7);
+  --scrim: rgba(0, 0, 0, .72);
+  --rough: url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2748%27 height=%2748%27 viewBox=%270 0 48 48%27 fill=%27none%27 stroke=%27%237a6b5b%27 stroke-linecap=%27round%27%3E %3Cpath stroke-width=%271.7%27 d=%27M.6 4.6C9 3.7 17 5.4 25 4.4S39 5 47.4 3.9%27/%3E %3Cpath stroke-width=%27.7%27 d=%27M2 6.2C14 5.6 30 6.6 46 5.7%27 opacity=%27.55%27/%3E %3Cpath stroke-width=%271.5%27 d=%27M4.3.6C3.5 10 5.2 19 4.2 28S4.9 40 3.8 47.4%27/%3E %3Cpath stroke-width=%271.7%27 d=%27M.6 43.5C10 44.6 20 42.9 31 44.2S42 43.3 47.4 44.4%27/%3E %3Cpath stroke-width=%271.5%27 d=%27M43.6.6C44.5 11 43 22 44.3 32S43.4 41 44.5 47.4%27/%3E %3Cpath stroke-width=%27.6%27 d=%27M41.5 2.2l4.6 3.9M2.4 41.6l3.7 4.4%27 opacity=%27.6%27/%3E %3C/svg%3E");
+  --grain: url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27180%27 height=%27180%27%3E%3Cfilter id=%27n%27%3E%3CfeTurbulence type=%27fractalNoise%27 baseFrequency=%27.85%27 numOctaves=%272%27 stitchTiles=%27stitch%27/%3E%3CfeColorMatrix values=%270 0 0 0 0.95 0 0 0 0 0.9 0 0 0 0 0.82 0 0 0 0.35 0%27/%3E%3C/filter%3E%3Crect width=%27100%25%27 height=%27100%25%27 filter=%27url%28%23n%29%27/%3E%3C/svg%3E");
+  --vignette: radial-gradient(ellipse at center, transparent 50%, rgba(0, 0, 0, .55) 100%);
+}
+/* Film grain and a vignette over everything; clicks go straight through. */
+:root[data-palette="horror"] body::before,
+:root[data-palette="horror"] body::after { content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 2147483000; }
+:root[data-palette="horror"] body::before { background: var(--vignette); }
+:root[data-palette="horror"] body::after { background-image: var(--grain); opacity: .18; mix-blend-mode: multiply; }
+:root[data-palette="horror"][data-theme="dark"] body::after { mix-blend-mode: screen; opacity: .14; }
+/* Hand-inked borders: square, uneven, a little overshoot at the corners. */
+:root[data-palette="horror"] :is(.card, dialog, .btn, .segmented, .composer-box, .bot-card, .swatch, .drop-zone, .toast,
+  input[type="text"], input[type="url"], input[type="password"], input[type="search"], input[type="number"], select, textarea) {
+  border-style: solid; border-width: 2px; border-color: transparent;
+  border-image: var(--rough) 8 / 8px / 2px round;
+}
+:root[data-palette="horror"] .composer-box textarea,
+:root[data-palette="horror"] .title-input { border-image: none; border-color: transparent; }
+:root[data-palette="horror"] .swatch:has(input:checked) { box-shadow: 3px 3px 0 var(--accent); }
+/* Typewritten labels: buttons, choices, chips and names. */
+:root[data-palette="horror"] :is(.btn, .segmented span, .chip, .msg-name, .field-label, .field > label:not(.check), .tool-label, .main-nav a) {
+  text-transform: uppercase; letter-spacing: .07em; font-weight: 400;
+}
+:root[data-palette="horror"] :is(h1, h2, h3) { font-weight: 400; letter-spacing: .02em; }
+:root[data-palette="horror"] h1 { animation: horror-flicker 9s steps(1, end) infinite; }
+@keyframes horror-flicker {
+  0%, 91%, 93%, 95.5%, 100% { opacity: 1; }
+  92% { opacity: .35; } 94% { opacity: .75; } 95% { opacity: .2; }
+}
+/* Faded photographs. */
+:root[data-palette="horror"] :is(.avatar img, .portrait img, .expr-face img, .bg-thumb img) {
+  filter: sepia(.35) saturate(.8) contrast(1.08);
+}
+:root[data-palette="horror"] ::selection { background: var(--primary); color: var(--on-primary); }
+:root[data-palette="horror"] { scrollbar-color: var(--primary) var(--bg); }
+:root[data-palette="horror"] .msg-body .caret,
+:root[data-palette="horror"] .msg-body .typing i { background: var(--accent); }
+:root[data-palette="horror"][data-theme="dark"] .msg-body { font-weight: 400; }
+/* The story opens with a blood-red initial in every layout, not only Novel. */
+:root[data-palette="horror"] .msg.is-opening .msg-body > p:first-child::first-letter {
+  float: left; margin: .06em .12em 0 0; font-family: var(--font-display); font-size: 3.1em; line-height: .82;
+  font-style: normal; color: var(--accent);
+}
