@@ -1034,7 +1034,8 @@ body.in-chat .site-footer { display: none; }
   .msg:not(.is-last):not(.tools-open):not(:focus-within) .msg-foot { min-height: 0; }
   .msg:not(.is-last):not(.tools-open):not(:focus-within) .msg-foot:not(:has(.swipes, .msg-meta)) { display: none; }
 }
-.msg-meta { font-size: var(--t-sm); color: var(--muted); margin-left: auto; display: flex; align-items: center; gap: var(--s2); }
+.msg-meta { font-size: var(--t-sm); color: var(--muted); margin-left: auto; display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: var(--s2); min-width: 0; }
+.msg-meta .chip { white-space: nowrap; }
 .swipes { display: inline-flex; align-items: center; font-size: var(--t-sm); color: var(--muted); font-variant-numeric: tabular-nums; }
 .msg-edit textarea { min-height: 112px; }
 .msg-edit .actions { margin-top: var(--s2); justify-content: flex-end; }
@@ -1861,8 +1862,9 @@ html { -webkit-tap-highlight-color: transparent; }
 :root[data-palette="horror"] .composer-box textarea,
 :root[data-palette="horror"] .title-input { border-image: none; border-color: transparent; }
 :root[data-palette="horror"] .swatch:has(input:checked) { box-shadow: 3px 3px 0 var(--accent); }
-/* Typewritten labels: buttons, choices, chips and names. */
-:root[data-palette="horror"] :is(.btn, .segmented span, .chip, .msg-name, .field-label, .field > label:not(.check), .tool-label, .main-nav a) {
+/* Typewritten labels: buttons, choices and names. Chips under a message
+   (lore titles, moods) stay in normal case: in capitals they crowd the row. */
+:root[data-palette="horror"] :is(.btn, .segmented span, .msg-name, .field-label, .field > label:not(.check), .tool-label, .main-nav a) {
   text-transform: uppercase; letter-spacing: .07em; font-weight: 400;
 }
 :root[data-palette="horror"] :is(h1, h2, h3) { font-weight: 400; letter-spacing: .02em; }
@@ -1880,6 +1882,10 @@ html { -webkit-tap-highlight-color: transparent; }
 :root[data-palette="horror"] .msg-body .caret,
 :root[data-palette="horror"] .msg-body .typing i { background: var(--accent); }
 :root[data-palette="horror"][data-theme="dark"] .msg-body { font-weight: 400; }
+/* Speech in a pale blood tint, not full red: long passages stay easy on the
+   eyes, and red is kept for initials, buttons and the cursor. */
+:root[data-palette="horror"] .msg-body .q { color: color-mix(in srgb, var(--accent) 35%, var(--ink)); }
+:root[data-palette="horror"][data-chat-quotes="plain"] .msg-body .q { color: inherit; }
 /* The story opens with a blood-red initial in every layout, not only Novel. */
 :root[data-palette="horror"] .msg.is-opening .msg-body > p:first-child::first-letter {
   float: left; margin: .06em .12em 0 0; font-family: var(--font-display); font-size: 3.1em; line-height: .82;

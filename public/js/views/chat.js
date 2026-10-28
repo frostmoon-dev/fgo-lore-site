@@ -618,7 +618,11 @@ export async function render(main, [botId, chatId, jumpTo]) {
     if (avoided.length) {
       info.push(`<button type="button" class="chip avoid-chip" data-action="fix-avoided" title="${esc(avoided.join(", "))}">${avoided.length} overused phrase${avoided.length === 1 ? "" : "s"}</button>`);
     }
-    if (meta.lore?.length) info.push(meta.lore.map((t) => `<span class="chip" title="Lore used">${esc(t)}</span>`).join(""));
+    if (meta.lore?.length) {
+      // Entries can share a title ("{{user}} relationship" five times): one chip each, with a count, macros filled in.
+      const counts = meta.lore.reduce((c, t) => c.set(t, (c.get(t) ?? 0) + 1), new Map());
+      info.push([...counts].map(([t, n]) => `<span class="chip" title="Lore used">${esc(applyMacros(t, namesFor(speaker ?? bot)))}${n > 1 ? ` ×${n}` : ""}</span>`).join(""));
+    }
     if (meta.usage) {
       const cached = cachedTokens(meta.usage);
       info.push(`<span title="Tokens in / out${cached ? "; reused from the provider's cache" : ""}">${meta.usage.prompt_tokens ?? "?"} → ${meta.usage.completion_tokens ?? "?"} tokens${cached ? ` · ${cached} cached` : ""}</span>`);
