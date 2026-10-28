@@ -1825,7 +1825,7 @@ html { -webkit-tap-highlight-color: transparent; }
   --primary: #7d0d12; --primary-hover: #5e090d; --on-primary: #f6efe2;
   --accent: #8f1218; --accent-hover: #6d0d12; --on-accent: #ffffff; --accent-soft: #ecc9c0;
   --danger: #8f1218; --ok: #3f5a2c;
-  --shadow-1: 3px 3px 0 rgba(125, 13, 18, .16);
+  --shadow-1: 3px 3px 0 color-mix(in srgb, var(--accent) 18%, transparent);
   --shadow-2: 6px 6px 0 rgba(27, 19, 17, .2), 0 18px 40px rgba(27, 19, 17, .25);
   --scrim: rgba(20, 8, 6, .55);
   --r-sm: 0px; --r-md: 0px; --r-lg: 0px; --r-pill: 0px;
@@ -1840,8 +1840,8 @@ html { -webkit-tap-highlight-color: transparent; }
   --primary: #a3161c; --primary-hover: #c01f26; --on-primary: #f3ead9;
   --accent: #e2463e; --accent-hover: #ee6a5f; --on-accent: #120707; --accent-soft: #3a1513;
   --danger: #ff6b5e; --ok: #9db88a;
-  --shadow-1: 3px 3px 0 rgba(163, 22, 28, .28);
-  --shadow-2: 6px 6px 0 rgba(163, 22, 28, .25), 0 18px 48px rgba(0, 0, 0, .7);
+  --shadow-1: 3px 3px 0 color-mix(in srgb, var(--accent) 30%, transparent);
+  --shadow-2: 6px 6px 0 color-mix(in srgb, var(--accent) 25%, transparent), 0 18px 48px rgba(0, 0, 0, .7);
   --scrim: rgba(0, 0, 0, .72);
   --rough: url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2748%27 height=%2748%27 viewBox=%270 0 48 48%27 fill=%27none%27 stroke=%27%237a6b5b%27 stroke-linecap=%27round%27%3E %3Cpath stroke-width=%271.7%27 d=%27M.6 4.6C9 3.7 17 5.4 25 4.4S39 5 47.4 3.9%27/%3E %3Cpath stroke-width=%27.7%27 d=%27M2 6.2C14 5.6 30 6.6 46 5.7%27 opacity=%27.55%27/%3E %3Cpath stroke-width=%271.5%27 d=%27M4.3.6C3.5 10 5.2 19 4.2 28S4.9 40 3.8 47.4%27/%3E %3Cpath stroke-width=%271.7%27 d=%27M.6 43.5C10 44.6 20 42.9 31 44.2S42 43.3 47.4 44.4%27/%3E %3Cpath stroke-width=%271.5%27 d=%27M43.6.6C44.5 11 43 22 44.3 32S43.4 41 44.5 47.4%27/%3E %3Cpath stroke-width=%27.6%27 d=%27M41.5 2.2l4.6 3.9M2.4 41.6l3.7 4.4%27 opacity=%27.6%27/%3E %3C/svg%3E");
   --grain: url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27180%27 height=%27180%27%3E%3Cfilter id=%27n%27%3E%3CfeTurbulence type=%27fractalNoise%27 baseFrequency=%27.85%27 numOctaves=%272%27 stitchTiles=%27stitch%27/%3E%3CfeColorMatrix values=%270 0 0 0 0.95 0 0 0 0 0.9 0 0 0 0 0.82 0 0 0 0.35 0%27/%3E%3C/filter%3E%3Crect width=%27100%25%27 height=%27100%25%27 filter=%27url%28%23n%29%27/%3E%3C/svg%3E");
@@ -1854,7 +1854,7 @@ html { -webkit-tap-highlight-color: transparent; }
 :root[data-palette="horror"] body::after { background-image: var(--grain); opacity: .18; mix-blend-mode: multiply; }
 :root[data-palette="horror"][data-theme="dark"] body::after { mix-blend-mode: screen; opacity: .14; }
 /* Hand-inked borders: square, uneven, a little overshoot at the corners. */
-:root[data-palette="horror"] :is(.card, dialog, .btn, .segmented, .composer-box, .bot-card, .swatch, .drop-zone, .toast,
+:root[data-palette="horror"] :is(.card, dialog, .btn, .segmented, .composer-box, .bot-card, .swatch, .drop-zone, .toast, .menu,
   input[type="text"], input[type="url"], input[type="password"], input[type="search"], input[type="number"], select, textarea) {
   border-style: solid; border-width: 2px; border-color: transparent;
   border-image: var(--rough) 8 / 8px / 2px round;
@@ -1891,3 +1891,164 @@ html { -webkit-tap-highlight-color: transparent; }
   float: left; margin: .06em .12em 0 0; font-family: var(--font-display); font-size: 3.1em; line-height: .82;
   font-style: normal; color: var(--accent);
 }
+
+/* ---------- Horror Story, after research into the show ----------
+   The logo is ITC Willow, after Charles Rennie Mackintosh's Art Nouveau
+   lettering: tall, condensed, scratchy, blood red on black. Aubrey (free,
+   condensed Art Nouveau) stands in, roughened by an SVG filter. The opening
+   titles were shot on grainy Super 16mm, so the grain moves like film. */
+:root[data-palette="horror"] :is(h1, h2, h3) { text-transform: uppercase; letter-spacing: .04em; line-height: 1.05; }
+:root[data-palette="horror"] h1 { color: var(--accent); font-size: calc(var(--t-2xl) * 1.25); letter-spacing: .05em; filter: url(#mp-scratch); }
+:root[data-palette="horror"] .card-title { letter-spacing: .06em; }
+/* The typewriter face runs wide; the header keeps room for everything. */
+:root[data-palette="horror"] .main-nav a { letter-spacing: .02em; }
+/* Phones: a tap flashes the season's colour, not the system grey. */
+:root[data-palette="horror"] { -webkit-tap-highlight-color: color-mix(in srgb, var(--accent) 25%, transparent); }
+/* A line the fandom quotes, one a day, under the home page title. */
+.epigraph { margin: var(--s2) 0 var(--s3); font-family: var(--chat-font, var(--font)); font-style: italic; color: var(--narration); font-size: var(--t-md); }
+.epigraph span { display: block; margin-top: 2px; font-family: var(--font); font-style: normal; font-size: var(--t-xs); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.epigraph span::before { content: "— "; }
+/* Film grain that moves, a few frames a second, like Super 16mm. */
+:root[data-palette="horror"] body::after { inset: -50%; animation: horror-grain .5s steps(5) infinite; }
+@keyframes horror-grain {
+  0% { transform: translate(0, 0); } 20% { transform: translate(-3%, 2%); } 40% { transform: translate(2%, -3%); }
+  60% { transform: translate(-2%, -1%); } 80% { transform: translate(3%, 3%); } 100% { transform: translate(0, 0); }
+}
+/* Asylum: Briarcliff's institutional green and rust; cards ruled like case files. */
+:root[data-palette="horror"][data-season="asylum"] {
+  --bg: #dfe2d6;
+  --surface: #e9ebe1;
+  --raised: #f3f4ec;
+  --ink: #141a16;
+  --muted: #4f5a52;
+  --narration: #434d46;
+  --line: #c6ccbc;
+  --line-strong: #6f7a70;
+  --fill: #d4d9ca;
+  --fill-strong: #c8cfbd;
+  --primary: #3c4f43;
+  --primary-hover: #2d3c33;
+  --on-primary: #eef1e8;
+  --accent: #8a2b12;
+  --accent-hover: #6c210d;
+  --on-accent: #ffffff;
+  --accent-soft: #e8cfc2;
+  --rough: url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2748%27 height=%2748%27 viewBox=%270 0 48 48%27 fill=%27none%27 stroke=%27%234a5a4e%27 stroke-linecap=%27round%27%3E %3Cpath stroke-width=%271.7%27 d=%27M.6 4.6C9 3.7 17 5.4 25 4.4S39 5 47.4 3.9%27/%3E %3Cpath stroke-width=%27.7%27 d=%27M2 6.2C14 5.6 30 6.6 46 5.7%27 opacity=%27.55%27/%3E %3Cpath stroke-width=%271.5%27 d=%27M4.3.6C3.5 10 5.2 19 4.2 28S4.9 40 3.8 47.4%27/%3E %3Cpath stroke-width=%271.7%27 d=%27M.6 43.5C10 44.6 20 42.9 31 44.2S42 43.3 47.4 44.4%27/%3E %3Cpath stroke-width=%271.5%27 d=%27M43.6.6C44.5 11 43 22 44.3 32S43.4 41 44.5 47.4%27/%3E %3Cpath stroke-width=%27.6%27 d=%27M41.5 2.2l4.6 3.9M2.4 41.6l3.7 4.4%27 opacity=%27.6%27/%3E %3C/svg%3E");
+}
+:root[data-palette="horror"][data-season="asylum"][data-theme="dark"] {
+  --bg: #0b0f0d;
+  --surface: #121815;
+  --raised: #18201c;
+  --ink: #dfe6dc;
+  --muted: #96a297;
+  --narration: #c3cdc2;
+  --line: #232c27;
+  --line-strong: #66736a;
+  --fill: #1c2420;
+  --fill-strong: #26302a;
+  --primary: #7a9a83;
+  --primary-hover: #8fae97;
+  --on-primary: #0b0f0d;
+  --accent: #d9714f;
+  --accent-hover: #e58b6d;
+  --on-accent: #120805;
+  --accent-soft: #33201a;
+  --rough: url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2748%27 height=%2748%27 viewBox=%270 0 48 48%27 fill=%27none%27 stroke=%27%236c7a6f%27 stroke-linecap=%27round%27%3E %3Cpath stroke-width=%271.7%27 d=%27M.6 4.6C9 3.7 17 5.4 25 4.4S39 5 47.4 3.9%27/%3E %3Cpath stroke-width=%27.7%27 d=%27M2 6.2C14 5.6 30 6.6 46 5.7%27 opacity=%27.55%27/%3E %3Cpath stroke-width=%271.5%27 d=%27M4.3.6C3.5 10 5.2 19 4.2 28S4.9 40 3.8 47.4%27/%3E %3Cpath stroke-width=%271.7%27 d=%27M.6 43.5C10 44.6 20 42.9 31 44.2S42 43.3 47.4 44.4%27/%3E %3Cpath stroke-width=%271.5%27 d=%27M43.6.6C44.5 11 43 22 44.3 32S43.4 41 44.5 47.4%27/%3E %3Cpath stroke-width=%27.6%27 d=%27M41.5 2.2l4.6 3.9M2.4 41.6l3.7 4.4%27 opacity=%27.6%27/%3E %3C/svg%3E");
+}
+/* Coven: black lace and white with a witch's violet; cards edged with a fine inner rule like lace trim. */
+:root[data-palette="horror"][data-season="coven"] {
+  --bg: #ebeae8;
+  --surface: #f5f4f2;
+  --raised: #fbfaf9;
+  --ink: #0f0e10;
+  --muted: #55525a;
+  --narration: #47444b;
+  --line: #d5d3d6;
+  --line-strong: #7a7680;
+  --fill: #e1dfe2;
+  --fill-strong: #d5d2d7;
+  --primary: #141215;
+  --primary-hover: #2a272c;
+  --on-primary: #f5f4f2;
+  --accent: #5b3a78;
+  --accent-hover: #472d5e;
+  --on-accent: #ffffff;
+  --accent-soft: #e2d8eb;
+  --rough: url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2748%27 height=%2748%27 viewBox=%270 0 48 48%27 fill=%27none%27 stroke=%27%232a272c%27 stroke-linecap=%27round%27%3E %3Cpath stroke-width=%271.7%27 d=%27M.6 4.6C9 3.7 17 5.4 25 4.4S39 5 47.4 3.9%27/%3E %3Cpath stroke-width=%27.7%27 d=%27M2 6.2C14 5.6 30 6.6 46 5.7%27 opacity=%27.55%27/%3E %3Cpath stroke-width=%271.5%27 d=%27M4.3.6C3.5 10 5.2 19 4.2 28S4.9 40 3.8 47.4%27/%3E %3Cpath stroke-width=%271.7%27 d=%27M.6 43.5C10 44.6 20 42.9 31 44.2S42 43.3 47.4 44.4%27/%3E %3Cpath stroke-width=%271.5%27 d=%27M43.6.6C44.5 11 43 22 44.3 32S43.4 41 44.5 47.4%27/%3E %3Cpath stroke-width=%27.6%27 d=%27M41.5 2.2l4.6 3.9M2.4 41.6l3.7 4.4%27 opacity=%27.6%27/%3E %3C/svg%3E");
+}
+:root[data-palette="horror"][data-season="coven"][data-theme="dark"] {
+  --bg: #070708;
+  --surface: #0f0f11;
+  --raised: #161618;
+  --ink: #ecebee;
+  --muted: #a29fa8;
+  --narration: #cfccd4;
+  --line: #222125;
+  --line-strong: #6f6c75;
+  --fill: #1b1a1e;
+  --fill-strong: #252428;
+  --primary: #ecebee;
+  --primary-hover: #ffffff;
+  --on-primary: #0f0e10;
+  --accent: #c3a6e0;
+  --accent-hover: #d4bdea;
+  --on-accent: #160d1e;
+  --accent-soft: #2a2133;
+  --rough: url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2748%27 height=%2748%27 viewBox=%270 0 48 48%27 fill=%27none%27 stroke=%27%237a7680%27 stroke-linecap=%27round%27%3E %3Cpath stroke-width=%271.7%27 d=%27M.6 4.6C9 3.7 17 5.4 25 4.4S39 5 47.4 3.9%27/%3E %3Cpath stroke-width=%27.7%27 d=%27M2 6.2C14 5.6 30 6.6 46 5.7%27 opacity=%27.55%27/%3E %3Cpath stroke-width=%271.5%27 d=%27M4.3.6C3.5 10 5.2 19 4.2 28S4.9 40 3.8 47.4%27/%3E %3Cpath stroke-width=%271.7%27 d=%27M.6 43.5C10 44.6 20 42.9 31 44.2S42 43.3 47.4 44.4%27/%3E %3Cpath stroke-width=%271.5%27 d=%27M43.6.6C44.5 11 43 22 44.3 32S43.4 41 44.5 47.4%27/%3E %3Cpath stroke-width=%27.6%27 d=%27M41.5 2.2l4.6 3.9M2.4 41.6l3.7 4.4%27 opacity=%27.6%27/%3E %3C/svg%3E");
+}
+/* Hotel: the Cortez's art deco crimson and gold; titles glow like neon and sit on a gold double rule. */
+:root[data-palette="horror"][data-season="hotel"] {
+  --bg: #eadfd0;
+  --surface: #f3eadd;
+  --raised: #f8f2e8;
+  --ink: #1c1210;
+  --muted: #5e4a41;
+  --narration: #4f3d36;
+  --line: #d6c6b2;
+  --line-strong: #7f6a5a;
+  --fill: #e2d4c1;
+  --fill-strong: #d8c6b0;
+  --primary: #6e0f1c;
+  --primary-hover: #530b15;
+  --on-primary: #f8f2e8;
+  --accent: #7d5810;
+  --accent-hover: #624509;
+  --on-accent: #ffffff;
+  --accent-soft: #efdfbd;
+  --rough: url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2748%27 height=%2748%27 viewBox=%270 0 48 48%27 fill=%27none%27 stroke=%27%236a4a2a%27 stroke-linecap=%27round%27%3E %3Cpath stroke-width=%271.7%27 d=%27M.6 4.6C9 3.7 17 5.4 25 4.4S39 5 47.4 3.9%27/%3E %3Cpath stroke-width=%27.7%27 d=%27M2 6.2C14 5.6 30 6.6 46 5.7%27 opacity=%27.55%27/%3E %3Cpath stroke-width=%271.5%27 d=%27M4.3.6C3.5 10 5.2 19 4.2 28S4.9 40 3.8 47.4%27/%3E %3Cpath stroke-width=%271.7%27 d=%27M.6 43.5C10 44.6 20 42.9 31 44.2S42 43.3 47.4 44.4%27/%3E %3Cpath stroke-width=%271.5%27 d=%27M43.6.6C44.5 11 43 22 44.3 32S43.4 41 44.5 47.4%27/%3E %3Cpath stroke-width=%27.6%27 d=%27M41.5 2.2l4.6 3.9M2.4 41.6l3.7 4.4%27 opacity=%27.6%27/%3E %3C/svg%3E");
+}
+:root[data-palette="horror"][data-season="hotel"][data-theme="dark"] {
+  --bg: #0f0708;
+  --surface: #170c0e;
+  --raised: #1f1113;
+  --ink: #f1e4d4;
+  --muted: #b09c8c;
+  --narration: #d9c9b8;
+  --line: #2e1b1e;
+  --line-strong: #7d6560;
+  --fill: #24151a;
+  --fill-strong: #301c22;
+  --primary: #a3122a;
+  --primary-hover: #c0183a;
+  --on-primary: #fbefe0;
+  --accent: #e3b75a;
+  --accent-hover: #efca7c;
+  --on-accent: #1a1205;
+  --accent-soft: #3a2a10;
+  --rough: url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2748%27 height=%2748%27 viewBox=%270 0 48 48%27 fill=%27none%27 stroke=%27%238a6a4a%27 stroke-linecap=%27round%27%3E %3Cpath stroke-width=%271.7%27 d=%27M.6 4.6C9 3.7 17 5.4 25 4.4S39 5 47.4 3.9%27/%3E %3Cpath stroke-width=%27.7%27 d=%27M2 6.2C14 5.6 30 6.6 46 5.7%27 opacity=%27.55%27/%3E %3Cpath stroke-width=%271.5%27 d=%27M4.3.6C3.5 10 5.2 19 4.2 28S4.9 40 3.8 47.4%27/%3E %3Cpath stroke-width=%271.7%27 d=%27M.6 43.5C10 44.6 20 42.9 31 44.2S42 43.3 47.4 44.4%27/%3E %3Cpath stroke-width=%271.5%27 d=%27M43.6.6C44.5 11 43 22 44.3 32S43.4 41 44.5 47.4%27/%3E %3Cpath stroke-width=%27.6%27 d=%27M41.5 2.2l4.6 3.9M2.4 41.6l3.7 4.4%27 opacity=%27.6%27/%3E %3C/svg%3E");
+}
+:root[data-palette="horror"][data-season="asylum"] .card {
+  background-image: repeating-linear-gradient(to bottom, transparent 0 27px, color-mix(in srgb, var(--line) 75%, transparent) 27px 28px);
+}
+:root[data-palette="horror"][data-season="coven"] .card,
+:root[data-palette="horror"][data-season="coven"] dialog {
+  box-shadow: inset 0 0 0 5px var(--surface), inset 0 0 0 6px var(--line-strong), var(--shadow-1);
+}
+:root[data-palette="horror"][data-season="coven"] dialog { box-shadow: inset 0 0 0 5px var(--raised), inset 0 0 0 6px var(--line-strong), var(--shadow-2); }
+:root[data-palette="horror"][data-season="hotel"] h1 { padding-bottom: var(--s2); border-bottom: 4px double var(--accent); filter: none; }
+:root[data-palette="horror"][data-season="hotel"][data-theme="dark"] h1 {
+  color: #ffd98a;
+  text-shadow: 0 0 4px rgba(227, 183, 90, .9), 0 0 14px rgba(192, 24, 58, .75), 0 0 32px rgba(192, 24, 58, .45);
+  animation: horror-neon 7s steps(1, end) infinite;
+}
+@keyframes horror-neon { 0%, 88%, 90%, 100% { opacity: 1; } 89% { opacity: .55; } 91% { opacity: .8; } }

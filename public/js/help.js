@@ -9,6 +9,14 @@ export const APP_VERSION = "2026.09.25.1";
 // Newest first. Each item says what it is and where it lives.
 export const NEWS = [
   {
+    version: "2026.10.28.2",
+    items: [
+      ["Horror Story, season by season", "Pick a season under Settings → Appearance → Colours: Murder House (blood red on black), Asylum (Briarcliff green and rust, cards ruled like case files), Coven (black lace and white with a witch's violet) or Hotel (the Cortez's art deco crimson and gold, with a neon title)."],
+      ["A logo-like title", "Horror Story's titles now use Aubrey, a tall Art Nouveau face close to the show's Mackintosh-style logo, in blood red with scratched edges. The film grain moves like the Super 16mm opening titles, and the home page opens with a line the fandom quotes."],
+      ["On phones too", "Menus get the inked frame, taps flash the season's colour, and the browser bar follows the season."],
+    ],
+  },
+  {
     version: "2026.10.28.1",
     items: [
       ["Horror Story", "A whole new look after American Horror Story, not just colours: typewritten labels, antique print for headings and the story, hand-inked borders, square corners, film grain, a vignette, faded photographs, a blood-red first letter and a title that flickers now and then. Case-file paper in light, a dark house in dark. Settings → Appearance → Colours, or Chat look."],

@@ -27,6 +27,8 @@ try {
   if (chatRead) root.dataset.chatRead = chatRead;
   const corners = localStorage.getItem("corners");
   if (corners) root.dataset.corners = corners;
+  const season = localStorage.getItem("horrorSeason");
+  if (season && palette === "horror") root.dataset.season = season;
   // Fonts and accent from looks.js: CSS variables, and font files to load.
   const looks = JSON.parse(localStorage.getItem("looks") || "null");
   for (const [k, v] of Object.entries(looks?.vars ?? {})) root.style.setProperty(k, v);

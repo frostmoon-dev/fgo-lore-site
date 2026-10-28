@@ -2,7 +2,7 @@ import { getSettings, saveSettings, exportAll, importAll, wipeAll, getUsage, cle
 import { usageChartHTML, wireUsageChart, shortNumber } from "../chart.js";
 import { installState, promptInstall, onInstallChange } from "../install.js";
 import {
-  CHAT_FONTS, SITE_FONTS, HEAD_FONTS, CORNERS, PALETTES, getLook, setLook, fontSelectHTML, paletteSwatchesHTML, contrast, isHex,
+  CHAT_FONTS, SITE_FONTS, HEAD_FONTS, CORNERS, PALETTES, SEASONS, getLook, setLook, fontSelectHTML, paletteSwatchesHTML, contrast, isHex,
 } from "../looks.js";
 import {
   $, $$, esc, icon, toast, confirmDialog, download, pickFile,
@@ -62,6 +62,11 @@ export async function render(main) {
             <legend class="field-label">Colours</legend>
             ${paletteSwatchesHTML("palette", getLook("palette"))}
             <p class="hint" id="palette-about"></p>
+          </fieldset>
+          <fieldset class="field" id="season-field">
+            <legend class="field-label">Season</legend>
+            ${segmentedHTML("season", SEASONS.map((x) => [x.key, x.label]), getLook("horrorSeason"))}
+            <p class="hint" id="season-about"></p>
           </fieldset>
           <div class="field">
             <label for="accent">Accent colour</label>
@@ -328,6 +333,8 @@ export async function render(main) {
   // Colours, accent, corners and fonts: looks.js stores and applies them.
   const paintAbout = () => {
     const p = PALETTES.find((x) => x.key === getLook("palette"));
+    $("#season-field", main).hidden = p?.key !== "horror";
+    $("#season-about", main).textContent = SEASONS.find((x) => x.key === getLook("horrorSeason"))?.about ?? "";
     $("#palette-about", main).textContent = `${p?.about ?? ""}${p?.fonts ? " It brings its own fonts while the font choices below stay at Rounded and Fraunces, and keeps its corners square." : ""}`;
   };
   // A home-made accent can vanish into some backgrounds; say so when it does.
@@ -342,6 +349,7 @@ export async function render(main) {
     $("#accent-hint", main).classList.toggle("error-text", weak);
   }
   $$('input[name="palette"]', main).forEach((r) => r.addEventListener("change", () => { setLook("palette", r.value); paintAbout(); paintAccent(); }));
+  $$('input[name="season"]', main).forEach((r) => r.addEventListener("change", () => { setLook("horrorSeason", r.value); paintAbout(); paintAccent(); }));
   $("#accent", main).addEventListener("input", (e) => { setLook("accent", e.target.value); paintAccent(); });
   $("#accent-reset", main).addEventListener("click", () => { setLook("accent", ""); paintAccent(); });
   $$('input[name="corners"]', main).forEach((r) => r.addEventListener("change", () => setLook("corners", r.value)));

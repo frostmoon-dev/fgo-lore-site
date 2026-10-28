@@ -3,6 +3,7 @@ import { $, $$, esc, confirmDialog, toast } from "./ui.js";
 import { registerServiceWorker } from "./install.js";
 import { openPalette, goToSettings } from "./palette.js";
 import { maybeShowTour } from "./help.js";
+import { applyLooks } from "./looks.js";
 
 // ---------- Routes ----------
 // Each view module exports render(main, params) and may return
@@ -116,7 +117,7 @@ function paintThemeButton() {
   $$('meta[name="theme-color"]').forEach((m) => { m.setAttribute("content", bg); m.removeAttribute("media"); });
 }
 // Settings changes the theme and colours too; follow them from one place.
-new MutationObserver(paintThemeButton).observe(document.documentElement, { attributeFilter: ["data-theme", "data-palette"] });
+new MutationObserver(paintThemeButton).observe(document.documentElement, { attributeFilter: ["data-theme", "data-palette", "data-season"] });
 themeBtn.addEventListener("click", () => {
   const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
   document.documentElement.dataset.theme = next;
@@ -167,6 +168,9 @@ try {
 }
 paintStatus();
 await route();
+// theme-init.js has set the colours and fonts; this adds what needs the page
+// itself, like Horror Story's scratched-title filter.
+applyLooks();
 registerServiceWorker();
 maybeShowTour();
 
