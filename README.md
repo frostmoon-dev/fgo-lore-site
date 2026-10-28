@@ -98,8 +98,10 @@ server-side storage of your key.
   Rename still offers a suggested title.
 - **Colours**: Moon Cell (violet and rose, after BB; the default), Paper (cream and clay), Avalon
   (moss and gold), Chaldea (slate and blue), Sakura (blush and plum), Ember (charcoal and crimson) or
-  Mono, each in light and dark, or Horror Story (after American Horror Story: its own fonts, hand-inked
-  borders, square corners, film grain, a vignette and faded photographs), with text at 7:1 contrast and the accent at 4.5:1. An accent colour of
+  Mono, each in light and dark, or Horror Story (after American Horror Story: Aubrey titles in the spirit of
+  the show's Mackintosh-style logo, typewritten labels, hand-inked borders, square corners, moving
+  film grain, a vignette, faded photographs, a fandom quote on the home page, and four seasons:
+  Murder House, Asylum, Coven and Hotel), with text at 7:1 contrast and the accent at 4.5:1. An accent colour of
   your own can replace the set's. Corners: Sharp, Soft or Round. Settings → Appearance, or Chat look.
 - **Chat touches**: spoken lines in quotes are tinted toward the accent (Settings → Appearance →
   Chat dialogue: Tinted or Plain); a strip under the chat header shows the scene tracker's location

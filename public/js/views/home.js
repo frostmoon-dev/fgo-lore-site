@@ -7,6 +7,7 @@ import { importCardFile, importChubLink } from "../card.js";
 import { $, $$, esc, icon, avatarHTML, toast, timeAgo, download, openDialog } from "../ui.js";
 import { currentText } from "../prompt.js";
 import { previewHTML } from "../markdown.js";
+import { epigraph } from "../looks.js";
 
 export async function render(main) {
   const [allBots, allChats, conns, persona] = await Promise.all([
@@ -44,6 +45,7 @@ export async function render(main) {
       <div class="page-head">
         <div>
           <h1>Your bots</h1>
+          ${(() => { const e = epigraph(); return e ? `<p class="epigraph">“${esc(e.text)}”<span>${esc(e.who)}</span></p>` : ""; })()}
           <p class="lead">Write characters, give them faces and a world, then talk to them through your own
             API key or proxy. Everything stays in this browser.</p>
         </div>

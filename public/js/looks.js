@@ -48,18 +48,41 @@ export const PALETTES = [
   // A whole look rather than colours alone: its fonts replace the defaults
   // (a font picked in Settings still wins), and style.css adds the borders,
   // square corners, grain and faded photographs.
-  { key: "horror", label: "Horror Story", about: "After American Horror Story: case-file paper by day, a dark house by night. Typewritten labels, antique print, hand-inked borders and film grain.",
+  { key: "horror", label: "Horror Story", about: "After American Horror Story: tall Art Nouveau titles in blood red, like the show's Mackintosh-style logo; typewritten case-file labels; antique print for the story; hand-inked borders and moving film grain, after the Super 16mm opening titles. Pick a season below.",
     swatch: ["#e6dcc8", "#1b1311", "#8f1218"], dark: ["#0d0b0a", "#e9dfcc", "#e2463e"],
     fonts: {
       site: { stack: '"Special Elite", "Courier New", monospace', href: gf("Special+Elite") },
       chat: { stack: `"IM Fell English", ${SERIF}`, href: gf("IM+Fell+English:ital@0;1") },
-      head: { stack: `"IM Fell English SC", ${SERIF}`, href: gf("IM+Fell+English+SC") },
+      // The logo is ITC Willow, after Charles Rennie Mackintosh's lettering
+      // (neither is free); Aubrey is the closest free condensed Art Nouveau face.
+      head: { stack: `"Aubrey", "IM Fell English SC", ${SERIF}`, href: gf("Aubrey") },
     } },
 ];
 
+// Horror Story's seasons, the looks fans know them by.
+export const SEASONS = [
+  { key: "murder", label: "Murder House", about: "Blood red on black, the house on Westmoreland Place." },
+  { key: "asylum", label: "Asylum", about: "Briarcliff: institutional green, rust, and ruled case files." },
+  { key: "coven", label: "Coven", about: "Black lace and white, with a witch's violet." },
+  { key: "hotel", label: "Hotel", about: "The Cortez: art deco crimson and gold, with neon." },
+];
+
+// Short lines the fandom quotes most, shown under the home page title.
+// A season shows its own line; the others take turns, one a day.
+const EPIGRAPHS = [
+  { season: "murder", text: "Normal people scare me.", who: "Tate Langdon, Murder House" },
+  { season: "asylum", text: "All monsters are human.", who: "Sister Jude, Asylum" },
+  { season: "coven", text: "Surprise, bitch.", who: "Madison Montgomery, Coven" },
+];
+export function epigraph() {
+  if (getLook("palette") !== "horror") return null;
+  return EPIGRAPHS.find((e) => e.season === getLook("horrorSeason"))
+    ?? EPIGRAPHS[Math.floor(Date.now() / 86400000) % EPIGRAPHS.length];
+}
+
 export const CORNERS = [["sharp", "Sharp"], ["soft", "Soft"], ["round", "Round"]];
 
-const DEFAULTS = { palette: "moon", chatFont: "rounded", siteFont: "rounded", headFont: "fraunces", corners: "soft", accent: "" };
+const DEFAULTS = { palette: "moon", chatFont: "rounded", siteFont: "rounded", headFont: "fraunces", corners: "soft", accent: "", horrorSeason: "murder" };
 const VARS = ["--font", "--chat-font", "--font-display", "--accent", "--accent-hover", "--accent-soft", "--on-accent"];
 
 export function getLook(key) {
@@ -118,10 +141,25 @@ export function applyLooks() {
   if (chat.key === "rounded" || chat.key === "theme") delete root.dataset.chatFont; else root.dataset.chatFont = chat.key;
   const corners = getLook("corners");
   if (corners === "soft") delete root.dataset.corners; else root.dataset.corners = corners;
+  const season = palette === "horror" ? getLook("horrorSeason") : "murder";
+  if (season === "murder") delete root.dataset.season; else root.dataset.season = season;
+  if (palette === "horror") addScratchFilter();
 
   const links = [...new Set([chat, site, head].map((f) => f.href).filter(Boolean))];
   loadFonts(links);
   try { localStorage.setItem("looks", JSON.stringify({ vars, links })); } catch { /* private mode */ }
+}
+
+// Rough, scratched edges for big titles, like the show's logo. A CSS filter
+// can only point at an SVG filter in the same page, so it is added here once.
+function addScratchFilter() {
+  if (document.getElementById("mp-scratch")) return;
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("aria-hidden", "true");
+  svg.setAttribute("style", "position:absolute;width:0;height:0;overflow:hidden");
+  svg.innerHTML = '<filter id="mp-scratch" x="-2%" y="-10%" width="104%" height="120%"><feTurbulence type="fractalNoise" baseFrequency=".75" numOctaves="1" seed="7" result="n"/>' +
+    '<feDisplacementMap in="SourceGraphic" in2="n" scale="2.4" xChannelSelector="R" yChannelSelector="G"/></filter>';
+  document.body.append(svg);
 }
 
 export function loadFonts(links) {
