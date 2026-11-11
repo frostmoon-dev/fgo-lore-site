@@ -19,6 +19,8 @@ try {
   if (chatActions) root.dataset.chatActions = chatActions;
   const chatPic = localStorage.getItem("chatPic");
   if (chatPic) root.dataset.chatPic = chatPic;
+  const chatNarration = localStorage.getItem("chatNarration");
+  if (chatNarration) root.dataset.chatNarration = chatNarration;
   const chatLayout = localStorage.getItem("chatLayout");
   if (chatLayout) root.dataset.chatLayout = chatLayout;
   const chatSidebar = localStorage.getItem("chatSidebar");

@@ -43,8 +43,14 @@ export function renderMarkdown(src, { quotes = false } = {}) {
   let list = null;
   let fence = null;
 
+  // With quotes on (a chat message), a paragraph that is all *actions* is
+  // narration: marked so text-message bubbles and "dialogue only" can tell.
+  const ACT = /^\s*(\*[^*]+\*|_[^_]+_)(\s*(\*[^*]+\*|_[^_]+_))*\s*$/;
   const flushPara = () => {
-    if (para.length) out.push(`<p>${para.map((l) => inline(l, { quotes })).join("<br>")}</p>`);
+    if (para.length) {
+      const act = quotes && para.every((l) => ACT.test(l));
+      out.push(`<p${act ? ' class="act"' : ""}>${para.map((l) => inline(l, { quotes })).join("<br>")}</p>`);
+    }
     para = [];
   };
   const flushList = () => {

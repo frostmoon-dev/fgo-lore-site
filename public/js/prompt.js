@@ -285,6 +285,7 @@ export function buildPrompt({
   bot, persona, preset, settings, history, loreEntries = [], bond = null,
   mode = "reply", hint = "", memory = "", note = "", cast = [], scene = "",
   facts = "", chapters = [], recalled = [], windowStart = 0, authorNote = "", liked = [], repetition = [], clock = "",
+  texting = false,
 }) {
   const asUser = mode === "impersonate";
   if (asUser) bond = null;
@@ -392,6 +393,16 @@ export function buildPrompt({
   if (group && !asUser) {
     post = [post, `This is a group scene. Write only ${names.char}'s next reply. Do not write lines or actions for ${names.user} ` +
       `or for ${cast.map((c) => c.name).join(", ")}. Do not start with a name label.`].filter(Boolean).join("\n\n");
+  }
+  // Text messages: the two are apart, typing on their phones.
+  if (texting) {
+    post = [post, asUser
+      ? `This chat happens over text messages. Write only what ${names.user} types and sends: one or more short texts, each in its own paragraph. ` +
+        "No narration, no actions in asterisks, no quotation marks."
+      : `This chat happens over text messages: ${names.char} and ${names.user} are apart, texting on their phones. Write only what ${names.char} types and sends. ` +
+        "No narration, no actions or descriptions in asterisks, no quotation marks. Keep it like real texting: short messages, and you may send " +
+        `two to four separate texts, each in its own paragraph. Use ${names.char}'s own way of texting (punctuation, emoji, slang, capitals) only where it fits who they are.`,
+    ].filter(Boolean).join("\n\n");
   }
   // A lasting instruction for this chat (the author's note), sent with every request.
   if (authorNote?.trim()) post = [post, `Author's note for this story (keep following it): ${m(authorNote)}`].filter(Boolean).join("\n\n");
