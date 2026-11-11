@@ -2123,6 +2123,7 @@ html { -webkit-tap-highlight-color: transparent; }
 :is(:root[data-chat-layout="messages"], .chat-main.is-texting) .msg.user .msg-body > :is(p:not(.act), ul, ol, blockquote):last-of-type { border-bottom-right-radius: 5px; }
 :is(:root[data-chat-layout="messages"], .chat-main.is-texting) .msg-body > p.act { padding: 0 6px; font-size: .86em; color: var(--muted); }
 :is(:root[data-chat-layout="messages"], .chat-main.is-texting) .msg-body > .typing { height: auto; padding: 12px 14px; }
+.msg-body .typing[data-action] { cursor: pointer; }
 :is(:root[data-chat-layout="messages"], .chat-main.is-texting) .msg-body > .caret { display: none; }
 :is(:root[data-chat-layout="messages"], .chat-main.is-texting) .msg-foot { margin-left: 0; min-height: 0; }
 :is(:root[data-chat-layout="messages"], .chat-main.is-texting) .msg.user .msg-foot { justify-content: flex-end; }

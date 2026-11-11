@@ -201,6 +201,11 @@ server-side storage of your key.
 - **Text messages, per chat** (⋯ menu): replies and Write my reply are asked for texts with no
   narration (`texting` in buildPrompt, after the chat), and the chat shows as bubbles whatever the
   layout. Older messages are kept as they were.
+- **Texts arrive one at a time** (Text messages chats, `settings.textPace`): the reply on screen
+  shows one paragraph per bubble, with typing dots and a pause of 30 ms a character (0.5–2 s) before
+  each. A text shows once it is complete (a blank line follows it, or the reply ended). The full
+  reply is saved at once; tapping the dots or sending shows the rest. The header reads typing…,
+  online (last reply under 10 minutes ago) or last seen.
 - **Messages layout**: Chat look or Settings → Appearance. Each paragraph is a bubble (yours in the
   primary colour on the right), a paragraph that is all actions (`p.act`, marked by renderMarkdown)
   is a small caption, and "Read" shows under your message once it is answered.

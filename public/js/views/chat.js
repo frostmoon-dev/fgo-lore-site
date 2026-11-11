@@ -485,12 +485,21 @@ export async function render(main, [botId, chatId, jumpTo]) {
     });
   }
 
+  // In a Text messages chat, the bot is "online", "typing…" or "last seen".
+  function presence() {
+    if (group()) return "texting";
+    if (busy || pace) return "typing…";
+    const last = chat.messages.findLast((m) => m.role === "assistant");
+    if (!last?.at) return "texting";
+    return Date.now() - last.at < 10 * 60 * 1000 ? "online" : `last seen ${timeAgo(last.at)}`;
+  }
+
   function paintHeader() {
     if (gone()) return;
     $("#chat-title", main).innerHTML = `<span>${esc(chat.title)}</span>${icon("edit")}`;
     $("#chat-title", main).setAttribute("aria-label", `Chat name: ${chat.title}. Rename`);
     const p = persona();
-    $("#chat-sub", main).textContent = `with ${everyone().map((b) => b.name).join(", ")}${p ? ` · as ${p.name}` : ""}${chat.texting ? " · texting" : ""}`;
+    $("#chat-sub", main).textContent = `with ${everyone().map((b) => b.name).join(", ")}${p ? ` · as ${p.name}` : ""}${chat.texting ? ` · ${presence()}` : ""}`;
     // A texting chat always shows as message bubbles.
     $(".chat-main", main).classList.toggle("is-texting", !!chat.texting);
     paintModelChip();
@@ -555,10 +564,62 @@ export async function render(main, [botId, chatId, jumpTo]) {
   // ---------- Messages ----------
   const lastAssistantIndex = () => chat.messages.findLastIndex((m) => m.role === "assistant");
 
+  // ---------- Texts that arrive one at a time ----------
+  // In a Text messages chat, the reply being written shows one text (one
+  // paragraph) at a time, with typing dots and a pause sized to the next
+  // text. The whole reply is saved as soon as it arrives; this is display only.
+  let pace = null;       // { id, shown, done } for the reply on screen
+  let paceTimer = 0;
+  const textsOf = (text) => stripBond(text).split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+  const TYPING = '<span class="typing" aria-hidden="true"><i></i><i></i><i></i></span>';
+  function startPace(m) {
+    clearTimeout(paceTimer); paceTimer = 0;
+    pace = chat.texting && settings.textPace?.enabled !== false ? { id: m.id, shown: 0, done: false } : null;
+  }
+  function repaintPaced() {
+    const m = chat.messages.find((x) => x.id === pace?.id);
+    const el = m && $(`[data-id="${m.id}"] .msg-body`, logInner);
+    if (el) el.innerHTML = bodyHTML(m, currentText(m), busy);
+    if (nearBottom()) toBottom();
+  }
+  function endPace() {
+    clearTimeout(paceTimer); paceTimer = 0;
+    if (!pace) return;
+    pace = null;
+    if (!busy && !gone()) { paintLog({ scroll: nearBottom() }); paintHeader(); }
+  }
+  // The next text shows once it is complete: followed by a new paragraph, or
+  // the reply has finished.
+  function stepPace() {
+    if (!pace || paceTimer || gone()) return;
+    const m = chat.messages.find((x) => x.id === pace.id);
+    if (!m) { endPace(); return; }
+    const texts = textsOf(currentText(m));
+    const ready = pace.done ? texts.length : Math.max(0, texts.length - 1);
+    if (pace.shown >= texts.length && pace.done) { endPace(); return; }
+    if (pace.shown >= ready) return;
+    const wait = Math.max(500, Math.min(2000, texts[pace.shown].length * 30));
+    paceTimer = setTimeout(() => {
+      paceTimer = 0;
+      if (!pace) return;
+      pace.shown += 1;
+      repaintPaced();
+      stepPace();
+    }, wait);
+  }
+  function finishPace() { if (pace) { pace.done = true; stepPace(); } }
+
   function bodyHTML(m, text, streaming = false) {
     const meta = m.meta?.[m.swipeIndex ?? 0] ?? {};
     const think = meta.reasoning
       ? `<details class="thinking"><summary>Model's reasoning</summary><div>${esc(meta.reasoning)}</div></details>` : "";
+    if (pace?.id === m.id) {
+      const texts = textsOf(text);
+      const shown = texts.slice(0, pace.shown);
+      const more = pace.shown < texts.length || !pace.done;
+      return think + (shown.length ? renderMarkdown(applyMacros(shown.join("\n\n"), namesFor(speakerOf(m) ?? bot)), { quotes: true }) : "") +
+        (more ? TYPING.replace('class="typing"', 'class="typing" data-action="show-texts" title="Show the whole reply"') : "");
+    }
     const clean = stripBond(text);
     let content = clean.trim()
       ? renderMarkdown(applyMacros(clean, namesFor(speakerOf(m) ?? bot)), { quotes: true })
@@ -755,6 +816,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
     sendBtn.setAttribute("aria-label", on ? "Stop generating" : "Send message");
     logInner.setAttribute("aria-busy", String(on));
     $("#impersonate", main).disabled = on;
+    if (chat.texting) paintHeader();
   }
 
   // ---------- Scene direction ----------
@@ -900,8 +962,10 @@ export async function render(main, [botId, chatId, jumpTo]) {
     controller = new AbortController();
     const node = () => $(`[data-id="${target.id}"] .msg-body`, logInner);
     let frame = 0;
+    if (kind === "continue") endPace(); else startPace(target);
     const paintStream = () => {
       frame = 0;
+      if (pace?.id === target.id) { stepPace(); return; } // texts appear on their own clock
       const stick = nearBottom();
       const el = node();
       if (el) el.innerHTML = bodyHTML(target, target.swipes[si], true);
@@ -1003,6 +1067,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
     } finally {
       cancelAnimationFrame(frame);
       controller = null;
+      if (pace?.id === target.id) { if (ok) finishPace(); else endPace(); }
       // Left the chat while the reply was coming in: keep what arrived, draw nothing.
       if (gone()) { await bots.touch(bot); await persist(); return; }
       setActivity("reply", null);
@@ -2197,6 +2262,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
 
   async function send() {
     if (drafting) return;
+    endPace(); // answering now: show the whole reply first
     if (busy) { controller?.abort(); return; }
     const text = input.value.trim();
     if (!text) {
@@ -2302,6 +2368,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
     if (!btn) { showToolsOn(e); return; }
     const action = btn.dataset.action;
     if (action === "retry") { pendingError = null; generate("new"); return; }
+    if (action === "show-texts") { endPace(); return; }
     if (action === "show-earlier") { showEarlier(); $('[data-action="show-earlier"]', logInner)?.focus({ preventScroll: true }); return; }
     const el = btn.closest("[data-id]");
     const i = chat.messages.findIndex((m) => m.id === el?.dataset.id);
@@ -2878,6 +2945,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
   return {
     cleanup: () => {
       left = true;
+      clearTimeout(paceTimer);
       unregister();
       controller?.abort();
       drafting?.abort();
