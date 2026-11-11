@@ -25,14 +25,15 @@ function inline(s, { quotes }) {
 
 // One line of a message for lists (recent chats, pinned moments): cut at a
 // word near `max` characters, with *actions* and **bold** still formatted.
-export function previewHTML(src, max = 120) {
+// quotes: mark spoken lines and curl their quotes, as in a chat message.
+export function previewHTML(src, max = 120, { quotes = false } = {}) {
   let text = String(src ?? "").replace(/\s+/g, " ").trim();
   if (text.length > max) {
     text = text.slice(0, max).replace(/\s+\S*$/, "").replace(/[\s*_~]+$/, "");
     if ((text.match(/\*\*/g) || []).length % 2) text = text.replace(/\*\*(?!.*\*\*)/, ""); // a bold cut in half
     text += "…";
   }
-  return inline(escapeHTML(text), { quotes: false });
+  return inline(escapeHTML(text), { quotes });
 }
 
 export function renderMarkdown(src, { quotes = false } = {}) {

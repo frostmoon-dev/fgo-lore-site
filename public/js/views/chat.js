@@ -1,7 +1,7 @@
 import {
   bots, chats, lore, personas, getSettings, saveSettings, getActiveConnection, getActivePreset,
   getLorebooks, saveLorebooks, newLorebook, newLore, loreForBot, bondTier, bondLevels, BOND_KINDS, moodsOf, uid, now,
-  getBotPersonas, rememberBotPersona, seriesGroups,
+  getBotPersonas, rememberBotPersona, seriesGroups, bondPoints,
 } from "../store.js";
 import { registerCommands } from "../palette.js";
 import { chatCompletion, listModels } from "../api.js";
@@ -189,17 +189,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
   };
   const bondFor = (b, start = bondStartFor(b)) => levelOf(b, start + bondEarnedFor(b));
   // Every point where this character's bond changed, for the chart.
-  function bondHistory(b) {
-    let running = bondStartFor(b);
-    const points = [{ x: 0, ...levelOf(b, running) }];
-    chat.messages.forEach((m, i) => {
-      const delta = spokeBy(m, b) ? m.meta?.[m.swipeIndex ?? 0]?.bond : 0;
-      if (Number.isFinite(delta) && delta !== 0) { running += delta; points.push({ x: i + 1, ...levelOf(b, running) }); }
-    });
-    // Carry the line to the latest message so the chart reads to "now".
-    if (points.at(-1).x < chat.messages.length) points.push({ x: chat.messages.length, ...levelOf(b, running) });
-    return points;
-  }
+  const bondHistory = (b) => bondPoints(chat, b, bondDefault());
   const bondOn = bondOnFor(bot); // the meter in the header follows the chat's own bot
   const bondNow = () => bondFor(bot);
 
@@ -216,7 +206,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
           <div class="chat-sidebar-bot">
             ${botAvatar(bot, 48)}
             <div class="grow"><div class="name">${esc(bot.name)}</div>
-              <a href="#/bot/${bot.id}" class="link-btn">Edit bot</a></div>
+              <a href="#/bot/${bot.id}" class="link-btn">Edit bot</a> · <a href="#/scrapbook/${bot.id}" class="link-btn">Scrapbook</a></div>
           </div>
           <button class="btn btn-primary" type="button" id="new-chat">New chat</button>
         </div>

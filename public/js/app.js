@@ -19,6 +19,7 @@ const routes = [
   [/^\/lore(?:\/([^/]+))?$/, "lore", () => import("./views/lore.js")],
   [/^\/connection$/, "connection", () => import("./views/connection.js")],
   [/^\/settings$/, "settings", () => import("./views/settings.js")],
+  [/^\/scrapbook\/([^/]+)$/, "home", () => import("./views/scrapbook.js")],
 ];
 
 // Where the Back button goes when there is no earlier page in this visit.

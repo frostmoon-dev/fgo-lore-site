@@ -174,6 +174,27 @@ export function bondTier(value, bot) {
   return { ...list[Math.max(0, i)], index: Math.max(0, i) };
 }
 
+// Every point where a character's bond changed in a chat, for the chart:
+// [{ x: message number, value, label, behavior, index }]. The chat's own bot
+// starts from chat.bondStart, others in a group from chat.bondStarts.
+export function bondPoints(chat, bot, defaultStart = 20) {
+  const start = bot.id === chat.botId ? chat.bondStart : chat.bondStarts?.[bot.id];
+  let running = Number.isFinite(start) ? Number(start) : defaultStart;
+  const level = (raw) => {
+    const value = Math.max(0, Math.min(100, raw));
+    const t = bondTier(value, bot);
+    return { value, label: t.label, behavior: t.behavior, index: t.index };
+  };
+  const points = [{ x: 0, ...level(running) }];
+  chat.messages.forEach((m, i) => {
+    const delta = m.role === "assistant" && (m.botId ?? chat.botId) === bot.id ? m.meta?.[m.swipeIndex ?? 0]?.bond : 0;
+    if (Number.isFinite(delta) && delta !== 0) { running += delta; points.push({ x: i + 1, ...level(running) }); }
+  });
+  // Carry the line to the latest message so the chart reads to "now".
+  if (points.at(-1).x < chat.messages.length) points.push({ x: chat.messages.length, ...level(running) });
+  return points;
+}
+
 export const DEFAULT_PRESET = {
   id: "default",
   name: "Default",

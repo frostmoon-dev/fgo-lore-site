@@ -8,7 +8,7 @@ const SHELL = [
   "/js/app.js", "/js/theme-init.js", "/js/store.js", "/js/db.js", "/js/ui.js", "/js/api.js", "/js/prompt.js",
   "/js/markdown.js", "/js/card.js", "/js/ai.js", "/js/chart.js", "/js/memory.js", "/js/install.js", "/js/palette.js", "/js/help.js", "/js/looks.js",
   "/js/views/home.js", "/js/views/chat.js", "/js/views/bot-edit.js", "/js/views/personas.js", "/js/views/prompt.js",
-  "/js/views/lore.js", "/js/views/connection.js", "/js/views/settings.js", "/js/views/search.js",
+  "/js/views/lore.js", "/js/views/scrapbook.js", "/js/views/connection.js", "/js/views/settings.js", "/js/views/search.js",
 ];
 
 self.addEventListener("install", (e) => {

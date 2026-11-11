@@ -58,6 +58,7 @@ async function baseCommands() {
     ...allBots.flatMap((b) => [
       { group: "Bots", title: `Chat with ${b.name || "Unnamed"}`, keywords: `${b.tags.join(" ")} talk open`, run: go(`#/chat/${b.id}`) },
       { group: "Bots", title: `Edit ${b.name || "Unnamed"}`, keywords: "bot editor definition expressions", run: go(`#/bot/${b.id}`) },
+      { group: "Bots", title: `${b.name || "Unnamed"}'s scrapbook`, keywords: "memories pinned liked journal chapters thoughts bond keepsakes", run: go(`#/scrapbook/${b.id}`) },
     ]),
     set("Appearance and text size", "appearance", "theme font size larger smaller"),
     { group: "Settings", title: dark ? "Switch to light theme" : "Switch to dark theme", keywords: "theme mode colours", run: () => document.getElementById("theme-toggle")?.click() },

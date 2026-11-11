@@ -9,6 +9,12 @@ export const APP_VERSION = "2026.09.25.1";
 // Newest first. Each item says what it is and where it lives.
 export const NEWS = [
   {
+    version: "2026.11.11.4",
+    items: [
+      ["A scrapbook for each bot", "Everything you have kept with a bot, on one page: the bond's chart, pinned moments, liked replies, hidden thoughts, its journal and the chapters memory wrote, each with a link back into the chat. Open it from the book button on a bot's card, the link under its name in a chat, or Ctrl+K."],
+    ],
+  },
+  {
     version: "2026.11.11.3",
     items: [
       ["A look for each bot", "Give a bot colours of its own in its editor, under Look. Open its chat and the whole site wears them (a Horror Story bot can even pick its season); leave, and your own colours come back."],

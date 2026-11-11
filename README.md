@@ -198,6 +198,10 @@ server-side storage of your key.
   answers 400 to the marks is sent plain requests for the rest of the session; Connection → Mark
   prompts for caching turns it off. Example dialogue stops being sent once a chat has 40 messages
   (Prompt page; 20, 80 or never). The prompt preview lists each section's token count.
+- **Scrapbook per bot** (`#/scrapbook/<bot>`, views/scrapbook.js): gathers what chats already
+  store, with nothing new saved: days together, the bond chart (`bondPoints`, store.js, now shared
+  with the chat), pinned moments, liked replies, hidden thoughts, journal entries and chapters, each
+  linking back to its message.
 - **A look per bot**: `bot.look = { palette, season }`, chosen in the bot editor. `setBotLook`
   (looks.js) applies it while that bot's chat or editor is open and restores the site's on leaving;
   it is never written to the saved look, and it travels in exported cards.
