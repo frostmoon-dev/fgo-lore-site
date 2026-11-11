@@ -201,6 +201,10 @@ server-side storage of your key.
 - **Text messages, per chat** (⋯ menu): replies and Write my reply are asked for texts with no
   narration (`texting` in buildPrompt, after the chat), and the chat shows as bubbles whatever the
   layout. Older messages are kept as they were.
+- **Choices, per chat** (⋯ menu): replies end with `<choices>a | b | c</choices>`; `readChoices`
+  (prompt.js) keeps up to four, stored in the reply's meta and stripped from its text (and from the
+  stream), so they are never sent back. Buttons show under the latest reply once it has fully
+  arrived; tapping one sends it. Not asked for in Write my reply.
 - **Reply to a message**: the reply arrow under a message (or ⋯ → Reply to this) quotes it in the
   next message you send (`replyTo: { id, name, text }`, 140 characters). The quote shows above your
   message and jumps back to the original; the model gets `[Replying to <name>: <text>]` before that

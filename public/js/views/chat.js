@@ -7,7 +7,7 @@ import { registerCommands } from "../palette.js";
 import { chatCompletion, listModels } from "../api.js";
 import {
   buildPrompt, generationParams, currentText, applyMacros, readBond, readMood, guessMood, stripBond, cleanImpersonation, contentLevel,
-  readThought, clockNote,
+  readThought, readChoices, clockNote,
   avoidedIn, markAvoided, repetitionHints,
 } from "../prompt.js";
 import {
@@ -733,6 +733,8 @@ export async function render(main, [botId, chatId, jumpTo]) {
           <span>Bond with ${esc(speaker.name)}: ${esc(meta.milestone.from)} → ${esc(meta.milestone.to)}</span></div>` : "";
 
     const cutOff = isLastBot && !busy && meta.finish === "length";
+    // Options for your next move: under the latest reply only, once it has fully arrived.
+    const options = isLastBot && !busy && !pace && meta.choices?.length ? meta.choices : [];
     const opening = i === 0 && isBot ? " is-opening" : "";
     return `<article class="msg ${m.role} ${isLastBot ? "is-last" : ""}${face ? " has-face" : ""}${faceChanged ? " face-changed" : ""}${arriving ? " is-arriving" : ""}${opening}${m.id === toolsFor ? " tools-open" : ""}" data-id="${m.id}" aria-label="${esc(name)}"${arriving || faceChanged ? ` style="${arriving || faceChanged}"` : ""}>
       ${av}
@@ -745,6 +747,9 @@ export async function render(main, [botId, chatId, jumpTo]) {
         ${translation}
         ${cutOff ? `<div class="cutoff-bar"><span>This reply was cut off by the length limit.</span>
           <button class="btn btn-sm btn-primary" type="button" data-action="continue">Continue writing</button></div>` : ""}
+        ${options.length ? `<div class="choice-row" role="group" aria-label="What you could do next">
+          ${options.map((c, k) => `<button type="button" class="btn btn-sm choice-btn" data-action="choose" data-choice="${k}">${esc(applyMacros(c, namesFor(speaker ?? bot)))}</button>`).join("")}
+          <span class="choice-hint">or type your own</span></div>` : ""}
         <div class="msg-foot">
           ${swipeNav}
           <span class="msg-tools">
@@ -950,7 +955,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
       bot: speaker, persona: persona(), preset, settings: freshSettings, loreEntries, history: hist,
       bond: withBond ? beforeBond : null,
       ...memoryArgs(hist), scene: chat.scene?.text ?? "", authorNote: chat.authorNote ?? "", note: fullNote, cast: group() ? others(speaker) : [],
-      texting: !!chat.texting,
+      texting: !!chat.texting, choices: !!chat.choices,
       liked: likedFor(speaker, target.id), repetition: varied,
       clock: speaker.realTime ? clockNote({ gapMs: gapBefore(hist), user: userName(), char: speaker.name }) : "",
     });
@@ -1011,6 +1016,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
       const parsed = withBond ? readBond(res.content) : { text: stripBond(res.content), delta: 0 };
       // Kept beside the reply, not in it, so it is never sent back as history.
       const thought = speaker.thoughts ? readThought(res.content) : "";
+      const options = chat.choices ? readChoices(res.content) : [];
       // In a group scene models sometimes label their own line.
       if (group()) parsed.text = cleanImpersonation(parsed.text, speaker.name);
       if (kind === "continue") {
@@ -1022,6 +1028,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
           ...(withBond ? { bond: (Number(before.bond) || 0) + parsed.delta } : {}),
           ...(mood ? { mood } : {}),
           ...(thought ? { thought } : {}),
+          ...(options.length ? { choices: options } : {}),
         };
       } else {
         target.swipes[si] = parsed.text;
@@ -1031,6 +1038,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
           ...(withBond ? { bond: parsed.delta } : {}),
           ...(mood ? { mood } : {}),
           ...(thought ? { thought } : {}),
+          ...(options.length ? { choices: options } : {}),
           // Only the person's own direction or nudge earns the "directed" label.
           ...(directed || note ? { note: [directed, note].filter(Boolean).join(" ") } : {}),
           ...(directed ? { direction: directed } : {}),
@@ -1284,6 +1292,18 @@ export async function render(main, [botId, chatId, jumpTo]) {
       dlg.close();
       generate("swipe", { note: `Stay true to ${speaker.name}'s character. Avoid these problems from the last attempt: ${c.issues.join("; ")}. ${c.fix}` });
     });
+  }
+
+  // ---------- Choices ----------
+  // After each reply the bot offers a few options for your next move, as
+  // buttons under it. A few tokens a reply; you can always type instead.
+  async function toggleChoices() {
+    if (chat.choices) delete chat.choices; else chat.choices = true;
+    await persist();
+    paintLog({ scroll: false });
+    toast(chat.choices
+      ? `Choices on. From the next reply, ${bot.name} offers a few options for what you do next. Tap one, or type your own.`
+      : "Choices off.");
   }
 
   // ---------- Text messages ----------
@@ -2451,6 +2471,11 @@ export async function render(main, [botId, chatId, jumpTo]) {
       generate("continue");
     } else if (action === "check") {
       runCheck(m);
+    } else if (action === "choose") {
+      const pick = m.meta?.[m.swipeIndex ?? 0]?.choices?.[Number(btn.dataset.choice)];
+      if (!pick || busy) return;
+      input.value = applyMacros(pick, namesFor(speakerOf(m) ?? bot));
+      send();
     } else if (action === "reply") {
       setReply(m);
     } else if (action === "peek") {
@@ -2866,7 +2891,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
       bot: speaker, persona: persona(), preset, settings: s, history: withSpeakers(hist), loreEntries: entries,
       bond: bondOnFor(speaker) ? bondFor(speaker) : null,
       ...memoryArgs(hist), scene: chat.scene?.text ?? "", authorNote: chat.authorNote ?? "", note: direction(), cast: group() ? others(speaker) : [],
-      texting: !!chat.texting,
+      texting: !!chat.texting, choices: !!chat.choices,
       liked: likedFor(speaker),
       repetition: s.repetition?.enabled !== false ? repetitionHints(chat.messages.filter((x) => spokeBy(x, speaker)).slice(-6).map((x) => currentText(x)),
         { userTexts: chat.messages.filter((x) => x.role === "user").slice(-10).map((x) => currentText(x)) }) : [],
@@ -2900,6 +2925,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
     { label: `${bot.name}'s journal (${chat.journal.length})`, hint: "Private diary entries about you", onSelect: openJournal },
     { label: "Recap so far", hint: "A few lines on what has happened", onSelect: showRecap },
     { label: "Author's note", hint: chat.authorNote?.trim() ? clipText(chat.authorNote, 40) : "A lasting instruction for this chat", onSelect: openAuthorNote },
+    { label: chat.choices ? "Choices: on" : "Choices: off", hint: chat.choices ? "Stop offering options after replies" : "Options for your next move after each reply", onSelect: toggleChoices },
     { label: chat.texting ? "Text messages: on" : "Text messages: off", hint: chat.texting ? "Back to a story with narration" : `${bot.name} texts you: no narration, as bubbles`, onSelect: toggleTexting },
     { label: "Turn into a story", hint: "Rewrite the chat as prose", onSelect: openStory },
     { label: "Suggest lore from this chat", hint: "New entries from what happened", onSelect: openLoreSuggestions },
