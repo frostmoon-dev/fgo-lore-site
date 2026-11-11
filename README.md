@@ -198,6 +198,15 @@ server-side storage of your key.
   answers 400 to the marks is sent plain requests for the rest of the session; Connection → Mark
   prompts for caching turns it off. Example dialogue stops being sent once a chat has 40 messages
   (Prompt page; 20, 80 or never). The prompt preview lists each section's token count.
+- **Real time, per bot**: with *Knows the real time* on, a block after the chat (so prompt caching
+  is unaffected) tells the bot the local weekday, part of day and hour, and how long the person was
+  away (`clockNote`, prompt.js). Opening a chat 12 hours or more after its last message shows a bar
+  that lets the bot speak first: one request, only on a click.
+- **Hidden thoughts, per bot**: the bot may end a reply with `<thought>…</thought>`. It is stored in
+  the reply's meta, stripped from the text (so it is never sent back as history), hidden while
+  streaming, and shown by the "thought" chip under the message.
+- **Extra scene tracker lines, per bot**: up to six labels of your own (Sanity, Inventory…) that the
+  scene tracker keeps with its usual lines.
 - **Thinking control** (`api.js`): a connection sets how much the model may reason, separately for
   chat replies and background tasks (Provider default, Off, Low, High, Max). DeepSeek, which thinks
   at high effort by default and bills it as output, gets Off for both unless changed: `thinking:

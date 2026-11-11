@@ -9,6 +9,14 @@ export const APP_VERSION = "2026.09.25.1";
 // Newest first. Each item says what it is and where it lives.
 export const NEWS = [
   {
+    version: "2026.11.11.2",
+    items: [
+      ["Bots that know the time", "Turn on Knows the real time in a bot's editor and it is told your local time of day and how long you were away. Come back after half a day or more and a bar offers to let the bot speak first. For companions who live in your world, not stories with a clock of their own."],
+      ["Hidden thoughts", "With Hidden thoughts on, a bot may add a private thought after a reply. Tap “thought” under the message to peek. It is kept beside the reply and never sent back to the model."],
+      ["Your own tracker lines", "Give a bot extra scene tracker lines in its editor, such as Sanity, Injuries or Inventory, and the tracker keeps them with the place, time and mood."],
+    ],
+  },
+  {
     version: "2026.11.11.1",
     items: [
       ["DeepSeek stops thinking on your bill", "DeepSeek's current models reason before every answer unless told not to, and bill that reasoning as output. MoonPaper now tells DeepSeek not to think: for chat replies, and for every background task (summaries, scene tracker, ideas, translations, names). Your temperature works again too, since DeepSeek ignores it while thinking."],

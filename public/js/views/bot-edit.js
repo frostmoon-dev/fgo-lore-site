@@ -51,6 +51,9 @@ export async function render(main, [id]) {
   bot.contentMode ??= "site";
   bot.expressions ??= {};
   bot.series ??= "";
+  bot.realTime ??= false;
+  bot.thoughts ??= false;
+  bot.trackerLines ??= [];
   const settings = await getSettings();
   // Series already in use come first; tags follow, since many people put the fandom in the tags.
   const others = (await bots.all()).filter((b) => b.id !== bot.id);
@@ -210,6 +213,15 @@ export async function render(main, [id]) {
                 </select>
                 <p class="hint" id="content-mode-hint">Set the site level in <a href="#/settings">Settings</a>. Safe for work keeps this bot's chats clean whatever the site allows.</p>
               </div>
+              <label class="check"><input type="checkbox" id="real-time" ${bot.realTime ? "checked" : ""}>
+                <span>Knows the real time<small>Told your local time of day and how long you were away, so it can say “you're up late” or “three days, and not a word?”. For companions who live in your world, not for stories with a clock of their own. About 40 tokens a reply.</small></span></label>
+              <label class="check"><input type="checkbox" id="thoughts" ${bot.thoughts ? "checked" : ""}>
+                <span>Hidden thoughts<small>May add a private thought after a reply. You only see it if you tap “thought” under the message. A few extra tokens a reply; never sent back to the model.</small></span></label>
+              <div class="field">
+                <label for="tracker-lines">Extra scene tracker lines</label>
+                <input type="text" id="tracker-lines" value="${esc(bot.trackerLines.join(", "))}" placeholder="Sanity, Injuries, Inventory" autocomplete="off" aria-describedby="tracker-lines-hint">
+                <p class="hint" id="tracker-lines-hint">Things the scene tracker keeps for this bot besides place, time, mood and so on. Up to six, separated by commas.</p>
+              </div>
               <label class="check"><input type="checkbox" id="bond-on" ${bot.bondEnabled === false ? "" : "checked"}>
                 <span>Track the bond with this bot<small>Shows a bond meter in the chat header and lets it shape how the bot treats you.</small></span></label>
               <div class="bond-setup form-grid" id="bond-setup">
@@ -344,6 +356,10 @@ export async function render(main, [id]) {
       : null;
     bot.bondMilestones = $("#bond-milestones", main).checked;
     bot.contentMode = val("#content-mode");
+    bot.realTime = $("#real-time", main).checked;
+    bot.thoughts = $("#thoughts", main).checked;
+    bot.trackerLines = val("#tracker-lines").split(",").map((t) => t.replace(/[:\n]/g, " ").replace(/\s+/g, " ").trim().slice(0, 24))
+      .filter((t, i, all) => t && all.findIndex((x) => x.toLowerCase() === t.toLowerCase()) === i).slice(0, 6);
     bot.gen = {};
     for (const k of ["temperature", "max_tokens", "top_k", "repetition_penalty"]) {
       const v = val(`#g-${k}`);

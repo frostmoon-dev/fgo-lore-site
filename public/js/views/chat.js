@@ -7,6 +7,7 @@ import { registerCommands } from "../palette.js";
 import { chatCompletion, listModels } from "../api.js";
 import {
   buildPrompt, generationParams, currentText, applyMacros, readBond, readMood, guessMood, stripBond, cleanImpersonation, contentLevel,
+  readThought, clockNote,
   avoidedIn, markAvoided, repetitionHints,
 } from "../prompt.js";
 import {
@@ -258,6 +259,11 @@ export async function render(main, [botId, chatId, jumpTo]) {
                 <button class="icon-btn" type="button" id="recap-close" aria-label="Dismiss recap" title="Dismiss">${icon("x")}</button></div>
               <div class="recap-body" id="recap-body"></div>
             </section>
+            <div class="draft-bar away-bar" id="away-bar" hidden>
+              <span class="grow" id="away-text"></span>
+              <button class="btn btn-sm btn-primary" type="button" id="away-go"></button>
+              <button class="icon-btn" type="button" id="away-close" aria-label="Dismiss" title="Dismiss">${icon("x")}</button>
+            </div>
             <div class="draft-bar" id="draft-bar" hidden>
               <span class="grow" id="draft-status" aria-live="polite"></span>
               <button class="btn btn-quiet btn-sm" type="button" id="draft-retry">Try again</button>
@@ -537,6 +543,18 @@ export async function render(main, [botId, chatId, jumpTo]) {
     strip.title = mood ? `Mood: ${mood}. Open the scene tracker.` : "Open the scene tracker.";
   }
 
+  // How long the chat had been quiet before the message now being answered
+  // (or before now, when the character speaks first).
+  function gapBefore(hist) {
+    const last = hist.at(-1);
+    if (!last) return 0;
+    return last.role === "user" ? (last.at ?? 0) - (hist.at(-2)?.at ?? last.at ?? 0) : Date.now() - (last.at ?? Date.now());
+  }
+  const awayText = (ms) => {
+    const h = ms / 3600000;
+    return h < 36 ? `${Math.round(h)} hours` : `${Math.round(h / 24)} days`;
+  };
+
   // ---------- Messages ----------
   const lastAssistantIndex = () => chat.messages.findLastIndex((m) => m.role === "assistant");
 
@@ -556,6 +574,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
   }
 
   const meta0 = (m) => m.meta?.[m.swipeIndex ?? 0] ?? {};
+  const peeked = new Set(); // messages whose hidden thought is open, for this visit
   // Messages and faces already on screen. A message drawn for the first time
   // after the chat opened eases in; a face that changes fades across. The log
   // is often redrawn a moment later, so a redraw resumes the animation where
@@ -630,6 +649,8 @@ export async function render(main, [botId, chatId, jumpTo]) {
     }
     if (meta.finish === "length" && !isLastBot) info.push(`<span title="The reply hit the max reply tokens limit">cut off</span>`);
     if (meta.mood) info.unshift(`<span class="chip mood-chip" title="${esc(name)}'s expression">${esc(meta.mood)}</span>`);
+    const peeking = !!meta.thought && peeked.has(m.id);
+    if (meta.thought) info.unshift(`<button type="button" class="chip thought-chip" data-action="peek" aria-expanded="${peeking}" title="${peeking ? "Hide" : "Peek at"} what ${esc(name)} did not say">${peeking ? "hide thought" : "thought"}</button>`);
     const speakerBond = isBot && bondOnFor(speaker);
     if (speakerBond && Number.isFinite(meta.bond) && meta.bond !== 0) {
       info.push(`<span class="bond-chip ${meta.bond > 0 ? "up" : "down"}" title="Bond change">${meta.bond > 0 ? "+" : "−"}${Math.abs(meta.bond)} bond</span>`);
@@ -656,6 +677,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
       <div style="min-width:0">
         <div class="msg-head"><span class="msg-name">${esc(name)}</span><time class="msg-time" datetime="${new Date(m.at).toISOString()}">${clock(m.at)}</time></div>
         <div class="msg-body">${bodyHTML(m, text, streaming)}</div>
+        ${peeking ? `<p class="thought" role="note"><span class="thought-label">${esc(name)} thinks</span>${esc(applyMacros(meta.thought, namesFor(speaker ?? bot)))}</p>` : ""}
         ${translation}
         ${cutOff ? `<div class="cutoff-bar"><span>This reply was cut off by the length limit.</span>
           <button class="btn btn-sm btn-primary" type="button" data-action="continue">Continue writing</button></div>` : ""}
@@ -863,6 +885,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
       bond: withBond ? beforeBond : null,
       ...memoryArgs(hist), scene: chat.scene?.text ?? "", authorNote: chat.authorNote ?? "", note: fullNote, cast: group() ? others(speaker) : [],
       liked: likedFor(speaker, target.id), repetition: varied,
+      clock: speaker.realTime ? clockNote({ gapMs: gapBefore(hist), user: userName(), char: speaker.name }) : "",
     });
     const body = {
       model: chat.model || speaker.model || conn.model || undefined,
@@ -917,6 +940,8 @@ export async function render(main, [botId, chatId, jumpTo]) {
       }
       const mood = readMood(res.content, moodsOf(speaker)) ?? guessMood(res.content, moodsOf(speaker));
       const parsed = withBond ? readBond(res.content) : { text: stripBond(res.content), delta: 0 };
+      // Kept beside the reply, not in it, so it is never sent back as history.
+      const thought = speaker.thoughts ? readThought(res.content) : "";
       // In a group scene models sometimes label their own line.
       if (group()) parsed.text = cleanImpersonation(parsed.text, speaker.name);
       if (kind === "continue") {
@@ -927,6 +952,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
           usage: sumUsage(before.usage, res.usage),
           ...(withBond ? { bond: (Number(before.bond) || 0) + parsed.delta } : {}),
           ...(mood ? { mood } : {}),
+          ...(thought ? { thought } : {}),
         };
       } else {
         target.swipes[si] = parsed.text;
@@ -935,6 +961,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
           reasoning: res.reasoning, finish: res.finishReason,
           ...(withBond ? { bond: parsed.delta } : {}),
           ...(mood ? { mood } : {}),
+          ...(thought ? { thought } : {}),
           // Only the person's own direction or nudge earns the "directed" label.
           ...(directed || note ? { note: [directed, note].filter(Boolean).join(" ") } : {}),
           ...(directed ? { direction: directed } : {}),
@@ -1561,7 +1588,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
     paintHeader();
     try {
       const text = await updateScene({
-        bot, names: namesFor(), previous: chat.scene?.text ?? "",
+        bot, names: namesFor(), previous: chat.scene?.text ?? "", extra: bot.trackerLines ?? [],
         lines: transcript(chat.messages.slice(chat.scene?.text ? -2 : -12), nameOf, namesFor()),
       });
       if (!text) throw new Error("The model sent back an empty scene.");
@@ -1588,7 +1615,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
           where everyone is, the time, the mood, what they wear and hold. Edit it freely.</p>
         <div class="field">
           <label for="sc-text">Right now <span class="count" id="sc-status"></span></label>
-          <textarea id="sc-text" class="tall" placeholder="Location: …&#10;Time: …&#10;Present: …&#10;Mood: …&#10;Appearance: …&#10;Holding: …">${esc(sc.text ?? "")}</textarea>
+          <textarea id="sc-text" class="tall" placeholder="Location: …&#10;Time: …&#10;Present: …&#10;Mood: …&#10;Appearance: …&#10;Holding: …${(bot.trackerLines ?? []).map((l) => `&#10;${esc(l)}: …`).join("")}">${esc(sc.text ?? "")}</textarea>
         </div>
         <label class="check"><input type="checkbox" id="sc-auto" ${sc.auto ? "checked" : ""}>
           <span>Update after every reply<small>One extra request per reply.</small></span></label>
@@ -2312,6 +2339,9 @@ export async function render(main, [botId, chatId, jumpTo]) {
       generate("continue");
     } else if (action === "check") {
       runCheck(m);
+    } else if (action === "peek") {
+      peeked.has(m.id) ? peeked.delete(m.id) : peeked.add(m.id);
+      paintLog({ scroll: false });
     } else if (action === "show-check") {
       showCheck(m);
     } else if (action === "fix-avoided") {
@@ -2738,6 +2768,21 @@ export async function render(main, [botId, chatId, jumpTo]) {
   paintLog();
   // Coming back after a break: a few lines on where the story stands.
   if (hasConnection && settings.recap?.auto !== false && chat.messages.length >= 6 && Date.now() - lastVisit > 12 * 3600 * 1000) showRecap();
+  // A bot that knows the real time can open after a long gap: one request,
+  // and only if asked for.
+  const awayMs = Date.now() - (chat.messages.at(-1)?.at ?? Date.now());
+  if (hasConnection && bot.realTime && chat.messages.length && awayMs > 12 * 3600 * 1000) {
+    const bar = $("#away-bar", main);
+    $("#away-text", main).textContent = `It has been about ${awayText(awayMs)} since you two last spoke.`;
+    $("#away-go", main).textContent = `Let ${bot.name} speak first`;
+    bar.hidden = false;
+    $("#away-close", main).addEventListener("click", () => { bar.hidden = true; });
+    $("#away-go", main).addEventListener("click", () => {
+      if (busy) return;
+      bar.hidden = true;
+      generate("new", { speaker: bot, note: `${userName()} has just come back after about ${awayText(awayMs)} away. Open with a short message that shows ${bot.name} noticed the time apart, in character.` });
+    });
+  }
   if (jumpTo) requestAnimationFrame(() => scrollToMessage(jumpTo));
   if (matchMedia("(hover: hover)").matches) input.focus();
 

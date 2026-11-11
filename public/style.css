@@ -1002,6 +1002,15 @@ body.in-chat .site-footer { display: none; }
   float: left; margin: .06em .12em 0 0; font-family: var(--font-display); font-size: 3.1em; line-height: .82;
   font-weight: 600; font-style: normal; color: var(--accent);
 }
+/* A hidden thought, opened with the "thought" chip under a reply. */
+.thought {
+  margin-top: var(--s2); max-width: 33em; padding: var(--s2) var(--s3); border-left: 2px solid var(--line-strong);
+  font-family: var(--chat-font, var(--font)); font-size: calc(var(--t-base) * var(--chat-scale)); font-style: italic;
+  line-height: var(--lh-read); color: var(--narration); animation: fade-in 180ms var(--ease) both;
+}
+.thought-label { display: block; font-family: var(--font); font-style: normal; font-size: var(--t-xs); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+button.thought-chip { cursor: pointer; font: inherit; font-size: var(--t-sm); }
+:root[data-chat-read="on"] .thought, :root[data-chat-read="on"] .away-bar { display: none !important; }
 /* Where and when, from the scene tracker. Opens it on a click. */
 .scene-strip {
   display: flex; align-items: center; gap: var(--s2); width: 100%; min-height: 32px; padding: var(--s1) var(--s4);

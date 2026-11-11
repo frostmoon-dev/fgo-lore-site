@@ -234,7 +234,34 @@ export function guessMood(text, allowed) {
   return best ?? (allowed.includes("neutral") ? "neutral" : null);
 }
 
-export const stripBond = (text) => String(text ?? "").replace(BOND_TAG, "").replace(MOOD_TAG, "").replace(/\n{3,}$/, "\n").trimEnd();
+// A private thought the character adds after a reply: <thought>…</thought>.
+// Shown only when the reader peeks; never part of the story text. A tag
+// still open at the end (a reply mid-stream, or cut off) is hidden too.
+export const THOUGHT_TAG = /<thought>([\s\S]*?)<\/thought>/gi;
+const OPEN_THOUGHT = /<thought>[\s\S]*$|<\/?thou?g?h?t?$/i;
+export function readThought(text) {
+  const last = [...String(text ?? "").matchAll(THOUGHT_TAG)].at(-1);
+  return last ? last[1].replace(/\s+/g, " ").trim().slice(0, 600) : "";
+}
+
+export const stripBond = (text) => String(text ?? "").replace(THOUGHT_TAG, "").replace(OPEN_THOUGHT, "")
+  .replace(BOND_TAG, "").replace(MOOD_TAG, "").replace(/\n{3,}$/, "\n").trimEnd();
+
+// The real time where the person is, and how long they were away, for bots
+// that live in the person's own world. gapMs: time since the last message
+// before this exchange.
+export function clockNote({ now = new Date(), gapMs = 0, user = "User", char = "Character" } = {}) {
+  const h = now.getHours();
+  const part = h < 5 ? "the middle of the night" : h < 12 ? "morning" : h < 17 ? "afternoon" : h < 21 ? "evening" : "night";
+  const hour = now.toLocaleTimeString([], { hour: "numeric" });
+  const day = now.toLocaleDateString([], { weekday: "long" });
+  const hours = gapMs / 3600000;
+  const away = hours < 1 ? "" : hours < 36 ? `about ${Math.round(hours)} hour${Math.round(hours) === 1 ? "" : "s"}`
+    : `about ${Math.round(hours / 24)} days`;
+  return `For ${user} it is ${day} ${part}, around ${hour}.` +
+    (away ? ` ${user} was away for ${away} before this message.` : "") +
+    ` ${char} knows this the way anyone knows the time. Let it colour the reply only where it fits; do not announce it.`;
+}
 
 // Cleans a message the model wrote for {{user}}: drops a "Name:" label
 // (plain or bold) or a bond tag it copied from the history.
@@ -257,7 +284,7 @@ export function cleanImpersonation(text, userName) {
 export function buildPrompt({
   bot, persona, preset, settings, history, loreEntries = [], bond = null,
   mode = "reply", hint = "", memory = "", note = "", cast = [], scene = "",
-  facts = "", chapters = [], recalled = [], windowStart = 0, authorNote = "", liked = [], repetition = [],
+  facts = "", chapters = [], recalled = [], windowStart = 0, authorNote = "", liked = [], repetition = [], clock = "",
 }) {
   const asUser = mode === "impersonate";
   if (asUser) bond = null;
@@ -351,6 +378,9 @@ export function buildPrompt({
     late.push("## Recalled from earlier in this chat (use only if it fits)\n" +
       recalled.map((r) => `- ${r.label}: ${m(r.text)}`).join("\n"));
   }
+  // The real time, for bots that keep it. After the chat, so it never
+  // changes the part of the prompt a provider can cache.
+  if (!asUser && clock?.trim()) late.push(`## The real world right now\n${clock.trim()}`);
   if (bond) {
     // bond: { value, label, behavior, kind } from the bot's kind of bond.
     late.push(`## Bond\n${names.user}'s bond with ${names.char}${bond.kind ? ` (${bond.kind.toLowerCase()})` : ""} ` +
@@ -369,6 +399,11 @@ export function buildPrompt({
   if (moods.length) {
     post = [post, `At the very end of your reply, on its own line, add a tag like <mood:${moods[0]}> naming ${names.char}'s expression ` +
       `as the reply ends, one of: ${moods.join(", ")}. Never mention the tag in the story.`].filter(Boolean).join("\n\n");
+  }
+  if (!asUser && bot.thoughts) {
+    post = [post, `After your reply, on its own line, you may add one private thought of ${names.char}'s, as <thought>…</thought>: ` +
+      `one or two sentences ${names.user} cannot hear, in ${names.char}'s own voice, that add something the reply does not say. ` +
+      "Skip it when there is nothing worth hiding. Never refer to it in the story."].filter(Boolean).join("\n\n");
   }
   post = [post, avoidRule(settings)].filter(Boolean).join("\n\n");
   if (!asUser && repetition.length) post = [post, `Vary your writing. In ${names.char}'s recent replies:\n${repetition.map((h) => `- ${h}`).join("\n")}`].join("\n\n");
