@@ -597,6 +597,13 @@ h2.sub {
 @media (hover: hover) { .swatch:hover { border-color: var(--line-strong); } }
 .swatch:has(input:checked) { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
 .swatch:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* "Same as the site": a swatch that shows no colours of its own. */
+.swatch-none { background: repeating-linear-gradient(135deg, var(--fill) 0 6px, var(--surface) 6px 12px); }
+/* Bot editor: a bot's backgrounds for places, each with its tags. */
+.place-bgs { display: grid; gap: var(--s2); }
+.place-bgs:empty { display: none; }
+.place-bg { display: grid; grid-template-columns: 96px minmax(0, 1fr) auto; gap: var(--s3); align-items: center; }
+.place-bg .bg-thumb { width: 96px; aspect-ratio: 16 / 9; height: auto; }
 .accent-row { display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap; }
 .accent-row input[type="color"] {
   width: 40px; height: 40px; padding: 3px; border: 1.5px solid var(--ink); border-radius: var(--r-pill);
@@ -1234,6 +1241,9 @@ button.thought-chip { cursor: pointer; font: inherit; font-size: var(--t-sm); }
   background-size: cover; background-position: center;
 }
 .chat-bg[hidden] { display: none; }
+/* The background of the place just left, fading away over the new one. */
+.chat-bg-old { animation: bg-out 800ms var(--ease) forwards; }
+@keyframes bg-out { to { opacity: 0; } }
 .chat-bg::after { content: ""; position: absolute; inset: 0; background: var(--bg); opacity: var(--bg-dim, .86); }
 .chat-main.has-bg > *:not(.chat-bg) { position: relative; z-index: 1; }
 .chat-main.has-bg .chat-topbar, .chat-main.has-bg .composer { background: color-mix(in srgb, var(--bg) 90%, transparent); }

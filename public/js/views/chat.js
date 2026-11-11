@@ -18,7 +18,7 @@ import {
   memoryContext, liveChapters, windowStart as memoryWindowStart, autoChapters, pendingChapters,
   chaptersToFold, recallFor, parseChapter, cachedTokens, reasoningTokens, trimMemory, KEEP_RECENT,
 } from "../memory.js";
-import { CHAT_FONTS, getLook, setLook, fontSelectHTML, paletteSwatchesHTML } from "../looks.js";
+import { CHAT_FONTS, PALETTES, getLook, setLook, setBotLook, fontSelectHTML, paletteSwatchesHTML } from "../looks.js";
 import { bondChartHTML, wireBondChart } from "../chart.js";
 import { renderMarkdown, previewHTML } from "../markdown.js";
 import {
@@ -100,6 +100,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
     return;
   }
   document.body.classList.add("in-chat");
+  setBotLook(bot.look); // the bot's own colours, if it has any, until you leave
 
   const [settings, allPersonas, activePersona, allBots, botPersonas] = await Promise.all([getSettings(), personas.all(), personas.active(), bots.all(), getBotPersonas()]);
   // New chats start as whoever you last were with this bot.
@@ -529,18 +530,22 @@ export async function render(main, [botId, chatId, jumpTo]) {
     paintSceneStrip();
   }
 
+  // One line of the scene tracker, by its label; empty when unknown.
+  function sceneLine(label) {
+    const v = new RegExp(`^\\s*${label}\\s*:\\s*(.+)$`, "im").exec(chat.scene?.text ?? "")?.[1].trim() ?? "";
+    return /^(unknown|n\/a|none|-)?$/i.test(v) ? "" : v;
+  }
+
   // Where and when the scene is, from the scene tracker, under the header.
   function paintSceneStrip() {
     const strip = $("#scene-strip", main);
-    const line = (label) => {
-      const v = new RegExp(`^\\s*${label}\\s*:\\s*(.+)$`, "im").exec(chat.scene?.text ?? "")?.[1].trim() ?? "";
-      return /^(unknown|n\/a|none|-)?$/i.test(v) ? "" : v;
-    };
+    const line = sceneLine;
     const parts = [line("Location"), line("Time")].filter(Boolean);
     strip.hidden = !parts.length;
     $("#scene-strip-text", main).textContent = parts.join(" · ");
     const mood = line("Mood");
     strip.title = mood ? `Mood: ${mood}. Open the scene tracker.` : "Open the scene tracker.";
+    paintBackground(); // the place may have its own background
   }
 
   // How long the chat had been quiet before the message now being answered
@@ -2468,13 +2473,40 @@ export async function render(main, [botId, chatId, jumpTo]) {
   // ---------- Chat look ----------
   // The bot's background (or the default one from Settings), dimmed so text
   // stays readable. Repainted live from the Chat look dialog.
+  // A bot's backgrounds for places: the one whose tags the scene tracker's
+  // location and time name most often wins; none named, none chosen.
+  function placeBackground() {
+    const where = `${sceneLine("Location")} ${sceneLine("Time")}`.toLowerCase();
+    if (!where.trim()) return null;
+    let best = null;
+    let score = 0;
+    for (const b of bot.backgrounds ?? []) {
+      const hits = String(b.tags ?? "").toLowerCase().split(",").map((t) => t.trim()).filter(Boolean)
+        .filter((t) => new RegExp(`(^|[^a-z0-9])${t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^a-z0-9]|$)`).test(where)).length;
+      if (hits > score) { best = b; score = hits; }
+    }
+    return best?.url ?? null;
+  }
+  let shownBg; // undefined until the first paint, so opening a chat does not fade
   function paintBackground() {
-    const url = bot.background ?? settings.chatBackground ?? null;
     const layer = $(".chat-bg", main);
+    if (!layer) return;
+    const url = placeBackground() ?? bot.background ?? settings.chatBackground ?? null;
+    main.style.setProperty("--bg-dim", String(settings.backgroundDim ?? 0.86));
+    if (url === shownBg) return;
+    // The old picture stays on top and fades away over the new one.
+    if (shownBg && url && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      const old = document.createElement("div");
+      old.className = "chat-bg chat-bg-old";
+      old.setAttribute("aria-hidden", "true");
+      old.style.backgroundImage = `url("${shownBg}")`;
+      layer.after(old);
+      setTimeout(() => old.remove(), 900);
+    }
+    shownBg = url;
     $(".chat-main", main).classList.toggle("has-bg", !!url);
     layer.hidden = !url;
     layer.style.backgroundImage = url ? `url("${url}")` : "";
-    main.style.setProperty("--bg-dim", String(settings.backgroundDim ?? 0.86));
   }
   paintBackground();
 
@@ -2502,10 +2534,13 @@ export async function render(main, [botId, chatId, jumpTo]) {
         <p class="hint">${settings.chatBackground ? "Without one, this chat uses the default background from Settings." : "Only chats with this bot use it. The default for every bot is in Settings."}</p>
       </div>
       ${sliderHTML({ id: "look-dim", label: "Dim behind the text", min: 0.4, max: 0.98, step: 0.02, value: settings.backgroundDim ?? 0.86, hint: "Higher hides more of the picture. Applies to every chat." })}
-      <fieldset class="field"><legend class="field-label">Colours</legend>
+      ${bot.look ? `<div class="field"><span class="field-label">Colours</span>
+        <p class="hint">${esc(bot.name)} has a look of its own (${esc(PALETTES.find((p) => p.key === bot.look.palette)?.label ?? "custom")}), used while you are in its chats.
+          <a href="#/bot/${bot.id}" id="look-bot">Change it in the bot's editor</a>.</p></div>`
+    : `<fieldset class="field"><legend class="field-label">Colours</legend>
         ${paletteSwatchesHTML("look-palette", getLook("palette"))}
-        <p class="hint">For the whole site. More in Settings: your own accent, fonts and corners.</p>
-      </fieldset>
+        <p class="hint">For the whole site. More in Settings: your own accent, fonts and corners. A bot can have colours of its own, set in its editor.</p>
+      </fieldset>`}
       <div class="field"><label for="look-font">Font</label>
         ${fontSelectHTML("look-font", CHAT_FONTS, getLook("chatFont"))}
         <p class="hint">For messages and the box you type in. Clear is made for low vision and tired eyes.</p>
@@ -2563,6 +2598,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
     $$('input[name="look-pic"]', dlg).forEach((r) => r.addEventListener("change", () => setLocal("chatPic", "chatPic", r.value, "lg")));
     $("#look-done", dlg).addEventListener("click", () => dlg.close());
     $("#look-more", dlg).addEventListener("click", () => dlg.close());
+    $("#look-bot", dlg)?.addEventListener("click", () => dlg.close());
   }
 
   // Rename in place: click the name, type, Enter saves, Esc cancels.
@@ -2836,6 +2872,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
       document.removeEventListener("keydown", onGlobalKey);
       main.removeEventListener("focusout", settlePage);
       document.body.classList.remove("in-chat");
+      setBotLook(null);
     },
   };
 }

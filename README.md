@@ -198,6 +198,12 @@ server-side storage of your key.
   answers 400 to the marks is sent plain requests for the rest of the session; Connection → Mark
   prompts for caching turns it off. Example dialogue stops being sent once a chat has 40 messages
   (Prompt page; 20, 80 or never). The prompt preview lists each section's token count.
+- **A look per bot**: `bot.look = { palette, season }`, chosen in the bot editor. `setBotLook`
+  (looks.js) applies it while that bot's chat or editor is open and restores the site's on leaving;
+  it is never written to the saved look, and it travels in exported cards.
+- **Backgrounds for places**: `bot.backgrounds = [{ id, url, tags }]` (up to 8). The chat picks the
+  one whose comma-separated tags appear most in the scene tracker's Location and Time lines, falls
+  back to the bot's main background, and cross-fades on a change (no fade with reduced motion).
 - **Real time, per bot**: with *Knows the real time* on, a block after the chat (so prompt caching
   is unaffected) tells the bot the local weekday, part of day and hour, and how long the person was
   away (`clockNote`, prompt.js). Opening a chat 12 hours or more after its last message shows a bar

@@ -92,6 +92,7 @@ function fromCard(json) {
     gen: ext.gen ?? {},
     avatar: ext.avatar ?? null,
     ...(ext.contentMode === "safe" ? { contentMode: "safe" } : {}),
+    ...(typeof ext.look?.palette === "string" ? { look: { palette: ext.look.palette, ...(ext.look.season ? { season: String(ext.look.season) } : {}) } } : {}),
     ...(ext.bondKind ? { bondKind: ext.bondKind, bondLevels: ext.bondLevels ?? null, bondMilestones: ext.bondMilestones !== false } : {}),
   });
   const lore = (d.character_book?.entries ?? []).map((e, i) =>
@@ -204,7 +205,7 @@ export function toCard(bot, loreEntries = []) {
       } : undefined,
       extensions: { shirus_garden: {
         tagline: bot.tagline, series: bot.series ?? "", model: bot.model, gen: bot.gen,
-        bondKind: bot.bondKind, bondLevels: bot.bondLevels, bondMilestones: bot.bondMilestones, contentMode: bot.contentMode,
+        bondKind: bot.bondKind, bondLevels: bot.bondLevels, bondMilestones: bot.bondMilestones, contentMode: bot.contentMode, look: bot.look ?? undefined,
       } },
     },
   };

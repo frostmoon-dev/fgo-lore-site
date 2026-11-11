@@ -116,12 +116,27 @@ function accentVars(hex) {
   };
 }
 
+// ---------- A look per bot ----------
+// A bot may carry colours of its own: { palette, season }. While one is set
+// (in that bot's chat or editor) it stands in for the site's colours and
+// season; fonts you picked yourself still win. It is never saved as the
+// site's look, so the next page load starts from your own.
+let botLook = null;
+export const validLook = (look) => (look && PALETTES.some((p) => p.key === look.palette)
+  ? { palette: look.palette, ...(look.palette === "horror" ? { season: SEASONS.some((s) => s.key === look.season) ? look.season : "murder" } : {}) }
+  : null);
+export function setBotLook(look) {
+  botLook = validLook(look);
+  applyLooks();
+}
+
 // ---------- Apply ----------
 export function applyLooks() {
   const root = document.documentElement;
   const pick = (list, key) => list.find((f) => f.key === getLook(key)) ?? list[0];
+  const palette = botLook?.palette ?? getLook("palette");
   // A palette with fonts of its own fills every font left at its default.
-  const own = PALETTES.find((p) => p.key === getLook("palette"))?.fonts;
+  const own = PALETTES.find((p) => p.key === palette)?.fonts;
   const chat = own && getLook("chatFont") === DEFAULTS.chatFont ? { key: "theme", ...own.chat } : pick(CHAT_FONTS, "chatFont");
   const site = own && getLook("siteFont") === DEFAULTS.siteFont ? { key: "theme", ...own.site } : pick(SITE_FONTS, "siteFont");
   const head = own && getLook("headFont") === DEFAULTS.headFont ? { key: "theme", ...own.head } : pick(HEAD_FONTS, "headFont");
@@ -131,22 +146,23 @@ export function applyLooks() {
   // The chat follows the site font unless told otherwise, so Rounded stays Nunito.
   if (chat.key !== "rounded" || site.key !== "rounded") vars["--chat-font"] = chat.stack;
   if (head.key !== "fraunces") vars["--font-display"] = head.key === "site" ? site.stack : head.stack;
-  const accent = getLook("accent");
+  // Your own accent belongs to your colours, not to a bot's.
+  const accent = botLook ? "" : getLook("accent");
   if (isHex(accent)) Object.assign(vars, accentVars(accent));
   for (const k of VARS) root.style.removeProperty(k);
   for (const [k, v] of Object.entries(vars)) root.style.setProperty(k, v);
 
-  const palette = getLook("palette");
   if (palette === "paper") delete root.dataset.palette; else root.dataset.palette = palette;
   if (chat.key === "rounded" || chat.key === "theme") delete root.dataset.chatFont; else root.dataset.chatFont = chat.key;
   const corners = getLook("corners");
   if (corners === "soft") delete root.dataset.corners; else root.dataset.corners = corners;
-  const season = palette === "horror" ? getLook("horrorSeason") : "murder";
+  const season = palette === "horror" ? botLook?.season ?? getLook("horrorSeason") : "murder";
   if (season === "murder") delete root.dataset.season; else root.dataset.season = season;
   if (palette === "horror") addScratchFilter();
 
   const links = [...new Set([chat, site, head].map((f) => f.href).filter(Boolean))];
   loadFonts(links);
+  if (botLook) return; // the saved look stays your own
   try { localStorage.setItem("looks", JSON.stringify({ vars, links })); } catch { /* private mode */ }
 }
 
@@ -184,8 +200,14 @@ export function fontSelectHTML(id, list, value) {
     : list.filter((f) => !f.group).map(opt).join(""))).join("")}</select>`;
 }
 
-export function paletteSwatchesHTML(name, value) {
-  return `<div class="swatches">${PALETTES.map((p) => `
+// none: the label of a first choice that means "no palette" (value "").
+export function paletteSwatchesHTML(name, value, { none = "" } = {}) {
+  return `<div class="swatches">${none ? `
+    <label class="swatch">
+      <input type="radio" name="${name}" value="" ${value ? "" : "checked"}>
+      <span class="swatch-chip swatch-none" aria-hidden="true"></span>
+      <span class="swatch-name">${esc(none)}</span>
+    </label>` : ""}${PALETTES.map((p) => `
     <label class="swatch" title="${esc(p.about)}">
       <input type="radio" name="${name}" value="${p.key}" ${p.key === value ? "checked" : ""}>
       <span class="swatch-chip" aria-hidden="true" style="--sw-bg:${p.swatch[0]};--sw-ink:${p.swatch[1]};--sw-accent:${p.swatch[2]};--sw-bg-dark:${p.dark[0]};--sw-ink-dark:${p.dark[1]};--sw-accent-dark:${p.dark[2]}"><i></i><i></i></span>

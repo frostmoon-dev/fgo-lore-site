@@ -9,6 +9,13 @@ export const APP_VERSION = "2026.09.25.1";
 // Newest first. Each item says what it is and where it lives.
 export const NEWS = [
   {
+    version: "2026.11.11.3",
+    items: [
+      ["A look for each bot", "Give a bot colours of its own in its editor, under Look. Open its chat and the whole site wears them (a Horror Story bot can even pick its season); leave, and your own colours come back."],
+      ["Backgrounds that follow the scene", "Add up to eight backgrounds to a bot and tag each with places or times: throne room, forest, night. When the scene tracker's location or time names a tag, the chat fades to that background. Turn on Update after every reply in the scene tracker, or edit the scene yourself."],
+    ],
+  },
+  {
     version: "2026.11.11.2",
     items: [
       ["Bots that know the time", "Turn on Knows the real time in a bot's editor and it is told your local time of day and how long you were away. Come back after half a day or more and a bar offers to let the bot speak first. For companions who live in your world, not stories with a clock of their own."],
