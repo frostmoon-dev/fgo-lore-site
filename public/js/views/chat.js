@@ -7,7 +7,7 @@ import { registerCommands } from "../palette.js";
 import { chatCompletion, listModels } from "../api.js";
 import {
   buildPrompt, generationParams, currentText, applyMacros, readBond, readMood, guessMood, stripBond, cleanImpersonation, contentLevel,
-  readThought, clockNote,
+  readThought, readChoices, clockNote,
   avoidedIn, markAvoided, repetitionHints,
 } from "../prompt.js";
 import {
@@ -250,6 +250,10 @@ export async function render(main, [botId, chatId, jumpTo]) {
                 <button class="icon-btn" type="button" id="recap-close" aria-label="Dismiss recap" title="Dismiss">${icon("x")}</button></div>
               <div class="recap-body" id="recap-body"></div>
             </section>
+            <div class="draft-bar reply-bar" id="reply-bar" hidden>
+              ${icon("reply")}<span class="grow" id="reply-text"></span>
+              <button class="icon-btn" type="button" id="reply-close" aria-label="Cancel the reply" title="Cancel (Esc)">${icon("x")}</button>
+            </div>
             <div class="draft-bar away-bar" id="away-bar" hidden>
               <span class="grow" id="away-text"></span>
               <button class="btn btn-sm btn-primary" type="button" id="away-go"></button>
@@ -485,12 +489,21 @@ export async function render(main, [botId, chatId, jumpTo]) {
     });
   }
 
+  // In a Text messages chat, the bot is "online", "typing…" or "last seen".
+  function presence() {
+    if (group()) return "texting";
+    if (busy || pace) return "typing…";
+    const last = chat.messages.findLast((m) => m.role === "assistant");
+    if (!last?.at) return "texting";
+    return Date.now() - last.at < 10 * 60 * 1000 ? "online" : `last seen ${timeAgo(last.at)}`;
+  }
+
   function paintHeader() {
     if (gone()) return;
     $("#chat-title", main).innerHTML = `<span>${esc(chat.title)}</span>${icon("edit")}`;
     $("#chat-title", main).setAttribute("aria-label", `Chat name: ${chat.title}. Rename`);
     const p = persona();
-    $("#chat-sub", main).textContent = `with ${everyone().map((b) => b.name).join(", ")}${p ? ` · as ${p.name}` : ""}${chat.texting ? " · texting" : ""}`;
+    $("#chat-sub", main).textContent = `with ${everyone().map((b) => b.name).join(", ")}${p ? ` · as ${p.name}` : ""}${chat.texting ? ` · ${presence()}` : ""}`;
     // A texting chat always shows as message bubbles.
     $(".chat-main", main).classList.toggle("is-texting", !!chat.texting);
     paintModelChip();
@@ -555,10 +568,62 @@ export async function render(main, [botId, chatId, jumpTo]) {
   // ---------- Messages ----------
   const lastAssistantIndex = () => chat.messages.findLastIndex((m) => m.role === "assistant");
 
+  // ---------- Texts that arrive one at a time ----------
+  // In a Text messages chat, the reply being written shows one text (one
+  // paragraph) at a time, with typing dots and a pause sized to the next
+  // text. The whole reply is saved as soon as it arrives; this is display only.
+  let pace = null;       // { id, shown, done } for the reply on screen
+  let paceTimer = 0;
+  const textsOf = (text) => stripBond(text).split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+  const TYPING = '<span class="typing" aria-hidden="true"><i></i><i></i><i></i></span>';
+  function startPace(m) {
+    clearTimeout(paceTimer); paceTimer = 0;
+    pace = chat.texting && settings.textPace?.enabled !== false ? { id: m.id, shown: 0, done: false } : null;
+  }
+  function repaintPaced() {
+    const m = chat.messages.find((x) => x.id === pace?.id);
+    const el = m && $(`[data-id="${m.id}"] .msg-body`, logInner);
+    if (el) el.innerHTML = bodyHTML(m, currentText(m), busy);
+    if (nearBottom()) toBottom();
+  }
+  function endPace() {
+    clearTimeout(paceTimer); paceTimer = 0;
+    if (!pace) return;
+    pace = null;
+    if (!busy && !gone()) { paintLog({ scroll: nearBottom() }); paintHeader(); }
+  }
+  // The next text shows once it is complete: followed by a new paragraph, or
+  // the reply has finished.
+  function stepPace() {
+    if (!pace || paceTimer || gone()) return;
+    const m = chat.messages.find((x) => x.id === pace.id);
+    if (!m) { endPace(); return; }
+    const texts = textsOf(currentText(m));
+    const ready = pace.done ? texts.length : Math.max(0, texts.length - 1);
+    if (pace.shown >= texts.length && pace.done) { endPace(); return; }
+    if (pace.shown >= ready) return;
+    const wait = Math.max(500, Math.min(2000, texts[pace.shown].length * 30));
+    paceTimer = setTimeout(() => {
+      paceTimer = 0;
+      if (!pace) return;
+      pace.shown += 1;
+      repaintPaced();
+      stepPace();
+    }, wait);
+  }
+  function finishPace() { if (pace) { pace.done = true; stepPace(); } }
+
   function bodyHTML(m, text, streaming = false) {
     const meta = m.meta?.[m.swipeIndex ?? 0] ?? {};
     const think = meta.reasoning
       ? `<details class="thinking"><summary>Model's reasoning</summary><div>${esc(meta.reasoning)}</div></details>` : "";
+    if (pace?.id === m.id) {
+      const texts = textsOf(text);
+      const shown = texts.slice(0, pace.shown);
+      const more = pace.shown < texts.length || !pace.done;
+      return think + (shown.length ? renderMarkdown(applyMacros(shown.join("\n\n"), namesFor(speakerOf(m) ?? bot)), { quotes: true }) : "") +
+        (more ? TYPING.replace('class="typing"', 'class="typing" data-action="show-texts" title="Show the whole reply"') : "");
+    }
     const clean = stripBond(text);
     let content = clean.trim()
       ? renderMarkdown(applyMacros(clean, namesFor(speakerOf(m) ?? bot)), { quotes: true })
@@ -668,19 +733,27 @@ export async function render(main, [botId, chatId, jumpTo]) {
           <span>Bond with ${esc(speaker.name)}: ${esc(meta.milestone.from)} → ${esc(meta.milestone.to)}</span></div>` : "";
 
     const cutOff = isLastBot && !busy && meta.finish === "length";
+    // Options for your next move: under the latest reply only, once it has fully arrived.
+    const options = isLastBot && !busy && !pace && meta.choices?.length ? meta.choices : [];
     const opening = i === 0 && isBot ? " is-opening" : "";
     return `<article class="msg ${m.role} ${isLastBot ? "is-last" : ""}${face ? " has-face" : ""}${faceChanged ? " face-changed" : ""}${arriving ? " is-arriving" : ""}${opening}${m.id === toolsFor ? " tools-open" : ""}" data-id="${m.id}" aria-label="${esc(name)}"${arriving || faceChanged ? ` style="${arriving || faceChanged}"` : ""}>
       ${av}
       <div style="min-width:0">
         <div class="msg-head"><span class="msg-name">${esc(name)}</span><time class="msg-time" datetime="${new Date(m.at).toISOString()}">${clock(m.at)}</time></div>
+        ${m.replyTo?.text ? `<button type="button" class="reply-quote" data-action="jump-reply" title="Show the message this answers">
+          <span class="reply-name">${esc(m.replyTo.name)}</span><span class="reply-snippet">${esc(m.replyTo.text)}</span></button>` : ""}
         <div class="msg-body">${bodyHTML(m, text, streaming)}</div>
         ${peeking ? `<p class="thought" role="note"><span class="thought-label">${esc(name)} thinks</span>${esc(applyMacros(meta.thought, namesFor(speaker ?? bot)))}</p>` : ""}
         ${translation}
         ${cutOff ? `<div class="cutoff-bar"><span>This reply was cut off by the length limit.</span>
           <button class="btn btn-sm btn-primary" type="button" data-action="continue">Continue writing</button></div>` : ""}
+        ${options.length ? `<div class="choice-row" role="group" aria-label="What you could do next">
+          ${options.map((c, k) => `<button type="button" class="btn btn-sm choice-btn" data-action="choose" data-choice="${k}">${esc(applyMacros(c, namesFor(speaker ?? bot)))}</button>`).join("")}
+          <span class="choice-hint">or type your own</span></div>` : ""}
         <div class="msg-foot">
           ${swipeNav}
           <span class="msg-tools">
+            <button class="icon-btn" type="button" data-action="reply" aria-label="Reply to this message" title="Reply">${icon("reply")}</button>
             <button class="icon-btn" type="button" data-action="edit" aria-label="Edit message" title="Edit" ${busy ? "disabled" : ""}>${icon("edit")}</button>
             ${isLastBot ? `<button class="icon-btn" type="button" data-action="regenerate" aria-label="Regenerate reply, with options" aria-haspopup="menu" aria-expanded="false" title="Regenerate" ${busy ? "disabled" : ""}>${icon("refresh")}</button>` : ""}
             ${isBot ? `<button class="icon-btn${isLiked(m) ? " is-on" : ""}" type="button" data-action="like" aria-pressed="${isLiked(m)}"
@@ -755,6 +828,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
     sendBtn.setAttribute("aria-label", on ? "Stop generating" : "Send message");
     logInner.setAttribute("aria-busy", String(on));
     $("#impersonate", main).disabled = on;
+    if (chat.texting) paintHeader();
   }
 
   // ---------- Scene direction ----------
@@ -881,7 +955,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
       bot: speaker, persona: persona(), preset, settings: freshSettings, loreEntries, history: hist,
       bond: withBond ? beforeBond : null,
       ...memoryArgs(hist), scene: chat.scene?.text ?? "", authorNote: chat.authorNote ?? "", note: fullNote, cast: group() ? others(speaker) : [],
-      texting: !!chat.texting,
+      texting: !!chat.texting, choices: !!chat.choices,
       liked: likedFor(speaker, target.id), repetition: varied,
       clock: speaker.realTime ? clockNote({ gapMs: gapBefore(hist), user: userName(), char: speaker.name }) : "",
     });
@@ -900,8 +974,10 @@ export async function render(main, [botId, chatId, jumpTo]) {
     controller = new AbortController();
     const node = () => $(`[data-id="${target.id}"] .msg-body`, logInner);
     let frame = 0;
+    if (kind === "continue") endPace(); else startPace(target);
     const paintStream = () => {
       frame = 0;
+      if (pace?.id === target.id) { stepPace(); return; } // texts appear on their own clock
       const stick = nearBottom();
       const el = node();
       if (el) el.innerHTML = bodyHTML(target, target.swipes[si], true);
@@ -940,6 +1016,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
       const parsed = withBond ? readBond(res.content) : { text: stripBond(res.content), delta: 0 };
       // Kept beside the reply, not in it, so it is never sent back as history.
       const thought = speaker.thoughts ? readThought(res.content) : "";
+      const options = chat.choices ? readChoices(res.content) : [];
       // In a group scene models sometimes label their own line.
       if (group()) parsed.text = cleanImpersonation(parsed.text, speaker.name);
       if (kind === "continue") {
@@ -951,6 +1028,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
           ...(withBond ? { bond: (Number(before.bond) || 0) + parsed.delta } : {}),
           ...(mood ? { mood } : {}),
           ...(thought ? { thought } : {}),
+          ...(options.length ? { choices: options } : {}),
         };
       } else {
         target.swipes[si] = parsed.text;
@@ -960,6 +1038,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
           ...(withBond ? { bond: parsed.delta } : {}),
           ...(mood ? { mood } : {}),
           ...(thought ? { thought } : {}),
+          ...(options.length ? { choices: options } : {}),
           // Only the person's own direction or nudge earns the "directed" label.
           ...(directed || note ? { note: [directed, note].filter(Boolean).join(" ") } : {}),
           ...(directed ? { direction: directed } : {}),
@@ -1003,6 +1082,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
     } finally {
       cancelAnimationFrame(frame);
       controller = null;
+      if (pace?.id === target.id) { if (ok) finishPace(); else endPace(); }
       // Left the chat while the reply was coming in: keep what arrived, draw nothing.
       if (gone()) { await bots.touch(bot); await persist(); return; }
       setActivity("reply", null);
@@ -1212,6 +1292,18 @@ export async function render(main, [botId, chatId, jumpTo]) {
       dlg.close();
       generate("swipe", { note: `Stay true to ${speaker.name}'s character. Avoid these problems from the last attempt: ${c.issues.join("; ")}. ${c.fix}` });
     });
+  }
+
+  // ---------- Choices ----------
+  // After each reply the bot offers a few options for your next move, as
+  // buttons under it. A few tokens a reply; you can always type instead.
+  async function toggleChoices() {
+    if (chat.choices) delete chat.choices; else chat.choices = true;
+    await persist();
+    paintLog({ scroll: false });
+    toast(chat.choices
+      ? `Choices on. From the next reply, ${bot.name} offers a few options for what you do next. Tap one, or type your own.`
+      : "Choices off.");
   }
 
   // ---------- Text messages ----------
@@ -2195,8 +2287,26 @@ export async function render(main, [botId, chatId, jumpTo]) {
     input.focus();
   });
 
+  // ---------- Reply to a message ----------
+  // The next message you send quotes this one; the model is told which line
+  // you answered.
+  let replyTo = null;
+  const replyBar = $("#reply-bar", main);
+  function setReply(m) {
+    const text = stripBond(currentText(m)).replace(/[*_]/g, "").replace(/\s+/g, " ").trim();
+    if (!text) return;
+    const name = m.role === "user" ? userName() : (speakerOf(m) ?? bot).name;
+    replyTo = { id: m.id, name, text: text.length > 140 ? `${text.slice(0, 140).replace(/\s+\S*$/, "")}…` : text };
+    $("#reply-text", main).innerHTML = `Replying to <strong>${esc(name)}</strong>: “${esc(replyTo.text)}”`;
+    replyBar.hidden = false;
+    input.focus();
+  }
+  function clearReply() { replyTo = null; replyBar.hidden = true; }
+  $("#reply-close", main).addEventListener("click", () => { clearReply(); input.focus(); });
+
   async function send() {
     if (drafting) return;
+    endPace(); // answering now: show the whole reply first
     if (busy) { controller?.abort(); return; }
     const text = input.value.trim();
     if (!text) {
@@ -2211,7 +2321,8 @@ export async function render(main, [botId, chatId, jumpTo]) {
     const roll = text.startsWith("/roll") ? parseRoll(text) : null;
     if (text.startsWith("/roll") && !roll) { toast("Write a roll like /roll d20, /roll 2d6+1 or /roll d100 to open the door.", "error"); return; }
     if (roll) await addRoll(roll);
-    else chat.messages.push({ id: uid(), role: "user", content: text, at: now() });
+    else chat.messages.push({ id: uid(), role: "user", content: text, at: now(), ...(replyTo ? { replyTo } : {}) });
+    clearReply();
     input.value = "";
     fitInput();
     await persist();
@@ -2267,6 +2378,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
 
   $("#composer", main).addEventListener("submit", (e) => { e.preventDefault(); send(); });
   input.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && replyTo && !busy && !drafting) { e.preventDefault(); clearReply(); return; }
     if (e.altKey && e.code === "KeyW") { e.preventDefault(); impersonate(); return; }
     if (e.altKey && e.code === "KeyD") { e.preventDefault(); setDirecting(directBar.hidden); return; }
     if (e.altKey && e.code === "KeyS") { e.preventDefault(); suggestBar.hidden ? showIdeas() : closeIdeas(); return; }
@@ -2302,6 +2414,13 @@ export async function render(main, [botId, chatId, jumpTo]) {
     if (!btn) { showToolsOn(e); return; }
     const action = btn.dataset.action;
     if (action === "retry") { pendingError = null; generate("new"); return; }
+    if (action === "show-texts") { endPace(); return; }
+    if (action === "jump-reply") {
+      const at = btn.closest("[data-id]");
+      const from = chat.messages.find((x) => x.id === at?.dataset.id);
+      if (from?.replyTo && !scrollToMessage(from.replyTo.id)) toast("That message is no longer in this chat.");
+      return;
+    }
     if (action === "show-earlier") { showEarlier(); $('[data-action="show-earlier"]', logInner)?.focus({ preventScroll: true }); return; }
     const el = btn.closest("[data-id]");
     const i = chat.messages.findIndex((m) => m.id === el?.dataset.id);
@@ -2331,6 +2450,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
       const hasTr = isBot ? m.meta?.[m.swipeIndex ?? 0]?.translation : m.translation;
       openMenu(btn, [
         ...(isBot && i === chat.messages.length - 1 ? [{ label: "Continue this reply", hint: "Write more from where it ends", disabled: busy, onSelect: () => generate("continue") }] : []),
+        { label: "Reply to this", hint: "Quote it in your next message", onSelect: () => setReply(m) },
         { label: "Copy", onSelect: () => copyMessage(m) },
         { label: hasTr ? "Hide translation" : `Translate into ${myLanguage()}`, onSelect: () => (hasTr ? hideTranslation(m) : translateMessage(m)) },
         ...(isBot ? [{ label: "Check character", hint: "Does this stay true to the definition?", disabled: checking.has(m.id), onSelect: () => runCheck(m) }] : []),
@@ -2351,6 +2471,13 @@ export async function render(main, [botId, chatId, jumpTo]) {
       generate("continue");
     } else if (action === "check") {
       runCheck(m);
+    } else if (action === "choose") {
+      const pick = m.meta?.[m.swipeIndex ?? 0]?.choices?.[Number(btn.dataset.choice)];
+      if (!pick || busy) return;
+      input.value = applyMacros(pick, namesFor(speakerOf(m) ?? bot));
+      send();
+    } else if (action === "reply") {
+      setReply(m);
     } else if (action === "peek") {
       peeked.has(m.id) ? peeked.delete(m.id) : peeked.add(m.id);
       paintLog({ scroll: false });
@@ -2764,7 +2891,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
       bot: speaker, persona: persona(), preset, settings: s, history: withSpeakers(hist), loreEntries: entries,
       bond: bondOnFor(speaker) ? bondFor(speaker) : null,
       ...memoryArgs(hist), scene: chat.scene?.text ?? "", authorNote: chat.authorNote ?? "", note: direction(), cast: group() ? others(speaker) : [],
-      texting: !!chat.texting,
+      texting: !!chat.texting, choices: !!chat.choices,
       liked: likedFor(speaker),
       repetition: s.repetition?.enabled !== false ? repetitionHints(chat.messages.filter((x) => spokeBy(x, speaker)).slice(-6).map((x) => currentText(x)),
         { userTexts: chat.messages.filter((x) => x.role === "user").slice(-10).map((x) => currentText(x)) }) : [],
@@ -2798,6 +2925,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
     { label: `${bot.name}'s journal (${chat.journal.length})`, hint: "Private diary entries about you", onSelect: openJournal },
     { label: "Recap so far", hint: "A few lines on what has happened", onSelect: showRecap },
     { label: "Author's note", hint: chat.authorNote?.trim() ? clipText(chat.authorNote, 40) : "A lasting instruction for this chat", onSelect: openAuthorNote },
+    { label: chat.choices ? "Choices: on" : "Choices: off", hint: chat.choices ? "Stop offering options after replies" : "Options for your next move after each reply", onSelect: toggleChoices },
     { label: chat.texting ? "Text messages: on" : "Text messages: off", hint: chat.texting ? "Back to a story with narration" : `${bot.name} texts you: no narration, as bubbles`, onSelect: toggleTexting },
     { label: "Turn into a story", hint: "Rewrite the chat as prose", onSelect: openStory },
     { label: "Suggest lore from this chat", hint: "New entries from what happened", onSelect: openLoreSuggestions },
@@ -2878,6 +3006,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
   return {
     cleanup: () => {
       left = true;
+      clearTimeout(paceTimer);
       unregister();
       controller?.abort();
       drafting?.abort();

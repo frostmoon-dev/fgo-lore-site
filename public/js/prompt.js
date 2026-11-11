@@ -239,12 +239,25 @@ export function guessMood(text, allowed) {
 // still open at the end (a reply mid-stream, or cut off) is hidden too.
 export const THOUGHT_TAG = /<thought>([\s\S]*?)<\/thought>/gi;
 const OPEN_THOUGHT = /<thought>[\s\S]*$|<\/?thou?g?h?t?$/i;
+// Options for what the person does next: <choices>one | two | three</choices>.
+export const CHOICES_TAG = /<choices>([\s\S]*?)<\/choices>/gi;
+const OPEN_CHOICES = /<choices>[\s\S]*$|<\/?cho?i?c?e?s?$/i;
+export function readChoices(text) {
+  const last = [...String(text ?? "").matchAll(CHOICES_TAG)].at(-1);
+  if (!last) return [];
+  const seen = new Set();
+  return last[1].split(/\||\n/)
+    .map((c) => c.replace(/\s+/g, " ").trim().replace(/^(?:[-*•]|\d+[.)])\s*/, "").replace(/^["“'](.*)["”']$/, "$1").trim().slice(0, 80))
+    .filter((c) => c && !seen.has(c.toLowerCase()) && seen.add(c.toLowerCase()))
+    .slice(0, 4);
+}
 export function readThought(text) {
   const last = [...String(text ?? "").matchAll(THOUGHT_TAG)].at(-1);
   return last ? last[1].replace(/\s+/g, " ").trim().slice(0, 600) : "";
 }
 
-export const stripBond = (text) => String(text ?? "").replace(THOUGHT_TAG, "").replace(OPEN_THOUGHT, "")
+export const stripBond = (text) => String(text ?? "").replace(THOUGHT_TAG, "").replace(CHOICES_TAG, "")
+  .replace(OPEN_THOUGHT, "").replace(OPEN_CHOICES, "")
   .replace(BOND_TAG, "").replace(MOOD_TAG, "").replace(/\n{3,}$/, "\n").trimEnd();
 
 // The real time where the person is, and how long they were away, for bots
@@ -285,7 +298,7 @@ export function buildPrompt({
   bot, persona, preset, settings, history, loreEntries = [], bond = null,
   mode = "reply", hint = "", memory = "", note = "", cast = [], scene = "",
   facts = "", chapters = [], recalled = [], windowStart = 0, authorNote = "", liked = [], repetition = [], clock = "",
-  texting = false,
+  texting = false, choices = false,
 }) {
   const asUser = mode === "impersonate";
   if (asUser) bond = null;
@@ -304,8 +317,12 @@ export function buildPrompt({
   let clean = recentHistory
     .filter((x) => (x.role === "user" || x.role === "assistant") && !x.error)
     .map((x) => {
-      const content = stripBond(currentText(x));
-      if (!group) return { role: x.role, content: currentText(x) };
+      // A message that answers an earlier one says which, the same way every
+      // turn, so the cached part of the prompt does not change.
+      const said = x.role === "user" && x.replyTo?.text
+        ? `[Replying to ${x.replyTo.name}: ${x.replyTo.text}]\n${currentText(x)}` : currentText(x);
+      const content = stripBond(said);
+      if (!group) return { role: x.role, content: said };
       const own = x.role === "assistant" && nameOf(x) === names.char;
       return { role: own ? "assistant" : "user", content: own ? content : `${nameOf(x)}: ${content}` };
     })
@@ -415,6 +432,11 @@ export function buildPrompt({
     post = [post, `After your reply, on its own line, you may add one private thought of ${names.char}'s, as <thought>…</thought>: ` +
       `one or two sentences ${names.user} cannot hear, in ${names.char}'s own voice, that add something the reply does not say. ` +
       "Skip it when there is nothing worth hiding. Never refer to it in the story."].filter(Boolean).join("\n\n");
+  }
+  if (!asUser && choices) {
+    post = [post, `After your reply, on its own line, offer 2 to 4 short options for what ${names.user} might ${texting ? "text back" : "do or say next"}, ` +
+      "as <choices>first | second | third</choices>. Each under 12 words, in " + `${names.user}'s voice, clearly different from each other ` +
+      "(for example one bold, one careful, one that changes direction). Never mention them in the story."].join("\n\n");
   }
   post = [post, avoidRule(settings)].filter(Boolean).join("\n\n");
   if (!asUser && repetition.length) post = [post, `Vary your writing. In ${names.char}'s recent replies:\n${repetition.map((h) => `- ${h}`).join("\n")}`].join("\n\n");

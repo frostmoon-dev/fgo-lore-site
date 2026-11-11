@@ -55,6 +55,9 @@ export const DEFAULT_SETTINGS = {
   // Spot habits in a bot's recent replies (same opening, phrases, endings)
   // and ask the next reply to vary them. Local, no extra request.
   repetition: { enabled: true },
+  // In Text messages chats, a reply's texts appear one at a time with a
+  // typing pause between them, like someone typing. Display only.
+  textPace: { enabled: true },
   // Phrases models overuse. Sent as "never write these"; any that still
   // appear are marked in the reply and can be rewritten in one tap.
   avoid: {
