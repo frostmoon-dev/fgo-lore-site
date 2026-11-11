@@ -35,7 +35,7 @@ async function askOnce(messages, { bot, maxTokens, temperature, signal }) {
   const res = await chatCompletion(conn, {
     model: bot?.model || conn.model || undefined,
     messages, stream: false, max_tokens: maxTokens, temperature,
-  }, { signal });
+  }, { signal, purpose: "task" });
   window.dispatchEvent(new CustomEvent("api-status", { detail: true }));
   return res;
 }

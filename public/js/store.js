@@ -349,7 +349,7 @@ export const dayKey = (t = Date.now()) => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
 export const getUsage = () => db.getKV("usage", { days: {} });
-export function recordUsage({ model, prompt, completion, estimated, cached = 0 }) {
+export function recordUsage({ model, prompt, completion, estimated, cached = 0, reasoning = 0 }) {
   usageQueue = usageQueue.then(async () => {
     const usage = await getUsage();
     const key = dayKey();
@@ -359,6 +359,8 @@ export function recordUsage({ model, prompt, completion, estimated, cached = 0 }
     if (estimated) day.estimated += 1;
     // Input tokens the provider reused from its prompt cache (usually cheaper).
     day.cached = (day.cached ?? 0) + cached;
+    // Output tokens spent on reasoning rather than the answer.
+    day.reasoning = (day.reasoning ?? 0) + reasoning;
     const keep = Object.keys(usage.days).sort().slice(-USAGE_DAYS);
     usage.days = Object.fromEntries(keep.map((k) => [k, usage.days[k]]));
     await db.setKV("usage", usage);

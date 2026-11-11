@@ -15,7 +15,7 @@ import {
 } from "../ai.js";
 import {
   memoryContext, liveChapters, windowStart as memoryWindowStart, autoChapters, pendingChapters,
-  chaptersToFold, recallFor, parseChapter, cachedTokens, trimMemory, KEEP_RECENT,
+  chaptersToFold, recallFor, parseChapter, cachedTokens, reasoningTokens, trimMemory, KEEP_RECENT,
 } from "../memory.js";
 import { CHAT_FONTS, getLook, setLook, fontSelectHTML, paletteSwatchesHTML } from "../looks.js";
 import { bondChartHTML, wireBondChart } from "../chart.js";
@@ -625,7 +625,8 @@ export async function render(main, [botId, chatId, jumpTo]) {
     }
     if (meta.usage) {
       const cached = cachedTokens(meta.usage);
-      info.push(`<span title="Tokens in / out${cached ? "; reused from the provider's cache" : ""}">${meta.usage.prompt_tokens ?? "?"} → ${meta.usage.completion_tokens ?? "?"} tokens${cached ? ` · ${cached} cached` : ""}</span>`);
+      const thought = reasoningTokens(meta.usage);
+      info.push(`<span title="Tokens in / out${thought ? "; part of the output was the model thinking, which is billed too" : ""}${cached ? "; reused from the provider's cache" : ""}">${meta.usage.prompt_tokens ?? "?"} → ${meta.usage.completion_tokens ?? "?"} tokens${thought ? ` (${thought} thinking)` : ""}${cached ? ` · ${cached} cached` : ""}</span>`);
     }
     if (meta.finish === "length" && !isLastBot) info.push(`<span title="The reply hit the max reply tokens limit">cut off</span>`);
     if (meta.mood) info.unshift(`<span class="chip mood-chip" title="${esc(name)}'s expression">${esc(meta.mood)}</span>`);
@@ -889,7 +890,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
 
     try {
       const ask = (b) => chatCompletion(conn, b, {
-        signal: controller.signal, cache: true,
+        signal: controller.signal, cache: true, purpose: "reply",
         onRetry: ({ attempt, max }) => setActivity("reply", `The model is busy. Trying again (${attempt} of ${max})…`),
         onDelta: (r) => {
           if (r.content && /^The (model is busy|reply came back empty)/.test(activity.get("reply") ?? "")) setActivity("reply", `${speaker.name} is writing…`);
@@ -2028,7 +2029,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
     let text = "";
     try {
       const res = await chatCompletion(conn, body, {
-        signal: drafting.signal, cache: true,
+        signal: drafting.signal, cache: true, purpose: "reply",
         onRetry: ({ attempt, max }) => showDraftBar(`The model is busy. Trying again (${attempt} of ${max})…`, { tools: false }),
         onDelta: (r) => { input.value = cleanImpersonation(r.content, who); fitInput(); },
       });

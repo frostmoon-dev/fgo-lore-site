@@ -110,7 +110,7 @@ export async function listModels(conn) {
 // Sends a chat request. Calls onDelta as text streams in. Resolves with the
 // full reply; rejects with AbortError when stopped.
 import { recordUsage, getSettings } from "./store.js";
-import { cachedTokens } from "./memory.js";
+import { cachedTokens, reasoningTokens } from "./memory.js";
 
 // Every finished request is counted. Providers that do not report token
 // counts get an estimate (about four characters per token), marked as such.
@@ -123,6 +123,7 @@ function count(payload, result) {
     completion: Number(u?.completion_tokens) || est(`${result.content}${result.reasoning ?? ""}`),
     estimated: !(u?.prompt_tokens && u?.completion_tokens),
     cached: Number(cachedTokens(u)) || 0,
+    reasoning: Number(reasoningTokens(u)) || 0,
   });
 }
 
@@ -169,15 +170,54 @@ export function withCacheMarks(messages) {
   return messages.map((m, i) => ((i === 0 && m.role === "system") || i === last ? mark(m) : m));
 }
 
+// ---------- Thinking ----------
+// Some models reason before they answer, and bill that reasoning as output.
+// DeepSeek's current models do it by default, at high effort, on every
+// request, and ignore temperature while they do. A connection therefore says
+// how much thinking a chat reply and a background task (summary, scene
+// tracker, translation…) may use. "default" sends nothing.
+export const THINK_LEVELS = [["default", "Provider default"], ["off", "Off"], ["low", "Low"], ["high", "High"], ["max", "Max"]];
+const HEADROOM = { low: 1024, high: 4096, max: 8192 }; // room for the reasoning, on top of the reply length
+const unthinkable = new Set(); // connections that rejected the fields this session
+
+export function providerOf(conn) {
+  let host = "";
+  try { host = new URL(normalizeBaseUrl(conn?.baseUrl)).hostname; } catch { /* server mode or no URL */ }
+  if (/(^|\.)deepseek\.com$/i.test(host)) return "deepseek";
+  if (/(^|\.)openrouter\.ai$/i.test(host)) return "openrouter";
+  return "other";
+}
+export const isDeepSeek = (conn, model) => providerOf(conn) === "deepseek" || /deepseek/i.test(String(model ?? conn?.model ?? ""));
+
+// purpose: "reply" (a chat reply or Write my reply) or "task" (everything else).
+// DeepSeek does not think unless the connection says so; other providers
+// are left alone unless a level is chosen.
+export function thinkLevel(conn, model, purpose) {
+  const set = purpose === "reply" ? conn?.thinkReply : conn?.thinkTasks;
+  if (set && THINK_LEVELS.some(([k]) => k === set)) return set;
+  return isDeepSeek(conn, model) ? "off" : "default";
+}
+
+// The request fields for a level, in the provider's own words.
+export function thinkingFields(conn, level, model) {
+  if (!level || level === "default") return {};
+  if (providerOf(conn) === "openrouter") return { reasoning: { effort: level === "off" ? "none" : level } };
+  if (isDeepSeek(conn, model)) {
+    return level === "off" ? { thinking: { type: "disabled" } } : { thinking: { type: "enabled" }, reasoning_effort: level };
+  }
+  return { reasoning_effort: level === "off" ? "none" : level };
+}
+
 // retries: how many more tries after the first; defaults to the setting.
 // onRetry({ attempt, max, delay, message }) runs before each wait.
 // cache: mark the prompt for caching when the model needs it (chat replies).
-export async function chatCompletion(conn, body, { signal, onDelta = () => {}, onRetry = () => {}, retries, cache = false } = {}) {
+// purpose: "reply" or "task"; decides how much the model may think.
+export async function chatCompletion(conn, body, { signal, onDelta = () => {}, onRetry = () => {}, retries, cache = false, purpose = "task" } = {}) {
   const max = retries ?? (await getSettings()).retry?.tries ?? 3;
   for (let attempt = 0; ; attempt++) {
     let started = false;
     try {
-      return await completeOnce(conn, body, { signal, cache, onDelta: (r) => { started ||= !!(r.content || r.reasoning); onDelta(r); } });
+      return await completeOnce(conn, body, { signal, cache, purpose, onDelta: (r) => { started ||= !!(r.content || r.reasoning); onDelta(r); } });
     } catch (err) {
       if (err.name === "AbortError" || !err.busy || started || attempt >= max) {
         if (err.busy && attempt > 0) err.message = `${err.message} Tried ${attempt + 1} times; try again in a minute, or pick another model.`;
@@ -190,19 +230,35 @@ export async function chatCompletion(conn, body, { signal, onDelta = () => {}, o
   }
 }
 
-async function completeOnce(conn, body, { signal, onDelta, cache }) {
+async function completeOnce(conn, body, { signal, onDelta, cache, purpose }) {
   let extra = {};
   try { extra = parseExtraBody(conn.extraBody); } catch { /* shown on the Connection page */ }
   const payload = { ...extra, ...body };
   if (conn.model) payload.model ??= conn.model;
   if (!payload.model && conn.mode !== "server") throw new Error("No model chosen. Pick one on the Connection page.");
 
+  // Thinking: skipped when the connection's own extra fields already set it.
+  const ownThinking = ["thinking", "reasoning", "reasoning_effort"].some((k) => k in extra);
+  const level = ownThinking || unthinkable.has(conn.id) ? "default" : thinkLevel(conn, payload.model, purpose);
+  const think = thinkingFields(conn, level, payload.model);
+  const thinking = Object.keys(think).length > 0;
+  // Reasoning shares the length limit on most providers; give it room of its
+  // own so it cannot use up the reply and force a second, paid request.
+  const room = HEADROOM[level] && Number(payload.max_tokens) ? { max_tokens: Number(payload.max_tokens) + HEADROOM[level] } : {};
   const marked = cache && wantsCacheMarks(conn, payload.model) && !unmarkable.has(conn.id);
-  let r = await request(conn, "chat/completions", marked ? { ...payload, messages: withCacheMarks(payload.messages) } : payload, signal);
-  // A proxy that does not understand the marks: send it plain from now on.
-  if (marked && r.status === 400) {
-    const plain = await request(conn, "chat/completions", payload, signal);
-    if (plain.ok) unmarkable.add(conn.id);
+  const build = ({ marks = marked, withThinking = thinking } = {}) => ({
+    ...payload, ...(withThinking ? { ...think, ...room } : {}),
+    ...(marks ? { messages: withCacheMarks(payload.messages) } : {}),
+  });
+  let r = await request(conn, "chat/completions", build(), signal);
+  // A proxy that does not understand the marks or the thinking fields: send
+  // it plain, and from now on if that works.
+  if ((marked || thinking) && r.status === 400) {
+    const plain = await request(conn, "chat/completions", build({ marks: false, withThinking: false }), signal);
+    if (plain.ok) {
+      if (marked) unmarkable.add(conn.id);
+      if (thinking) unthinkable.add(conn.id);
+    }
     r = plain;
   }
   if (!r.ok) {

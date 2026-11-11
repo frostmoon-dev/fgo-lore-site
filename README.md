@@ -198,6 +198,12 @@ server-side storage of your key.
   answers 400 to the marks is sent plain requests for the rest of the session; Connection → Mark
   prompts for caching turns it off. Example dialogue stops being sent once a chat has 40 messages
   (Prompt page; 20, 80 or never). The prompt preview lists each section's token count.
+- **Thinking control** (`api.js`): a connection sets how much the model may reason, separately for
+  chat replies and background tasks (Provider default, Off, Low, High, Max). DeepSeek, which thinks
+  at high effort by default and bills it as output, gets Off for both unless changed: `thinking:
+  {type: "disabled"}` on its own API, `reasoning: {effort: "none"}` through OpenRouter. With thinking
+  on, `max_tokens` gets headroom for the reasoning. A provider that answers 400 to the fields is
+  sent plain requests for the session. Usage counts reasoning tokens and takes a cached-input price.
 - **Connection**: as many API profiles as you like, a model list fetched from the
   provider, a test button, custom headers for fussy proxies, and extra request fields (JSON
   merged into every chat request, e.g. OpenRouter's `provider` routing). With OpenRouter and a
