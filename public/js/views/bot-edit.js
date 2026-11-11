@@ -1,13 +1,15 @@
 import { bots, lore, newBot, newLorebook, getSettings, getLorebooks, saveLorebooks, loreForBot, BOND_KINDS, BOND_POINTS, bondLevels, EXPRESSIONS, MOOD_SUGGESTIONS, moodName } from "../store.js";
 import { toCard, cardPng, importCardFile, importCardBytes } from "../card.js";
 import { estimateTokens } from "../prompt.js";
+import { SEASONS, paletteSwatchesHTML, setBotLook, validLook } from "../looks.js";
 import { draftBot, sortDefinition } from "../ai.js";
 import {
-  $, $$, esc, icon, imagePicker, imagePickerHTML, avatarHTML, toast, confirmDialog, openDialog,
+  $, $$, esc, icon, imagePicker, imagePickerHTML, avatarHTML, toast, confirmDialog, openDialog, cropImage,
   download, slug, parseTags, autosize, sliderHTML, wireSlider,
 } from "../ui.js";
 
 const CONTENT_NAMES = { off: "Off", mature: "Mature", explicit: "Explicit" };
+const MAX_BACKGROUNDS = 8;
 
 const TEXT_FIELDS = [
   { key: "description", label: "Definition", rows: "tall", required: true,
@@ -51,6 +53,11 @@ export async function render(main, [id]) {
   bot.contentMode ??= "site";
   bot.expressions ??= {};
   bot.series ??= "";
+  bot.realTime ??= false;
+  bot.thoughts ??= false;
+  bot.trackerLines ??= [];
+  bot.look = validLook(bot.look);
+  bot.backgrounds ??= [];
   const settings = await getSettings();
   // Series already in use come first; tags follow, since many people put the fandom in the tags.
   const others = (await bots.all()).filter((b) => b.id !== bot.id);
@@ -193,6 +200,20 @@ export async function render(main, [id]) {
                   cls: "bg-edit",
                 })}</div>
               </div>
+              <div class="field">
+                <span class="field-label">Backgrounds for places</span>
+                <p class="hint">Optional. Tag each with the places or times it suits (throne room, forest, night). When the scene tracker's
+                  location or time names a tag, the chat fades to that background; otherwise the one above shows. Up to ${MAX_BACKGROUNDS}.</p>
+                <div class="place-bgs" id="place-bgs"></div>
+                <div><label class="btn btn-sm" for="place-bg-file">Add a background</label>
+                  <input type="file" id="place-bg-file" accept="image/*" class="sr-only"></div>
+              </div>
+              <fieldset class="field">
+                <legend class="field-label">Look</legend>
+                <p class="hint">Colours of this bot's own, used while you are in its chats. Your own colours come back when you leave.</p>
+                ${paletteSwatchesHTML("bot-palette", bot.look?.palette ?? "", { none: "Same as the site" })}
+                <div class="segmented" id="bot-season" hidden>${SEASONS.map((x) => `<label><input type="radio" name="bot-season" value="${x.key}" ${(bot.look?.season ?? "murder") === x.key ? "checked" : ""}><span>${esc(x.label)}</span></label>`).join("")}</div>
+              </fieldset>
               <fieldset class="field">
                 <legend class="field-label">Lorebooks</legend>
                 <p class="hint">Which sets of lore this bot can draw on. <a href="#/lore">Manage lorebooks</a>.</p>
@@ -209,6 +230,15 @@ export async function render(main, [id]) {
                   <option value="safe" ${bot.contentMode === "safe" ? "selected" : ""}>Always safe for work</option>
                 </select>
                 <p class="hint" id="content-mode-hint">Set the site level in <a href="#/settings">Settings</a>. Safe for work keeps this bot's chats clean whatever the site allows.</p>
+              </div>
+              <label class="check"><input type="checkbox" id="real-time" ${bot.realTime ? "checked" : ""}>
+                <span>Knows the real time<small>Told your local time of day and how long you were away, so it can say “you're up late” or “three days, and not a word?”. For companions who live in your world, not for stories with a clock of their own. About 40 tokens a reply.</small></span></label>
+              <label class="check"><input type="checkbox" id="thoughts" ${bot.thoughts ? "checked" : ""}>
+                <span>Hidden thoughts<small>May add a private thought after a reply. You only see it if you tap “thought” under the message. A few extra tokens a reply; never sent back to the model.</small></span></label>
+              <div class="field">
+                <label for="tracker-lines">Extra scene tracker lines</label>
+                <input type="text" id="tracker-lines" value="${esc(bot.trackerLines.join(", "))}" placeholder="Sanity, Injuries, Inventory" autocomplete="off" aria-describedby="tracker-lines-hint">
+                <p class="hint" id="tracker-lines-hint">Things the scene tracker keeps for this bot besides place, time, mood and so on. Up to six, separated by commas.</p>
               </div>
               <label class="check"><input type="checkbox" id="bond-on" ${bot.bondEnabled === false ? "" : "checked"}>
                 <span>Track the bond with this bot<small>Shows a bond meter in the chat header and lets it shape how the bot treats you.</small></span></label>
@@ -344,6 +374,13 @@ export async function render(main, [id]) {
       : null;
     bot.bondMilestones = $("#bond-milestones", main).checked;
     bot.contentMode = val("#content-mode");
+    const palette = $('input[name="bot-palette"]:checked', main)?.value ?? "";
+    bot.look = validLook(palette ? { palette, season: $('input[name="bot-season"]:checked', main)?.value } : null);
+    $$("[data-bg-tags]", main).forEach((el) => { const b = bot.backgrounds[Number(el.dataset.bgTags)]; if (b) b.tags = el.value; });
+    bot.realTime = $("#real-time", main).checked;
+    bot.thoughts = $("#thoughts", main).checked;
+    bot.trackerLines = val("#tracker-lines").split(",").map((t) => t.replace(/[:\n]/g, " ").replace(/\s+/g, " ").trim().slice(0, 24))
+      .filter((t, i, all) => t && all.findIndex((x) => x.toLowerCase() === t.toLowerCase()) === i).slice(0, 6);
     bot.gen = {};
     for (const k of ["temperature", "max_tokens", "top_k", "repetition_penalty"]) {
       const v = val(`#g-${k}`);
@@ -457,6 +494,46 @@ export async function render(main, [id]) {
       ? `<span class="bg-thumb"><img src="${esc(url)}" alt=""></span>`
       : `<span class="bg-thumb is-empty">No background</span>`),
   });
+  // ---- Backgrounds for places ----
+  function paintPlaceBgs() {
+    $("#place-bgs", main).innerHTML = bot.backgrounds.map((b, i) => `
+      <div class="place-bg">
+        <span class="bg-thumb"><img src="${esc(b.url)}" alt=""></span>
+        <div class="field"><label class="sr-only" for="bg-tags-${i}">Places and times for background ${i + 1}</label>
+          <input type="text" id="bg-tags-${i}" data-bg-tags="${i}" value="${esc(b.tags ?? "")}" placeholder="throne room, castle, night" autocomplete="off"></div>
+        <button class="icon-btn" type="button" data-bg-drop="${i}" aria-label="Take out background ${i + 1}" title="Take out">${icon("x")}</button>
+      </div>`).join("");
+    $('label[for="place-bg-file"]', main).hidden = bot.backgrounds.length >= MAX_BACKGROUNDS;
+  }
+  $("#place-bg-file", main).addEventListener("change", async (e) => {
+    const file = e.target.files[0];
+    e.target.value = "";
+    if (!file || bot.backgrounds.length >= MAX_BACKGROUNDS) return;
+    try {
+      const url = await cropImage(file, { aspect: 16 / 9, outW: 1600, outH: 900, quality: 0.82, title: "Crop the background" });
+      if (!url) return;
+      collect(); // keep tags typed so far
+      bot.backgrounds.push({ id: crypto.randomUUID(), url, tags: "" });
+      paintPlaceBgs(); update();
+      $(`#bg-tags-${bot.backgrounds.length - 1}`, main)?.focus();
+    } catch (err) { toast(err.message, "error"); }
+  });
+  $("#place-bgs", main).addEventListener("click", (e) => {
+    const r = e.target.closest("[data-bg-drop]");
+    if (!r) return;
+    collect();
+    bot.backgrounds.splice(Number(r.dataset.bgDrop), 1);
+    paintPlaceBgs(); update();
+  });
+  paintPlaceBgs();
+  // ---- Look ----
+  // The editor wears the bot's look while you choose it.
+  function paintLook() {
+    $("#bot-season", main).hidden = $('input[name="bot-palette"]:checked', main)?.value !== "horror";
+    setBotLook(bot.look);
+  }
+  $$('input[name="bot-palette"], input[name="bot-season"]', main).forEach((r) => r.addEventListener("change", () => { collect(); paintLook(); }));
+  paintLook();
   // ---- Kind of bond ----
   function paintBondLevels(list) {
     list.forEach((l, i) => {
@@ -765,6 +842,6 @@ export async function render(main, [id]) {
 
   return {
     isDirty,
-    cleanup: () => document.removeEventListener("keydown", onKey),
+    cleanup: () => { document.removeEventListener("keydown", onKey); setBotLook(null); },
   };
 }

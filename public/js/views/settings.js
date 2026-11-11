@@ -269,8 +269,11 @@ export async function render(main) {
                 <input type="number" id="price-in" min="0" step="0.01" inputmode="decimal" value="${esc(settings.usage.priceIn)}" placeholder="e.g. 3"></div>
               <div class="field"><label for="price-out">Output, US$ per million tokens</label>
                 <input type="number" id="price-out" min="0" step="0.01" inputmode="decimal" value="${esc(settings.usage.priceOut)}" placeholder="e.g. 15"></div>
+              <div class="field"><label for="price-cached">Cached input, US$ per million tokens</label>
+                <input type="number" id="price-cached" min="0" step="0.001" inputmode="decimal" value="${esc(settings.usage.priceCached ?? "")}" placeholder="optional"></div>
             </div>
-            <p class="hint">Find these on your provider's pricing page. The estimate uses one price for every model.</p>
+            <p class="hint">Find these on your provider's pricing page. The estimate uses one price for every model.
+              Cached input is the "cache hit" price; leave it empty to count cached tokens at the input price.</p>
           </details>
         </div>
       </div>
@@ -418,16 +421,18 @@ export async function render(main) {
   async function paintUsageStats() {
     const usage = await getUsage();
     const body = $("#usage-body", main);
-    const price = { in: Number(settings.usage.priceIn), out: Number(settings.usage.priceOut) };
+    const price = { in: Number(settings.usage.priceIn), out: Number(settings.usage.priceOut), cached: settings.usage.priceCached };
     const priced = price.in > 0 || price.out > 0;
-    const cost = (d) => (d.prompt * (price.in || 0) + d.completion * (price.out || 0)) / 1e6;
+    // Cached input at its own price when one is given (per-model rows have no cached count).
+    const hitPrice = price.cached !== "" && price.cached != null && Number(price.cached) >= 0 ? Number(price.cached) : (price.in || 0);
+    const cost = (d) => (((d.prompt - (d.cached ?? 0)) * (price.in || 0)) + (d.cached ?? 0) * hitPrice + d.completion * (price.out || 0)) / 1e6;
     const money = (n) => (n < 0.01 && n > 0 ? "under $0.01" : `$${n.toFixed(2)}`);
     const range = (n) => {
-      const out = { prompt: 0, completion: 0, requests: 0, estimated: 0, cached: 0, models: {} };
+      const out = { prompt: 0, completion: 0, requests: 0, estimated: 0, cached: 0, reasoning: 0, models: {} };
       for (let i = 0; i < n; i++) {
         const d = usage.days[dayKey(Date.now() - i * 86400000)];
         if (!d) continue;
-        for (const k of ["prompt", "completion", "requests", "estimated", "cached"]) out[k] += d[k] ?? 0;
+        for (const k of ["prompt", "completion", "requests", "estimated", "cached", "reasoning"]) out[k] += d[k] ?? 0;
         for (const [name, m] of Object.entries(d.models ?? {})) {
           const t = (out.models[name] ??= { prompt: 0, completion: 0, requests: 0 });
           t.prompt += m.prompt; t.completion += m.completion; t.requests += m.requests;
@@ -467,6 +472,7 @@ export async function render(main) {
           </table>
         </details>
         ${month.cached ? `<p class="hint">${Math.round((month.cached / Math.max(1, month.prompt)) * 100)}% of input tokens in the last 30 days (${month.cached.toLocaleString()}) were reused from your provider's cache, which most providers charge less for.</p>` : ""}
+        ${month.reasoning ? `<p class="hint">${Math.round((month.reasoning / Math.max(1, month.completion)) * 100)}% of output tokens in the last 30 days (${month.reasoning.toLocaleString()}) were the model thinking before it answered, billed as output. Connection → Thinking turns it down or off.</p>` : ""}
         ${month.estimated ? `<p class="hint">${month.estimated} of ${month.requests} requests were estimated at about 4 characters per token, because the provider did not report exact counts.</p>` : ""}
         <div><button class="btn btn-sm btn-quiet btn-danger" type="button" id="usage-clear">Clear usage history</button></div>
       </div>`;
@@ -480,11 +486,12 @@ export async function render(main) {
   }
   paintUsageStats();
   const savePrices = debounce(async () => {
-    settings.usage = (await saveSettings({ usage: { priceIn: $("#price-in", main).value, priceOut: $("#price-out", main).value } })).usage;
+    settings.usage = (await saveSettings({ usage: { priceIn: $("#price-in", main).value, priceOut: $("#price-out", main).value, priceCached: $("#price-cached", main).value } })).usage;
     paintUsageStats();
   }, 400);
   $("#price-in", main).addEventListener("input", savePrices);
   $("#price-out", main).addEventListener("input", savePrices);
+  $("#price-cached", main).addEventListener("input", savePrices);
 
   // ---- Install ----
   function paintInstall() {

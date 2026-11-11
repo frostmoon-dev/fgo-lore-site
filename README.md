@@ -198,6 +198,31 @@ server-side storage of your key.
   answers 400 to the marks is sent plain requests for the rest of the session; Connection → Mark
   prompts for caching turns it off. Example dialogue stops being sent once a chat has 40 messages
   (Prompt page; 20, 80 or never). The prompt preview lists each section's token count.
+- **Scrapbook per bot** (`#/scrapbook/<bot>`, views/scrapbook.js): gathers what chats already
+  store, with nothing new saved: days together, the bond chart (`bondPoints`, store.js, now shared
+  with the chat), pinned moments, liked replies, hidden thoughts, journal entries and chapters, each
+  linking back to its message.
+- **A look per bot**: `bot.look = { palette, season }`, chosen in the bot editor. `setBotLook`
+  (looks.js) applies it while that bot's chat or editor is open and restores the site's on leaving;
+  it is never written to the saved look, and it travels in exported cards.
+- **Backgrounds for places**: `bot.backgrounds = [{ id, url, tags }]` (up to 8). The chat picks the
+  one whose comma-separated tags appear most in the scene tracker's Location and Time lines, falls
+  back to the bot's main background, and cross-fades on a change (no fade with reduced motion).
+- **Real time, per bot**: with *Knows the real time* on, a block after the chat (so prompt caching
+  is unaffected) tells the bot the local weekday, part of day and hour, and how long the person was
+  away (`clockNote`, prompt.js). Opening a chat 12 hours or more after its last message shows a bar
+  that lets the bot speak first: one request, only on a click.
+- **Hidden thoughts, per bot**: the bot may end a reply with `<thought>…</thought>`. It is stored in
+  the reply's meta, stripped from the text (so it is never sent back as history), hidden while
+  streaming, and shown by the "thought" chip under the message.
+- **Extra scene tracker lines, per bot**: up to six labels of your own (Sanity, Inventory…) that the
+  scene tracker keeps with its usual lines.
+- **Thinking control** (`api.js`): a connection sets how much the model may reason, separately for
+  chat replies and background tasks (Provider default, Off, Low, High, Max). DeepSeek, which thinks
+  at high effort by default and bills it as output, gets Off for both unless changed: `thinking:
+  {type: "disabled"}` on its own API, `reasoning: {effort: "none"}` through OpenRouter. With thinking
+  on, `max_tokens` gets headroom for the reasoning. A provider that answers 400 to the fields is
+  sent plain requests for the session. Usage counts reasoning tokens and takes a cached-input price.
 - **Connection**: as many API profiles as you like, a model list fetched from the
   provider, a test button, custom headers for fussy proxies, and extra request fields (JSON
   merged into every chat request, e.g. OpenRouter's `provider` routing). With OpenRouter and a

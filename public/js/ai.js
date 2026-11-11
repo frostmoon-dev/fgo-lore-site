@@ -35,7 +35,7 @@ async function askOnce(messages, { bot, maxTokens, temperature, signal }) {
   const res = await chatCompletion(conn, {
     model: bot?.model || conn.model || undefined,
     messages, stream: false, max_tokens: maxTokens, temperature,
-  }, { signal });
+  }, { signal, purpose: "task" });
   window.dispatchEvent(new CustomEvent("api-status", { detail: true }));
   return res;
 }
@@ -264,14 +264,16 @@ export async function translate({ text, to, bot, signal }) {
 
 // ---------- Scene tracker ----------
 
-export async function updateScene({ bot, names, previous, lines, signal }) {
+// extra: more lines this bot tracks, such as Sanity or Inventory.
+export async function updateScene({ bot, names, previous, lines, extra = [], signal }) {
+  const labels = ["Location", "Time", "Present", "Mood", "Appearance", "Holding", ...extra].map((l) => `"${l}:"`).join(", ");
   const system =
     `You track the current state of a roleplay scene between ${names.user} and ${names.char}. ` +
     "From the previous state and the latest messages, write the state as it is now. Use exactly these lines, " +
-    'each starting with its label: "Location:", "Time:", "Present:", "Mood:", "Appearance:", "Holding:". ' +
+    `each starting with its label: ${labels}. ` +
     "Keep each line short. Carry details forward unless the messages change them. Write unknown if nothing is known. No other text.";
   const user = `${previous?.trim() ? `Previous state:\n${previous.trim()}\n\n` : ""}Latest messages:\n\n${lines}`;
-  return ask([{ role: "system", content: system }, { role: "user", content: user }], { bot, maxTokens: 300, temperature: 0.2, signal });
+  return ask([{ role: "system", content: system }, { role: "user", content: user }], { bot, maxTokens: 300 + extra.length * 40, temperature: 0.2, signal });
 }
 
 // ---------- Recap ----------

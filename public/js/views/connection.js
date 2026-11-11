@@ -1,5 +1,5 @@
 import { getConnections, saveConnections, getSettings, saveSettings, newConnection, PROVIDERS } from "../store.js";
-import { listModels, chatCompletion, serverConfig, normalizeBaseUrl, parseHeaders, parseExtraBody } from "../api.js";
+import { listModels, chatCompletion, serverConfig, normalizeBaseUrl, parseHeaders, parseExtraBody, THINK_LEVELS, thinkLevel, isDeepSeek, providerOf } from "../api.js";
 import { $, esc, icon, confirmDialog, debounce } from "../ui.js";
 
 export async function render(main) {
@@ -98,7 +98,7 @@ export async function render(main) {
         <div class="field">
           <label for="c-model">Model</label>
           <div class="input-group">
-            <input type="text" id="c-model" class="mono" value="${esc(conn.model)}" list="c-models" placeholder="${conn.mode === "server" ? esc(server.defaultModel || "server default") : "e.g. gpt-4o-mini, deepseek-chat"}" spellcheck="false">
+            <input type="text" id="c-model" class="mono" value="${esc(conn.model)}" list="c-models" placeholder="${conn.mode === "server" ? esc(server.defaultModel || "server default") : "e.g. gpt-4o-mini, deepseek-flash"}" spellcheck="false">
             <button class="btn" type="button" id="c-fetch">Load list</button>
           </div>
           <datalist id="c-models"></datalist>
@@ -116,6 +116,17 @@ export async function render(main) {
             </div>
           </div>
         </details>
+
+        <fieldset class="field" id="c-think">
+          <legend class="field-label">Thinking</legend>
+          <div class="form-row">
+            <div class="field"><label for="c-think-reply">Chat replies</label>
+              <select id="c-think-reply">${THINK_LEVELS.map(([k, l]) => `<option value="${k}">${l}</option>`).join("")}</select></div>
+            <div class="field"><label for="c-think-tasks">Background tasks</label>
+              <select id="c-think-tasks">${THINK_LEVELS.map(([k, l]) => `<option value="${k}">${l}</option>`).join("")}</select></div>
+          </div>
+          <p class="hint" id="c-think-hint"></p>
+        </fieldset>
 
         <label class="check"><input type="checkbox" id="c-cache" ${conn.cacheMarks === false ? "" : "checked"}>
           <span>Mark prompts for caching on Claude models<small>Claude only reuses a repeated prompt when it is marked. With this on,
@@ -157,9 +168,28 @@ export async function render(main) {
       ? `<button class="btn btn-sm" type="button" data-preset="moonshot">Keep Kimi on Moonshot's servers (cheaper with caching)</button>`
       : "";
   }
+  // What the two Thinking choices mean for this provider. The selects show
+  // the level in force, so a DeepSeek connection reads Off until changed.
+  // A level is only saved once you pick one; until then it follows the provider.
+  function paintThinking() {
+    $("#c-think-reply", root).value = thinkLevel(conn, conn.model, "reply");
+    $("#c-think-tasks", root).value = thinkLevel(conn, conn.model, "task");
+    // DeepSeek's current model names, offered until the list is loaded.
+    const list = $("#c-models", root);
+    if (!list.children.length && providerOf(conn) === "deepseek") list.innerHTML = '<option value="deepseek-flash"><option value="deepseek-v4-pro">';
+    const on = (v) => ["low", "high", "max"].includes(v);
+    const reply = $("#c-think-reply", root).value;
+    $("#c-think-hint", root).textContent = isDeepSeek(conn, conn.model)
+      ? `DeepSeek thinks before every answer unless told not to, and bills the thinking as output. Off is cheapest and fastest.${on(reply) ? " While thinking is on for replies, DeepSeek ignores your temperature, and the reply gets extra length for the thinking." : ""} Background tasks are summaries, the scene tracker, ideas, translations and the like.`
+      : "How much the model may reason before it answers, where the provider lets you choose. Reasoning is billed as output. Provider default sends nothing. Background tasks are summaries, the scene tracker, ideas, translations and the like.";
+  }
   function wire() {
     const form = $("#c-form", root);
     paintPresets();
+    paintThinking();
+    // "input" on the select itself runs before the form's handler saves.
+    $("#c-think-reply", root).addEventListener("input", (e) => { conn.thinkReply = e.target.value; });
+    $("#c-think-tasks", root).addEventListener("input", (e) => { conn.thinkTasks = e.target.value; });
     $("#c-presets", root).addEventListener("click", (e) => {
       if (!e.target.closest('[data-preset="moonshot"]')) return;
       let cur = {};
@@ -178,6 +208,7 @@ export async function render(main) {
       conn.accessCode = $("#c-code", root).value;
       conn.extraBody = $("#c-extra", root).value;
       conn.cacheMarks = $("#c-cache", root).checked;
+      paintThinking();
       const xerr = $("#c-extra-err", root);
       try { parseExtraBody(conn.extraBody); xerr.hidden = true; }
       catch (ex) { xerr.hidden = false; xerr.textContent = ex instanceof SyntaxError ? "That JSON is not valid." : ex.message; }
@@ -244,7 +275,7 @@ export async function render(main) {
         const res = await chatCompletion(conn, {
           messages: [{ role: "user", content: "Reply with exactly one word: ready" }],
           max_tokens: 20, stream: false,
-        }, { retries: 0 }); // a test reports what happened, straight away
+        }, { retries: 0, purpose: "task" }); // a test reports what happened, straight away
         const ms = Math.round(performance.now() - t0);
         out.innerHTML = `<div class="note">${icon("check")}<span><strong>It works.</strong> Replied in ${ms} ms: “${esc(res.content.trim().slice(0, 80) || "(empty)")}”</span></div>`;
         window.dispatchEvent(new CustomEvent("api-status", { detail: true }));

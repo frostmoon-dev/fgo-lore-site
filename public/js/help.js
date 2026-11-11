@@ -9,6 +9,35 @@ export const APP_VERSION = "2026.09.25.1";
 // Newest first. Each item says what it is and where it lives.
 export const NEWS = [
   {
+    version: "2026.11.11.4",
+    items: [
+      ["A scrapbook for each bot", "Everything you have kept with a bot, on one page: the bond's chart, pinned moments, liked replies, hidden thoughts, its journal and the chapters memory wrote, each with a link back into the chat. Open it from the book button on a bot's card, the link under its name in a chat, or Ctrl+K."],
+    ],
+  },
+  {
+    version: "2026.11.11.3",
+    items: [
+      ["A look for each bot", "Give a bot colours of its own in its editor, under Look. Open its chat and the whole site wears them (a Horror Story bot can even pick its season); leave, and your own colours come back."],
+      ["Backgrounds that follow the scene", "Add up to eight backgrounds to a bot and tag each with places or times: throne room, forest, night. When the scene tracker's location or time names a tag, the chat fades to that background. Turn on Update after every reply in the scene tracker, or edit the scene yourself."],
+    ],
+  },
+  {
+    version: "2026.11.11.2",
+    items: [
+      ["Bots that know the time", "Turn on Knows the real time in a bot's editor and it is told your local time of day and how long you were away. Come back after half a day or more and a bar offers to let the bot speak first. For companions who live in your world, not stories with a clock of their own."],
+      ["Hidden thoughts", "With Hidden thoughts on, a bot may add a private thought after a reply. Tap “thought” under the message to peek. It is kept beside the reply and never sent back to the model."],
+      ["Your own tracker lines", "Give a bot extra scene tracker lines in its editor, such as Sanity, Injuries or Inventory, and the tracker keeps them with the place, time and mood."],
+    ],
+  },
+  {
+    version: "2026.11.11.1",
+    items: [
+      ["DeepSeek stops thinking on your bill", "DeepSeek's current models reason before every answer unless told not to, and bill that reasoning as output. MoonPaper now tells DeepSeek not to think: for chat replies, and for every background task (summaries, scene tracker, ideas, translations, names). Your temperature works again too, since DeepSeek ignores it while thinking."],
+      ["Thinking, your choice", "Connection → Thinking sets how much the model may reason, for chat replies and for background tasks: Off, Low, High or Max. With thinking on, a reply gets extra length for the reasoning, so it is not cut off and asked for twice."],
+      ["See what thinking costs", "A reply's token line shows how much of the output was thinking. Settings → Usage shows the share over 30 days, and takes a cached-input price so the cost estimate is right when cache hits are far cheaper."],
+    ],
+  },
+  {
     version: "2026.10.28.2",
     items: [
       ["Horror Story, season by season", "Pick a season under Settings → Appearance → Colours: Murder House (blood red on black), Asylum (Briarcliff green and rust, cards ruled like case files), Coven (black lace and white with a witch's violet) or Hotel (the Cortez's art deco crimson and gold, with a neon title)."],

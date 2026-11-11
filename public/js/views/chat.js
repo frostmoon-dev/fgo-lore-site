@@ -1,12 +1,13 @@
 import {
   bots, chats, lore, personas, getSettings, saveSettings, getActiveConnection, getActivePreset,
   getLorebooks, saveLorebooks, newLorebook, newLore, loreForBot, bondTier, bondLevels, BOND_KINDS, moodsOf, uid, now,
-  getBotPersonas, rememberBotPersona, seriesGroups,
+  getBotPersonas, rememberBotPersona, seriesGroups, bondPoints,
 } from "../store.js";
 import { registerCommands } from "../palette.js";
 import { chatCompletion, listModels } from "../api.js";
 import {
   buildPrompt, generationParams, currentText, applyMacros, readBond, readMood, guessMood, stripBond, cleanImpersonation, contentLevel,
+  readThought, clockNote,
   avoidedIn, markAvoided, repetitionHints,
 } from "../prompt.js";
 import {
@@ -15,9 +16,9 @@ import {
 } from "../ai.js";
 import {
   memoryContext, liveChapters, windowStart as memoryWindowStart, autoChapters, pendingChapters,
-  chaptersToFold, recallFor, parseChapter, cachedTokens, trimMemory, KEEP_RECENT,
+  chaptersToFold, recallFor, parseChapter, cachedTokens, reasoningTokens, trimMemory, KEEP_RECENT,
 } from "../memory.js";
-import { CHAT_FONTS, getLook, setLook, fontSelectHTML, paletteSwatchesHTML } from "../looks.js";
+import { CHAT_FONTS, PALETTES, getLook, setLook, setBotLook, fontSelectHTML, paletteSwatchesHTML } from "../looks.js";
 import { bondChartHTML, wireBondChart } from "../chart.js";
 import { renderMarkdown, previewHTML } from "../markdown.js";
 import {
@@ -99,6 +100,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
     return;
   }
   document.body.classList.add("in-chat");
+  setBotLook(bot.look); // the bot's own colours, if it has any, until you leave
 
   const [settings, allPersonas, activePersona, allBots, botPersonas] = await Promise.all([getSettings(), personas.all(), personas.active(), bots.all(), getBotPersonas()]);
   // New chats start as whoever you last were with this bot.
@@ -187,17 +189,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
   };
   const bondFor = (b, start = bondStartFor(b)) => levelOf(b, start + bondEarnedFor(b));
   // Every point where this character's bond changed, for the chart.
-  function bondHistory(b) {
-    let running = bondStartFor(b);
-    const points = [{ x: 0, ...levelOf(b, running) }];
-    chat.messages.forEach((m, i) => {
-      const delta = spokeBy(m, b) ? m.meta?.[m.swipeIndex ?? 0]?.bond : 0;
-      if (Number.isFinite(delta) && delta !== 0) { running += delta; points.push({ x: i + 1, ...levelOf(b, running) }); }
-    });
-    // Carry the line to the latest message so the chart reads to "now".
-    if (points.at(-1).x < chat.messages.length) points.push({ x: chat.messages.length, ...levelOf(b, running) });
-    return points;
-  }
+  const bondHistory = (b) => bondPoints(chat, b, bondDefault());
   const bondOn = bondOnFor(bot); // the meter in the header follows the chat's own bot
   const bondNow = () => bondFor(bot);
 
@@ -214,7 +206,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
           <div class="chat-sidebar-bot">
             ${botAvatar(bot, 48)}
             <div class="grow"><div class="name">${esc(bot.name)}</div>
-              <a href="#/bot/${bot.id}" class="link-btn">Edit bot</a></div>
+              <a href="#/bot/${bot.id}" class="link-btn">Edit bot</a> · <a href="#/scrapbook/${bot.id}" class="link-btn">Scrapbook</a></div>
           </div>
           <button class="btn btn-primary" type="button" id="new-chat">New chat</button>
         </div>
@@ -258,6 +250,11 @@ export async function render(main, [botId, chatId, jumpTo]) {
                 <button class="icon-btn" type="button" id="recap-close" aria-label="Dismiss recap" title="Dismiss">${icon("x")}</button></div>
               <div class="recap-body" id="recap-body"></div>
             </section>
+            <div class="draft-bar away-bar" id="away-bar" hidden>
+              <span class="grow" id="away-text"></span>
+              <button class="btn btn-sm btn-primary" type="button" id="away-go"></button>
+              <button class="icon-btn" type="button" id="away-close" aria-label="Dismiss" title="Dismiss">${icon("x")}</button>
+            </div>
             <div class="draft-bar" id="draft-bar" hidden>
               <span class="grow" id="draft-status" aria-live="polite"></span>
               <button class="btn btn-quiet btn-sm" type="button" id="draft-retry">Try again</button>
@@ -523,19 +520,35 @@ export async function render(main, [botId, chatId, jumpTo]) {
     paintSceneStrip();
   }
 
+  // One line of the scene tracker, by its label; empty when unknown.
+  function sceneLine(label) {
+    const v = new RegExp(`^\\s*${label}\\s*:\\s*(.+)$`, "im").exec(chat.scene?.text ?? "")?.[1].trim() ?? "";
+    return /^(unknown|n\/a|none|-)?$/i.test(v) ? "" : v;
+  }
+
   // Where and when the scene is, from the scene tracker, under the header.
   function paintSceneStrip() {
     const strip = $("#scene-strip", main);
-    const line = (label) => {
-      const v = new RegExp(`^\\s*${label}\\s*:\\s*(.+)$`, "im").exec(chat.scene?.text ?? "")?.[1].trim() ?? "";
-      return /^(unknown|n\/a|none|-)?$/i.test(v) ? "" : v;
-    };
+    const line = sceneLine;
     const parts = [line("Location"), line("Time")].filter(Boolean);
     strip.hidden = !parts.length;
     $("#scene-strip-text", main).textContent = parts.join(" · ");
     const mood = line("Mood");
     strip.title = mood ? `Mood: ${mood}. Open the scene tracker.` : "Open the scene tracker.";
+    paintBackground(); // the place may have its own background
   }
+
+  // How long the chat had been quiet before the message now being answered
+  // (or before now, when the character speaks first).
+  function gapBefore(hist) {
+    const last = hist.at(-1);
+    if (!last) return 0;
+    return last.role === "user" ? (last.at ?? 0) - (hist.at(-2)?.at ?? last.at ?? 0) : Date.now() - (last.at ?? Date.now());
+  }
+  const awayText = (ms) => {
+    const h = ms / 3600000;
+    return h < 36 ? `${Math.round(h)} hours` : `${Math.round(h / 24)} days`;
+  };
 
   // ---------- Messages ----------
   const lastAssistantIndex = () => chat.messages.findLastIndex((m) => m.role === "assistant");
@@ -556,6 +569,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
   }
 
   const meta0 = (m) => m.meta?.[m.swipeIndex ?? 0] ?? {};
+  const peeked = new Set(); // messages whose hidden thought is open, for this visit
   // Messages and faces already on screen. A message drawn for the first time
   // after the chat opened eases in; a face that changes fades across. The log
   // is often redrawn a moment later, so a redraw resumes the animation where
@@ -625,10 +639,13 @@ export async function render(main, [botId, chatId, jumpTo]) {
     }
     if (meta.usage) {
       const cached = cachedTokens(meta.usage);
-      info.push(`<span title="Tokens in / out${cached ? "; reused from the provider's cache" : ""}">${meta.usage.prompt_tokens ?? "?"} → ${meta.usage.completion_tokens ?? "?"} tokens${cached ? ` · ${cached} cached` : ""}</span>`);
+      const thought = reasoningTokens(meta.usage);
+      info.push(`<span title="Tokens in / out${thought ? "; part of the output was the model thinking, which is billed too" : ""}${cached ? "; reused from the provider's cache" : ""}">${meta.usage.prompt_tokens ?? "?"} → ${meta.usage.completion_tokens ?? "?"} tokens${thought ? ` (${thought} thinking)` : ""}${cached ? ` · ${cached} cached` : ""}</span>`);
     }
     if (meta.finish === "length" && !isLastBot) info.push(`<span title="The reply hit the max reply tokens limit">cut off</span>`);
     if (meta.mood) info.unshift(`<span class="chip mood-chip" title="${esc(name)}'s expression">${esc(meta.mood)}</span>`);
+    const peeking = !!meta.thought && peeked.has(m.id);
+    if (meta.thought) info.unshift(`<button type="button" class="chip thought-chip" data-action="peek" aria-expanded="${peeking}" title="${peeking ? "Hide" : "Peek at"} what ${esc(name)} did not say">${peeking ? "hide thought" : "thought"}</button>`);
     const speakerBond = isBot && bondOnFor(speaker);
     if (speakerBond && Number.isFinite(meta.bond) && meta.bond !== 0) {
       info.push(`<span class="bond-chip ${meta.bond > 0 ? "up" : "down"}" title="Bond change">${meta.bond > 0 ? "+" : "−"}${Math.abs(meta.bond)} bond</span>`);
@@ -655,6 +672,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
       <div style="min-width:0">
         <div class="msg-head"><span class="msg-name">${esc(name)}</span><time class="msg-time" datetime="${new Date(m.at).toISOString()}">${clock(m.at)}</time></div>
         <div class="msg-body">${bodyHTML(m, text, streaming)}</div>
+        ${peeking ? `<p class="thought" role="note"><span class="thought-label">${esc(name)} thinks</span>${esc(applyMacros(meta.thought, namesFor(speaker ?? bot)))}</p>` : ""}
         ${translation}
         ${cutOff ? `<div class="cutoff-bar"><span>This reply was cut off by the length limit.</span>
           <button class="btn btn-sm btn-primary" type="button" data-action="continue">Continue writing</button></div>` : ""}
@@ -862,6 +880,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
       bond: withBond ? beforeBond : null,
       ...memoryArgs(hist), scene: chat.scene?.text ?? "", authorNote: chat.authorNote ?? "", note: fullNote, cast: group() ? others(speaker) : [],
       liked: likedFor(speaker, target.id), repetition: varied,
+      clock: speaker.realTime ? clockNote({ gapMs: gapBefore(hist), user: userName(), char: speaker.name }) : "",
     });
     const body = {
       model: chat.model || speaker.model || conn.model || undefined,
@@ -889,7 +908,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
 
     try {
       const ask = (b) => chatCompletion(conn, b, {
-        signal: controller.signal, cache: true,
+        signal: controller.signal, cache: true, purpose: "reply",
         onRetry: ({ attempt, max }) => setActivity("reply", `The model is busy. Trying again (${attempt} of ${max})…`),
         onDelta: (r) => {
           if (r.content && /^The (model is busy|reply came back empty)/.test(activity.get("reply") ?? "")) setActivity("reply", `${speaker.name} is writing…`);
@@ -916,6 +935,8 @@ export async function render(main, [botId, chatId, jumpTo]) {
       }
       const mood = readMood(res.content, moodsOf(speaker)) ?? guessMood(res.content, moodsOf(speaker));
       const parsed = withBond ? readBond(res.content) : { text: stripBond(res.content), delta: 0 };
+      // Kept beside the reply, not in it, so it is never sent back as history.
+      const thought = speaker.thoughts ? readThought(res.content) : "";
       // In a group scene models sometimes label their own line.
       if (group()) parsed.text = cleanImpersonation(parsed.text, speaker.name);
       if (kind === "continue") {
@@ -926,6 +947,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
           usage: sumUsage(before.usage, res.usage),
           ...(withBond ? { bond: (Number(before.bond) || 0) + parsed.delta } : {}),
           ...(mood ? { mood } : {}),
+          ...(thought ? { thought } : {}),
         };
       } else {
         target.swipes[si] = parsed.text;
@@ -934,6 +956,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
           reasoning: res.reasoning, finish: res.finishReason,
           ...(withBond ? { bond: parsed.delta } : {}),
           ...(mood ? { mood } : {}),
+          ...(thought ? { thought } : {}),
           // Only the person's own direction or nudge earns the "directed" label.
           ...(directed || note ? { note: [directed, note].filter(Boolean).join(" ") } : {}),
           ...(directed ? { direction: directed } : {}),
@@ -1560,7 +1583,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
     paintHeader();
     try {
       const text = await updateScene({
-        bot, names: namesFor(), previous: chat.scene?.text ?? "",
+        bot, names: namesFor(), previous: chat.scene?.text ?? "", extra: bot.trackerLines ?? [],
         lines: transcript(chat.messages.slice(chat.scene?.text ? -2 : -12), nameOf, namesFor()),
       });
       if (!text) throw new Error("The model sent back an empty scene.");
@@ -1587,7 +1610,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
           where everyone is, the time, the mood, what they wear and hold. Edit it freely.</p>
         <div class="field">
           <label for="sc-text">Right now <span class="count" id="sc-status"></span></label>
-          <textarea id="sc-text" class="tall" placeholder="Location: …&#10;Time: …&#10;Present: …&#10;Mood: …&#10;Appearance: …&#10;Holding: …">${esc(sc.text ?? "")}</textarea>
+          <textarea id="sc-text" class="tall" placeholder="Location: …&#10;Time: …&#10;Present: …&#10;Mood: …&#10;Appearance: …&#10;Holding: …${(bot.trackerLines ?? []).map((l) => `&#10;${esc(l)}: …`).join("")}">${esc(sc.text ?? "")}</textarea>
         </div>
         <label class="check"><input type="checkbox" id="sc-auto" ${sc.auto ? "checked" : ""}>
           <span>Update after every reply<small>One extra request per reply.</small></span></label>
@@ -2028,7 +2051,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
     let text = "";
     try {
       const res = await chatCompletion(conn, body, {
-        signal: drafting.signal, cache: true,
+        signal: drafting.signal, cache: true, purpose: "reply",
         onRetry: ({ attempt, max }) => showDraftBar(`The model is busy. Trying again (${attempt} of ${max})…`, { tools: false }),
         onDelta: (r) => { input.value = cleanImpersonation(r.content, who); fitInput(); },
       });
@@ -2311,6 +2334,9 @@ export async function render(main, [botId, chatId, jumpTo]) {
       generate("continue");
     } else if (action === "check") {
       runCheck(m);
+    } else if (action === "peek") {
+      peeked.has(m.id) ? peeked.delete(m.id) : peeked.add(m.id);
+      paintLog({ scroll: false });
     } else if (action === "show-check") {
       showCheck(m);
     } else if (action === "fix-avoided") {
@@ -2437,13 +2463,40 @@ export async function render(main, [botId, chatId, jumpTo]) {
   // ---------- Chat look ----------
   // The bot's background (or the default one from Settings), dimmed so text
   // stays readable. Repainted live from the Chat look dialog.
+  // A bot's backgrounds for places: the one whose tags the scene tracker's
+  // location and time name most often wins; none named, none chosen.
+  function placeBackground() {
+    const where = `${sceneLine("Location")} ${sceneLine("Time")}`.toLowerCase();
+    if (!where.trim()) return null;
+    let best = null;
+    let score = 0;
+    for (const b of bot.backgrounds ?? []) {
+      const hits = String(b.tags ?? "").toLowerCase().split(",").map((t) => t.trim()).filter(Boolean)
+        .filter((t) => new RegExp(`(^|[^a-z0-9])${t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^a-z0-9]|$)`).test(where)).length;
+      if (hits > score) { best = b; score = hits; }
+    }
+    return best?.url ?? null;
+  }
+  let shownBg; // undefined until the first paint, so opening a chat does not fade
   function paintBackground() {
-    const url = bot.background ?? settings.chatBackground ?? null;
     const layer = $(".chat-bg", main);
+    if (!layer) return;
+    const url = placeBackground() ?? bot.background ?? settings.chatBackground ?? null;
+    main.style.setProperty("--bg-dim", String(settings.backgroundDim ?? 0.86));
+    if (url === shownBg) return;
+    // The old picture stays on top and fades away over the new one.
+    if (shownBg && url && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      const old = document.createElement("div");
+      old.className = "chat-bg chat-bg-old";
+      old.setAttribute("aria-hidden", "true");
+      old.style.backgroundImage = `url("${shownBg}")`;
+      layer.after(old);
+      setTimeout(() => old.remove(), 900);
+    }
+    shownBg = url;
     $(".chat-main", main).classList.toggle("has-bg", !!url);
     layer.hidden = !url;
     layer.style.backgroundImage = url ? `url("${url}")` : "";
-    main.style.setProperty("--bg-dim", String(settings.backgroundDim ?? 0.86));
   }
   paintBackground();
 
@@ -2471,10 +2524,13 @@ export async function render(main, [botId, chatId, jumpTo]) {
         <p class="hint">${settings.chatBackground ? "Without one, this chat uses the default background from Settings." : "Only chats with this bot use it. The default for every bot is in Settings."}</p>
       </div>
       ${sliderHTML({ id: "look-dim", label: "Dim behind the text", min: 0.4, max: 0.98, step: 0.02, value: settings.backgroundDim ?? 0.86, hint: "Higher hides more of the picture. Applies to every chat." })}
-      <fieldset class="field"><legend class="field-label">Colours</legend>
+      ${bot.look ? `<div class="field"><span class="field-label">Colours</span>
+        <p class="hint">${esc(bot.name)} has a look of its own (${esc(PALETTES.find((p) => p.key === bot.look.palette)?.label ?? "custom")}), used while you are in its chats.
+          <a href="#/bot/${bot.id}" id="look-bot">Change it in the bot's editor</a>.</p></div>`
+    : `<fieldset class="field"><legend class="field-label">Colours</legend>
         ${paletteSwatchesHTML("look-palette", getLook("palette"))}
-        <p class="hint">For the whole site. More in Settings: your own accent, fonts and corners.</p>
-      </fieldset>
+        <p class="hint">For the whole site. More in Settings: your own accent, fonts and corners. A bot can have colours of its own, set in its editor.</p>
+      </fieldset>`}
       <div class="field"><label for="look-font">Font</label>
         ${fontSelectHTML("look-font", CHAT_FONTS, getLook("chatFont"))}
         <p class="hint">For messages and the box you type in. Clear is made for low vision and tired eyes.</p>
@@ -2532,6 +2588,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
     $$('input[name="look-pic"]', dlg).forEach((r) => r.addEventListener("change", () => setLocal("chatPic", "chatPic", r.value, "lg")));
     $("#look-done", dlg).addEventListener("click", () => dlg.close());
     $("#look-more", dlg).addEventListener("click", () => dlg.close());
+    $("#look-bot", dlg)?.addEventListener("click", () => dlg.close());
   }
 
   // Rename in place: click the name, type, Enter saves, Esc cancels.
@@ -2737,6 +2794,21 @@ export async function render(main, [botId, chatId, jumpTo]) {
   paintLog();
   // Coming back after a break: a few lines on where the story stands.
   if (hasConnection && settings.recap?.auto !== false && chat.messages.length >= 6 && Date.now() - lastVisit > 12 * 3600 * 1000) showRecap();
+  // A bot that knows the real time can open after a long gap: one request,
+  // and only if asked for.
+  const awayMs = Date.now() - (chat.messages.at(-1)?.at ?? Date.now());
+  if (hasConnection && bot.realTime && chat.messages.length && awayMs > 12 * 3600 * 1000) {
+    const bar = $("#away-bar", main);
+    $("#away-text", main).textContent = `It has been about ${awayText(awayMs)} since you two last spoke.`;
+    $("#away-go", main).textContent = `Let ${bot.name} speak first`;
+    bar.hidden = false;
+    $("#away-close", main).addEventListener("click", () => { bar.hidden = true; });
+    $("#away-go", main).addEventListener("click", () => {
+      if (busy) return;
+      bar.hidden = true;
+      generate("new", { speaker: bot, note: `${userName()} has just come back after about ${awayText(awayMs)} away. Open with a short message that shows ${bot.name} noticed the time apart, in character.` });
+    });
+  }
   if (jumpTo) requestAnimationFrame(() => scrollToMessage(jumpTo));
   if (matchMedia("(hover: hover)").matches) input.focus();
 
@@ -2790,6 +2862,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
       document.removeEventListener("keydown", onGlobalKey);
       main.removeEventListener("focusout", settlePage);
       document.body.classList.remove("in-chat");
+      setBotLook(null);
     },
   };
 }

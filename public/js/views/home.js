@@ -184,6 +184,7 @@ export async function render(main) {
               <span class="bot-card-actions">
                 <button class="icon-btn fav-btn${b.favorite ? " is-on" : ""}" type="button" data-fav="${b.id}" aria-pressed="${b.favorite ? "true" : "false"}"
                   aria-label="${b.favorite ? `Remove ${esc(b.name)} from favourites` : `Add ${esc(b.name)} to favourites`}" title="${b.favorite ? "Favourite" : "Add to favourites"}">${icon("star")}</button>
+                <a class="icon-btn" href="#/scrapbook/${b.id}" aria-label="${esc(b.name)}'s scrapbook" title="Scrapbook">${icon("book")}</a>
                 <a class="icon-btn" href="#/bot/${b.id}" aria-label="Edit ${esc(b.name)}" title="Edit">${icon("edit")}</a>
               </span>
             </div>

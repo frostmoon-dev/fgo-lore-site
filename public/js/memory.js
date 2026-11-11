@@ -195,6 +195,8 @@ export function parseChapter(text) {
 // Tokens the provider reused from its cache, when it says so.
 export const cachedTokens = (usage) =>
   usage?.prompt_tokens_details?.cached_tokens ?? usage?.prompt_cache_hit_tokens ?? usage?.cache_read_input_tokens ?? 0;
+// Output tokens the model spent reasoning before it answered (billed as output).
+export const reasoningTokens = (usage) => usage?.completion_tokens_details?.reasoning_tokens ?? 0;
 
 // Memory for a chat cut back to its first `upTo` messages (rewind, branch).
 // Chapters past the cut go; facts go back to how they stood after the last
