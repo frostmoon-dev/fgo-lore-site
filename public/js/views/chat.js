@@ -250,6 +250,10 @@ export async function render(main, [botId, chatId, jumpTo]) {
                 <button class="icon-btn" type="button" id="recap-close" aria-label="Dismiss recap" title="Dismiss">${icon("x")}</button></div>
               <div class="recap-body" id="recap-body"></div>
             </section>
+            <div class="draft-bar reply-bar" id="reply-bar" hidden>
+              ${icon("reply")}<span class="grow" id="reply-text"></span>
+              <button class="icon-btn" type="button" id="reply-close" aria-label="Cancel the reply" title="Cancel (Esc)">${icon("x")}</button>
+            </div>
             <div class="draft-bar away-bar" id="away-bar" hidden>
               <span class="grow" id="away-text"></span>
               <button class="btn btn-sm btn-primary" type="button" id="away-go"></button>
@@ -734,6 +738,8 @@ export async function render(main, [botId, chatId, jumpTo]) {
       ${av}
       <div style="min-width:0">
         <div class="msg-head"><span class="msg-name">${esc(name)}</span><time class="msg-time" datetime="${new Date(m.at).toISOString()}">${clock(m.at)}</time></div>
+        ${m.replyTo?.text ? `<button type="button" class="reply-quote" data-action="jump-reply" title="Show the message this answers">
+          <span class="reply-name">${esc(m.replyTo.name)}</span><span class="reply-snippet">${esc(m.replyTo.text)}</span></button>` : ""}
         <div class="msg-body">${bodyHTML(m, text, streaming)}</div>
         ${peeking ? `<p class="thought" role="note"><span class="thought-label">${esc(name)} thinks</span>${esc(applyMacros(meta.thought, namesFor(speaker ?? bot)))}</p>` : ""}
         ${translation}
@@ -742,6 +748,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
         <div class="msg-foot">
           ${swipeNav}
           <span class="msg-tools">
+            <button class="icon-btn" type="button" data-action="reply" aria-label="Reply to this message" title="Reply">${icon("reply")}</button>
             <button class="icon-btn" type="button" data-action="edit" aria-label="Edit message" title="Edit" ${busy ? "disabled" : ""}>${icon("edit")}</button>
             ${isLastBot ? `<button class="icon-btn" type="button" data-action="regenerate" aria-label="Regenerate reply, with options" aria-haspopup="menu" aria-expanded="false" title="Regenerate" ${busy ? "disabled" : ""}>${icon("refresh")}</button>` : ""}
             ${isBot ? `<button class="icon-btn${isLiked(m) ? " is-on" : ""}" type="button" data-action="like" aria-pressed="${isLiked(m)}"
@@ -2260,6 +2267,23 @@ export async function render(main, [botId, chatId, jumpTo]) {
     input.focus();
   });
 
+  // ---------- Reply to a message ----------
+  // The next message you send quotes this one; the model is told which line
+  // you answered.
+  let replyTo = null;
+  const replyBar = $("#reply-bar", main);
+  function setReply(m) {
+    const text = stripBond(currentText(m)).replace(/[*_]/g, "").replace(/\s+/g, " ").trim();
+    if (!text) return;
+    const name = m.role === "user" ? userName() : (speakerOf(m) ?? bot).name;
+    replyTo = { id: m.id, name, text: text.length > 140 ? `${text.slice(0, 140).replace(/\s+\S*$/, "")}…` : text };
+    $("#reply-text", main).innerHTML = `Replying to <strong>${esc(name)}</strong>: “${esc(replyTo.text)}”`;
+    replyBar.hidden = false;
+    input.focus();
+  }
+  function clearReply() { replyTo = null; replyBar.hidden = true; }
+  $("#reply-close", main).addEventListener("click", () => { clearReply(); input.focus(); });
+
   async function send() {
     if (drafting) return;
     endPace(); // answering now: show the whole reply first
@@ -2277,7 +2301,8 @@ export async function render(main, [botId, chatId, jumpTo]) {
     const roll = text.startsWith("/roll") ? parseRoll(text) : null;
     if (text.startsWith("/roll") && !roll) { toast("Write a roll like /roll d20, /roll 2d6+1 or /roll d100 to open the door.", "error"); return; }
     if (roll) await addRoll(roll);
-    else chat.messages.push({ id: uid(), role: "user", content: text, at: now() });
+    else chat.messages.push({ id: uid(), role: "user", content: text, at: now(), ...(replyTo ? { replyTo } : {}) });
+    clearReply();
     input.value = "";
     fitInput();
     await persist();
@@ -2333,6 +2358,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
 
   $("#composer", main).addEventListener("submit", (e) => { e.preventDefault(); send(); });
   input.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && replyTo && !busy && !drafting) { e.preventDefault(); clearReply(); return; }
     if (e.altKey && e.code === "KeyW") { e.preventDefault(); impersonate(); return; }
     if (e.altKey && e.code === "KeyD") { e.preventDefault(); setDirecting(directBar.hidden); return; }
     if (e.altKey && e.code === "KeyS") { e.preventDefault(); suggestBar.hidden ? showIdeas() : closeIdeas(); return; }
@@ -2369,6 +2395,12 @@ export async function render(main, [botId, chatId, jumpTo]) {
     const action = btn.dataset.action;
     if (action === "retry") { pendingError = null; generate("new"); return; }
     if (action === "show-texts") { endPace(); return; }
+    if (action === "jump-reply") {
+      const at = btn.closest("[data-id]");
+      const from = chat.messages.find((x) => x.id === at?.dataset.id);
+      if (from?.replyTo && !scrollToMessage(from.replyTo.id)) toast("That message is no longer in this chat.");
+      return;
+    }
     if (action === "show-earlier") { showEarlier(); $('[data-action="show-earlier"]', logInner)?.focus({ preventScroll: true }); return; }
     const el = btn.closest("[data-id]");
     const i = chat.messages.findIndex((m) => m.id === el?.dataset.id);
@@ -2398,6 +2430,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
       const hasTr = isBot ? m.meta?.[m.swipeIndex ?? 0]?.translation : m.translation;
       openMenu(btn, [
         ...(isBot && i === chat.messages.length - 1 ? [{ label: "Continue this reply", hint: "Write more from where it ends", disabled: busy, onSelect: () => generate("continue") }] : []),
+        { label: "Reply to this", hint: "Quote it in your next message", onSelect: () => setReply(m) },
         { label: "Copy", onSelect: () => copyMessage(m) },
         { label: hasTr ? "Hide translation" : `Translate into ${myLanguage()}`, onSelect: () => (hasTr ? hideTranslation(m) : translateMessage(m)) },
         ...(isBot ? [{ label: "Check character", hint: "Does this stay true to the definition?", disabled: checking.has(m.id), onSelect: () => runCheck(m) }] : []),
@@ -2418,6 +2451,8 @@ export async function render(main, [botId, chatId, jumpTo]) {
       generate("continue");
     } else if (action === "check") {
       runCheck(m);
+    } else if (action === "reply") {
+      setReply(m);
     } else if (action === "peek") {
       peeked.has(m.id) ? peeked.delete(m.id) : peeked.add(m.id);
       paintLog({ scroll: false });

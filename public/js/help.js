@@ -9,6 +9,12 @@ export const APP_VERSION = "2026.09.25.1";
 // Newest first. Each item says what it is and where it lives.
 export const NEWS = [
   {
+    version: "2026.11.11.7",
+    items: [
+      ["Reply to a message", "The arrow under any message, or Reply to this in its ⋯ menu, quotes it in your next message. The bot is told which line you answered, and tapping the quote jumps back to it. Esc cancels."],
+    ],
+  },
+  {
     version: "2026.11.11.6",
     items: [
       ["Texts arrive like someone typing", "In Text messages chats, a reply's texts now appear one at a time, with typing dots and a pause sized to each text. Tap the dots to see the rest at once. The header shows the bot as typing…, online, or last seen 3 hours ago. Settings → Chat turns the pacing off."],

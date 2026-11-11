@@ -201,6 +201,10 @@ server-side storage of your key.
 - **Text messages, per chat** (⋯ menu): replies and Write my reply are asked for texts with no
   narration (`texting` in buildPrompt, after the chat), and the chat shows as bubbles whatever the
   layout. Older messages are kept as they were.
+- **Reply to a message**: the reply arrow under a message (or ⋯ → Reply to this) quotes it in the
+  next message you send (`replyTo: { id, name, text }`, 140 characters). The quote shows above your
+  message and jumps back to the original; the model gets `[Replying to <name>: <text>]` before that
+  message, the same every turn so prompt caching is not disturbed.
 - **Texts arrive one at a time** (Text messages chats, `settings.textPace`): the reply on screen
   shows one paragraph per bubble, with typing dots and a pause of 30 ms a character (0.5–2 s) before
   each. A text shows once it is complete (a blank line follows it, or the reply ended). The full

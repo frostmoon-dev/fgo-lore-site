@@ -304,8 +304,12 @@ export function buildPrompt({
   let clean = recentHistory
     .filter((x) => (x.role === "user" || x.role === "assistant") && !x.error)
     .map((x) => {
-      const content = stripBond(currentText(x));
-      if (!group) return { role: x.role, content: currentText(x) };
+      // A message that answers an earlier one says which, the same way every
+      // turn, so the cached part of the prompt does not change.
+      const said = x.role === "user" && x.replyTo?.text
+        ? `[Replying to ${x.replyTo.name}: ${x.replyTo.text}]\n${currentText(x)}` : currentText(x);
+      const content = stripBond(said);
+      if (!group) return { role: x.role, content: said };
       const own = x.role === "assistant" && nameOf(x) === names.char;
       return { role: own ? "assistant" : "user", content: own ? content : `${nameOf(x)}: ${content}` };
     })
