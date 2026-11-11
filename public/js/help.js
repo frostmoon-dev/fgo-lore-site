@@ -9,6 +9,14 @@ export const APP_VERSION = "2026.09.25.1";
 // Newest first. Each item says what it is and where it lives.
 export const NEWS = [
   {
+    version: "2026.11.11.5",
+    items: [
+      ["Text messages", "Turn a chat into a phone conversation from its ⋯ menu: the bot texts you, with no narration, a few short messages at a time, and the chat shows as message bubbles with “Read” under yours. Write my reply texts too. Turn it off the same way."],
+      ["Messages layout", "A third chat layout beside Chat and Novel: every paragraph a bubble, yours on the right, theirs on the left, with lines of pure narration as small captions. Settings → Appearance, or Chat look."],
+      ["Dialogue only", "Chat narration: Hide leaves only what is said. Lines that are all *actions* disappear, and so do actions beside speech. Settings → Appearance, or Chat look."],
+    ],
+  },
+  {
     version: "2026.11.11.4",
     items: [
       ["A scrapbook for each bot", "Everything you have kept with a bot, on one page: the bond's chart, pinned moments, liked replies, hidden thoughts, its journal and the chapters memory wrote, each with a link back into the chat. Open it from the book button on a bot's card, the link under its name in a chat, or Ctrl+K."],

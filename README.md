@@ -198,6 +198,13 @@ server-side storage of your key.
   answers 400 to the marks is sent plain requests for the rest of the session; Connection → Mark
   prompts for caching turns it off. Example dialogue stops being sent once a chat has 40 messages
   (Prompt page; 20, 80 or never). The prompt preview lists each section's token count.
+- **Text messages, per chat** (⋯ menu): replies and Write my reply are asked for texts with no
+  narration (`texting` in buildPrompt, after the chat), and the chat shows as bubbles whatever the
+  layout. Older messages are kept as they were.
+- **Messages layout**: Chat look or Settings → Appearance. Each paragraph is a bubble (yours in the
+  primary colour on the right), a paragraph that is all actions (`p.act`, marked by renderMarkdown)
+  is a small caption, and "Read" shows under your message once it is answered.
+- **Dialogue only** (Chat narration: Hide): hides `p.act` paragraphs and actions outside quotes.
 - **Scrapbook per bot** (`#/scrapbook/<bot>`, views/scrapbook.js): gathers what chats already
   store, with nothing new saved: days together, the bond chart (`bondPoints`, store.js, now shared
   with the chat), pinned moments, liked replies, hidden thoughts, journal entries and chapters, each

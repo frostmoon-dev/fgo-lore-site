@@ -490,7 +490,9 @@ export async function render(main, [botId, chatId, jumpTo]) {
     $("#chat-title", main).innerHTML = `<span>${esc(chat.title)}</span>${icon("edit")}`;
     $("#chat-title", main).setAttribute("aria-label", `Chat name: ${chat.title}. Rename`);
     const p = persona();
-    $("#chat-sub", main).textContent = `with ${everyone().map((b) => b.name).join(", ")}${p ? ` · as ${p.name}` : ""}`;
+    $("#chat-sub", main).textContent = `with ${everyone().map((b) => b.name).join(", ")}${p ? ` · as ${p.name}` : ""}${chat.texting ? " · texting" : ""}`;
+    // A texting chat always shows as message bubbles.
+    $(".chat-main", main).classList.toggle("is-texting", !!chat.texting);
     paintModelChip();
     const level = contentLevel(settings, bot);
     const tag = $("#content-tag", main);
@@ -879,6 +881,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
       bot: speaker, persona: persona(), preset, settings: freshSettings, loreEntries, history: hist,
       bond: withBond ? beforeBond : null,
       ...memoryArgs(hist), scene: chat.scene?.text ?? "", authorNote: chat.authorNote ?? "", note: fullNote, cast: group() ? others(speaker) : [],
+      texting: !!chat.texting,
       liked: likedFor(speaker, target.id), repetition: varied,
       clock: speaker.realTime ? clockNote({ gapMs: gapBefore(hist), user: userName(), char: speaker.name }) : "",
     });
@@ -1209,6 +1212,19 @@ export async function render(main, [botId, chatId, jumpTo]) {
       dlg.close();
       generate("swipe", { note: `Stay true to ${speaker.name}'s character. Avoid these problems from the last attempt: ${c.issues.join("; ")}. ${c.fix}` });
     });
+  }
+
+  // ---------- Text messages ----------
+  // The chat becomes a phone conversation: replies are texts with no
+  // narration, shown as bubbles. Kept per chat; branches keep it.
+  async function toggleTexting() {
+    if (chat.texting) delete chat.texting; else chat.texting = true;
+    await persist();
+    paintHeader();
+    paintLog({ scroll: false });
+    toast(chat.texting
+      ? `Text messages on. ${bot.name} now texts you: no narration, short messages as bubbles. Earlier messages stay as they were.`
+      : "Text messages off. Replies go back to a story with narration.");
   }
 
   // ---------- Author's note ----------
@@ -2034,6 +2050,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
       bot: partner, persona: persona(), preset, settings: freshSettings, loreEntries,
       history: hist, mode: "impersonate", hint,
       ...memoryArgs(hist), scene: chat.scene?.text ?? "", authorNote: chat.authorNote ?? "", cast: group() ? others(partner) : [],
+      texting: !!chat.texting,
     });
     const body = {
       model: chat.model || partner.model || conn.model || undefined,
@@ -2504,7 +2521,8 @@ export async function render(main, [botId, chatId, jumpTo]) {
   const LOOK_QUOTES = [["tint", "Tinted"], ["plain", "Plain"]];
   const LOOK_SIZES = [["sm", "Small"], ["md", "Default"], ["lg", "Large"], ["xl", "Largest"]];
   const LOOK_PICS = [["sm", "Small"], ["md", "Medium"], ["lg", "Large"]];
-  const LOOK_LAYOUTS = [["chat", "Chat"], ["novel", "Novel"]];
+  const LOOK_LAYOUTS = [["chat", "Chat"], ["novel", "Novel"], ["messages", "Messages"]];
+  const LOOK_NARRATION = [["show", "Show"], ["hide", "Hide"]];
   const readLocal = (key, fallback) => { try { return localStorage.getItem(key) ?? fallback; } catch { return fallback; } };
   // Same storage as Settings → Appearance, so both stay in step.
   function setLocal(key, dataKey, value, fallback) {
@@ -2550,6 +2568,10 @@ export async function render(main, [botId, chatId, jumpTo]) {
         ${seg("look-layout", LOOK_LAYOUTS, readLocal("chatLayout", "chat"))}
         <p class="hint">Novel hides the pictures beside each message and leaves names and text, like a book.</p>
       </fieldset>
+      <fieldset class="field"><legend class="field-label">Narration</legend>
+        ${seg("look-narration", LOOK_NARRATION, readLocal("chatNarration", "show"))}
+        <p class="hint">Hide leaves only what is said: lines that are all *actions* disappear, and actions beside speech too.</p>
+      </fieldset>
       <fieldset class="field"><legend class="field-label">Picture size</legend>
         ${seg("look-pic", LOOK_PICS, readLocal("chatPic", "lg"))}
         <p class="hint">Avatars and expressions beside each message. Smaller on phones.</p>
@@ -2585,6 +2607,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
     $$('input[name="look-quotes"]', dlg).forEach((r) => r.addEventListener("change", () => setLocal("chatQuotes", "chatQuotes", r.value, "tint")));
     $$('input[name="look-size"]', dlg).forEach((r) => r.addEventListener("change", () => setLocal("chatTextSize", "chatText", r.value, "md")));
     $$('input[name="look-layout"]', dlg).forEach((r) => r.addEventListener("change", () => setLocal("chatLayout", "chatLayout", r.value, "chat")));
+    $$('input[name="look-narration"]', dlg).forEach((r) => r.addEventListener("change", () => setLocal("chatNarration", "chatNarration", r.value, "show")));
     $$('input[name="look-pic"]', dlg).forEach((r) => r.addEventListener("change", () => setLocal("chatPic", "chatPic", r.value, "lg")));
     $("#look-done", dlg).addEventListener("click", () => dlg.close());
     $("#look-more", dlg).addEventListener("click", () => dlg.close());
@@ -2741,6 +2764,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
       bot: speaker, persona: persona(), preset, settings: s, history: withSpeakers(hist), loreEntries: entries,
       bond: bondOnFor(speaker) ? bondFor(speaker) : null,
       ...memoryArgs(hist), scene: chat.scene?.text ?? "", authorNote: chat.authorNote ?? "", note: direction(), cast: group() ? others(speaker) : [],
+      texting: !!chat.texting,
       liked: likedFor(speaker),
       repetition: s.repetition?.enabled !== false ? repetitionHints(chat.messages.filter((x) => spokeBy(x, speaker)).slice(-6).map((x) => currentText(x)),
         { userTexts: chat.messages.filter((x) => x.role === "user").slice(-10).map((x) => currentText(x)) }) : [],
@@ -2774,6 +2798,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
     { label: `${bot.name}'s journal (${chat.journal.length})`, hint: "Private diary entries about you", onSelect: openJournal },
     { label: "Recap so far", hint: "A few lines on what has happened", onSelect: showRecap },
     { label: "Author's note", hint: chat.authorNote?.trim() ? clipText(chat.authorNote, 40) : "A lasting instruction for this chat", onSelect: openAuthorNote },
+    { label: chat.texting ? "Text messages: on" : "Text messages: off", hint: chat.texting ? "Back to a story with narration" : `${bot.name} texts you: no narration, as bubbles`, onSelect: toggleTexting },
     { label: "Turn into a story", hint: "Rewrite the chat as prose", onSelect: openStory },
     { label: "Suggest lore from this chat", hint: "New entries from what happened", onSelect: openLoreSuggestions },
     { heading: "Behind the scenes" },

@@ -120,8 +120,13 @@ export async function render(main) {
           </fieldset>
           <fieldset class="field">
             <legend class="field-label">Chat layout</legend>
-            ${segmentedHTML("chat-layout", [["chat", "Chat"], ["novel", "Novel"]], readPref("chatLayout", "chat"))}
+            ${segmentedHTML("chat-layout", [["chat", "Chat"], ["novel", "Novel"], ["messages", "Messages"]], readPref("chatLayout", "chat"))}
             <p class="hint">Novel hides the pictures beside each message and leaves names and text, like a book.</p>
+          </fieldset>
+          <fieldset class="field">
+            <legend class="field-label">Chat narration</legend>
+            ${segmentedHTML("chat-narration", [["show", "Show"], ["hide", "Hide"]], readPref("chatNarration", "show"))}
+            <p class="hint">Hide leaves only dialogue: lines that are all *actions* disappear, and actions beside speech too.</p>
           </fieldset>
           <fieldset class="field">
             <legend class="field-label">Chat picture size</legend>
@@ -369,6 +374,11 @@ export async function render(main) {
   }));
   sizePref("text-size", "textSize", "text");
   sizePref("chat-text-size", "chatTextSize", "chatText");
+  $$('input[name="chat-narration"]', main).forEach((r) => r.addEventListener("change", () => {
+    try { r.value === "show" ? localStorage.removeItem("chatNarration") : localStorage.setItem("chatNarration", r.value); } catch {}
+    if (r.value === "show") delete document.documentElement.dataset.chatNarration;
+    else document.documentElement.dataset.chatNarration = r.value;
+  }));
   $$('input[name="chat-layout"]', main).forEach((r) => r.addEventListener("change", () => {
     try { r.value === "chat" ? localStorage.removeItem("chatLayout") : localStorage.setItem("chatLayout", r.value); } catch {}
     if (r.value === "chat") delete document.documentElement.dataset.chatLayout;

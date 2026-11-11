@@ -2087,3 +2087,57 @@ html { -webkit-tap-highlight-color: transparent; }
   animation: horror-neon 7s steps(1, end) infinite;
 }
 @keyframes horror-neon { 0%, 88%, 90%, 100% { opacity: 1; } 89% { opacity: .55; } 91% { opacity: .8; } }
+
+/* ---------- Text-message bubbles ----------
+   The Messages layout (Settings or Chat look), and any chat in Text messages
+   mode. Each paragraph is its own bubble; yours on the right in the primary
+   colour, theirs on the left. A paragraph that is all *actions* is a small
+   caption, not a bubble. */
+:is(:root[data-chat-layout="messages"], .chat-main.is-texting) .chat-log-inner { gap: 4px; }
+:is(:root[data-chat-layout="messages"], .chat-main.is-texting) .msg { --pic: 32px; grid-template-columns: var(--pic) minmax(0, 1fr); gap: var(--s2); }
+:is(:root[data-chat-layout="messages"], .chat-main.is-texting) :is(.msg.user + .msg.assistant, .msg.assistant + .msg.user) { margin-top: var(--s3); }
+:is(:root[data-chat-layout="messages"], .chat-main.is-texting) .msg.user { grid-template-columns: minmax(0, 1fr); }
+:is(:root[data-chat-layout="messages"], .chat-main.is-texting) .msg.user > :is(.avatar, .avatar-link) { display: none; }
+:is(:root[data-chat-layout="messages"], .chat-main.is-texting) .msg > :is(.avatar, .avatar-link) { display: block; align-self: start; margin-top: 2px; }
+:is(:root[data-chat-layout="messages"], .chat-main.is-texting) .msg > div { display: flex; flex-direction: column; align-items: flex-start; }
+:is(:root[data-chat-layout="messages"], .chat-main.is-texting) .msg.user > div { align-items: flex-end; }
+:is(:root[data-chat-layout="messages"], .chat-main.is-texting) .msg-head { order: 3; margin: 3px 8px 0; }
+:is(:root[data-chat-layout="messages"], .chat-main.is-texting) .msg.user .msg-name { display: none; }
+:is(:root[data-chat-layout="messages"], .chat-main.is-texting) .msg-name { font-size: var(--t-xs); color: var(--muted); font-weight: 500; }
+/* "Read" under your message once they have answered. */
+:is(:root[data-chat-layout="messages"], .chat-main.is-texting) .msg.user:has(+ .msg.assistant) .msg-time::after { content: " · Read"; }
+:is(:root[data-chat-layout="messages"], .chat-main.is-texting) .msg-body {
+  display: flex; flex-direction: column; align-items: inherit; gap: 3px;
+  max-width: min(80%, 30em); background: none; box-shadow: none; padding: 0;
+}
+:is(:root[data-chat-layout="messages"], .chat-main.is-texting) .msg-body > * + * { margin-top: 0; }
+:is(:root[data-chat-layout="messages"], .chat-main.is-texting) .msg-body > :is(p:not(.act), ul, ol, blockquote, .typing) {
+  padding: 8px 14px; border-radius: var(--bubble-r, 18px); background: var(--fill-strong); color: var(--ink); border: 0;
+}
+:is(:root[data-chat-layout="messages"], .chat-main.is-texting) .msg-body > :is(ul, ol) { padding-left: 2em; }
+:is(:root[data-chat-layout="messages"], .chat-main.is-texting) .msg.user .msg-body > :is(p:not(.act), ul, ol, blockquote) { background: var(--primary); color: var(--on-primary); }
+/* Inside a bubble everything is speech already: no tint. */
+:is(:root[data-chat-layout="messages"], .chat-main.is-texting) .msg-body :is(p:not(.act), li) :is(.q, em) { color: inherit; }
+/* The bubble nearest the sender gets a small corner, like a tail. */
+:is(:root[data-chat-layout="messages"], .chat-main.is-texting) .msg.assistant .msg-body > :is(p:not(.act), ul, ol, blockquote):last-of-type { border-bottom-left-radius: 5px; }
+:is(:root[data-chat-layout="messages"], .chat-main.is-texting) .msg.user .msg-body > :is(p:not(.act), ul, ol, blockquote):last-of-type { border-bottom-right-radius: 5px; }
+:is(:root[data-chat-layout="messages"], .chat-main.is-texting) .msg-body > p.act { padding: 0 6px; font-size: .86em; color: var(--muted); }
+:is(:root[data-chat-layout="messages"], .chat-main.is-texting) .msg-body > .typing { height: auto; padding: 12px 14px; }
+:is(:root[data-chat-layout="messages"], .chat-main.is-texting) .msg-body > .caret { display: none; }
+:is(:root[data-chat-layout="messages"], .chat-main.is-texting) .msg-foot { margin-left: 0; min-height: 0; }
+:is(:root[data-chat-layout="messages"], .chat-main.is-texting) .msg.user .msg-foot { justify-content: flex-end; }
+:is(:root[data-chat-layout="messages"], .chat-main.is-texting) .msg.user .msg-meta { margin-left: 0; }
+:is(:root[data-chat-layout="messages"], .chat-main.is-texting) .thought { max-width: min(80%, 30em); }
+:is(:root[data-chat-layout="messages"], .chat-main.is-texting) .msg.is-opening .msg-body > p:first-child::first-letter {
+  float: none; margin: 0; font: inherit; color: inherit; line-height: inherit;
+}
+@media (max-width: 600px) {
+  :is(:root[data-chat-layout="messages"], .chat-main.is-texting) .msg-body { max-width: 86%; }
+  :is(:root[data-chat-layout="messages"], .chat-main.is-texting) .msg { --pic: 28px; }
+}
+:root[data-palette="horror"] { --bubble-r: 3px; }
+
+/* Dialogue only (Chat narration: Hide): paragraphs that are all actions go,
+   and so do actions beside speech; emphasis inside a quote stays. */
+:root[data-chat-narration="hide"] .msg-body > p.act { display: none; }
+:root[data-chat-narration="hide"] .msg-body em:not(.q em) { display: none; }
