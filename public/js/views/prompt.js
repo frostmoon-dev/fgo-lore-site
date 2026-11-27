@@ -36,7 +36,7 @@ export async function render(main) {
             <label for="preset">Prompt preset</label>
             <select id="preset"></select>
           </div>
-          <div class="actions">
+          <div class="actions preset-actions">
             <button class="btn btn-sm" type="button" id="p-new">New</button>
             <button class="btn btn-sm" type="button" id="p-dup">Duplicate</button>
             <button class="btn btn-sm" type="button" id="p-rename">Rename</button>

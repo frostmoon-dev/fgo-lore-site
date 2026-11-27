@@ -214,7 +214,12 @@ export async function render(main, [id]) {
                 <legend class="field-label">Look</legend>
                 <p class="hint">Colours of this bot's own, used while you are in its chats. Your own colours come back when you leave.</p>
                 ${paletteSwatchesHTML("bot-palette", bot.look?.palette ?? "", { none: "Same as the site" })}
-                <div class="segmented" id="bot-season" hidden>${SEASONS.map((x) => `<label><input type="radio" name="bot-season" value="${x.key}" ${(bot.look?.season ?? "murder") === x.key ? "checked" : ""}><span>${esc(x.label)}</span></label>`).join("")}</div>
+                <div class="field" id="bot-season-field" hidden>
+                  <label for="bot-season">Horror Story season</label>
+                  <select id="bot-season">
+                    ${SEASONS.map((x) => `<option value="${x.key}" ${(bot.look?.season ?? "murder") === x.key ? "selected" : ""}>${esc(x.label)}</option>`).join("")}
+                  </select>
+                </div>
               </fieldset>
               <div class="field">
                 <label for="bot-visual">Default atmosphere</label>
@@ -384,7 +389,7 @@ export async function render(main, [id]) {
     bot.bondMilestones = $("#bond-milestones", main).checked;
     bot.contentMode = val("#content-mode");
     const palette = $('input[name="bot-palette"]:checked', main)?.value ?? "";
-    bot.look = validLook(palette ? { palette, season: $('input[name="bot-season"]:checked', main)?.value } : null);
+    bot.look = validLook(palette ? { palette, season: val("#bot-season") } : null);
     const vis = val("#bot-visual");
     bot.ambience = vis && vis !== "off" ? { visual: vis } : null;
     $$("[data-bg-tags]", main).forEach((el) => { const b = bot.backgrounds[Number(el.dataset.bgTags)]; if (b) b.tags = el.value; });
@@ -540,10 +545,11 @@ export async function render(main, [id]) {
   // ---- Look ----
   // The editor wears the bot's look while you choose it.
   function paintLook() {
-    $("#bot-season", main).hidden = $('input[name="bot-palette"]:checked', main)?.value !== "horror";
+    $("#bot-season-field", main).hidden = $('input[name="bot-palette"]:checked', main)?.value !== "horror";
     setBotLook(bot.look);
   }
-  $$('input[name="bot-palette"], input[name="bot-season"]', main).forEach((r) => r.addEventListener("change", () => { collect(); paintLook(); }));
+  $$('input[name="bot-palette"]', main).forEach((r) => r.addEventListener("change", () => { collect(); paintLook(); }));
+  $("#bot-season", main).addEventListener("change", () => { collect(); paintLook(); });
   paintLook();
   // ---- Kind of bond ----
   function paintBondLevels(list) {
