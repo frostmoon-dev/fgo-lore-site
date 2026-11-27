@@ -6,7 +6,7 @@ import {
 import { registerCommands } from "../palette.js";
 import { chatCompletion, listModels } from "../api.js";
 import {
-  buildPrompt, generationParams, currentText, applyMacros, readBond, readMood, guessMood, stripBond, cleanImpersonation, contentLevel,
+  buildPrompt, generationParams, currentText, applyMacros, readBond, readMood, guessMood, stripBond, stripNarration, stripReplyNarration, cleanImpersonation, contentLevel,
   readThought, readChoices, clockNote,
   avoidedIn, markAvoided, repetitionHints,
 } from "../prompt.js";
@@ -498,6 +498,9 @@ export async function render(main, [botId, chatId, jumpTo]) {
       });
     });
   }
+
+  const isTextingMode = () => !!chat.texting || document.documentElement.dataset.chatLayout === "messages";
+  const isNoNarration = () => isTextingMode() || document.documentElement.dataset.chatNarration === "hide";
 
   // In a Text messages chat, the bot is "online", "typing…" or "last seen".
   function presence() {
@@ -1040,11 +1043,14 @@ export async function render(main, [botId, chatId, jumpTo]) {
     const fullNote = [directed, note, shiftNote, continueNote, rollNote].filter(Boolean).join(" ");
 
     const [freshSettings, preset, loreEntries] = await Promise.all([getSettings(), getActivePreset(), loreForBot(speaker)]);
+    const textingOn = isTextingMode();
+    const noNarrationOn = isNoNarration();
     // Habits in this character's last replies, to vary this time. Not for
     // "continue", which finishes the same reply.
+    const cleanForRep = (t) => (noNarrationOn ? stripNarration(t, { unwrapQuotes: textingOn }) : t);
     const varied = kind !== "continue" && freshSettings.repetition?.enabled !== false
-      ? repetitionHints(chat.messages.filter((x) => x !== target && spokeBy(x, speaker)).slice(-6).map((x) => currentText(x)),
-        { userTexts: chat.messages.filter((x) => x.role === "user").slice(-10).map((x) => currentText(x)) })
+      ? repetitionHints(chat.messages.filter((x) => x !== target && spokeBy(x, speaker)).slice(-6).map((x) => cleanForRep(currentText(x))),
+        { userTexts: chat.messages.filter((x) => x.role === "user").slice(-10).map((x) => cleanForRep(currentText(x))) })
       : [];
     const beforeBond = bondFor(speaker);
     const hist = withSpeakers(chat.messages.slice(0, chat.messages.indexOf(target) + (kind === "continue" ? 1 : 0)));
@@ -1052,7 +1058,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
       bot: speaker, persona: persona(), preset, settings: freshSettings, loreEntries, history: hist,
       bond: withBond ? beforeBond : null,
       ...memoryArgs(hist), scene: chat.scene?.text ?? "", authorNote: chat.authorNote ?? "", note: fullNote, cast: group() ? others(speaker) : [],
-      texting: !!chat.texting, choices: !!chat.choices,
+      texting: textingOn, noNarration: noNarrationOn, choices: !!chat.choices,
       liked: likedFor(speaker, target.id), repetition: varied,
       clock: speaker.realTime ? clockNote({ gapMs: gapBefore(hist), user: userName(), char: speaker.name }) : "",
     });
@@ -1083,12 +1089,14 @@ export async function render(main, [botId, chatId, jumpTo]) {
     let ok = false;
 
     try {
+      const cleanLive = (raw) => (noNarrationOn ? stripReplyNarration(raw, { unwrapQuotes: textingOn }) : raw);
       const ask = (b) => chatCompletion(conn, b, {
         signal: controller.signal, cache: true, purpose: "reply",
         onRetry: ({ attempt, max }) => setActivity("reply", `The model is busy. Trying again (${attempt} of ${max})…`),
         onDelta: (r) => {
           if (r.content && /^The (model is busy|reply came back empty)/.test(activity.get("reply") ?? "")) setActivity("reply", `${speaker.name} is writing…`);
-          target.swipes[si] = kind === "continue" ? join(r.content) : r.content;
+          const nextText = cleanLive(r.content);
+          target.swipes[si] = kind === "continue" ? join(nextText) : nextText;
           if (kind !== "continue") target.meta[si].reasoning = r.reasoning;
           frame ||= requestAnimationFrame(paintStream);
         },
@@ -1111,6 +1119,10 @@ export async function render(main, [botId, chatId, jumpTo]) {
       }
       const mood = readMood(res.content, moodsOf(speaker)) ?? guessMood(res.content, moodsOf(speaker));
       const parsed = withBond ? readBond(res.content) : { text: stripBond(res.content), delta: 0 };
+      if (noNarrationOn) {
+        const stripped = stripNarration(parsed.text, { unwrapQuotes: textingOn });
+        if (stripped) parsed.text = stripped;
+      }
       // Kept beside the reply, not in it, so it is never sent back as history.
       const thought = speaker.thoughts ? readThought(res.content) : "";
       const options = chat.choices ? readChoices(res.content) : [];
@@ -2241,7 +2253,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
       bot: partner, persona: persona(), preset, settings: freshSettings, loreEntries,
       history: hist, mode: "impersonate", hint,
       ...memoryArgs(hist), scene: chat.scene?.text ?? "", authorNote: chat.authorNote ?? "", cast: group() ? others(partner) : [],
-      texting: !!chat.texting,
+      texting: isTextingMode(), noNarration: isNoNarration(),
     });
     const body = {
       model: chat.model || partner.model || conn.model || undefined,
@@ -3225,7 +3237,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
       bot: speaker, persona: persona(), preset, settings: s, history: withSpeakers(hist), loreEntries: entries,
       bond: bondOnFor(speaker) ? bondFor(speaker) : null,
       ...memoryArgs(hist), scene: chat.scene?.text ?? "", authorNote: chat.authorNote ?? "", note: direction(), cast: group() ? others(speaker) : [],
-      texting: !!chat.texting, choices: !!chat.choices,
+      texting: isTextingMode(), noNarration: isNoNarration(), choices: !!chat.choices,
       liked: likedFor(speaker),
       repetition: s.repetition?.enabled !== false ? repetitionHints(chat.messages.filter((x) => spokeBy(x, speaker)).slice(-6).map((x) => currentText(x)),
         { userTexts: chat.messages.filter((x) => x.role === "user").slice(-10).map((x) => currentText(x)) }) : [],
