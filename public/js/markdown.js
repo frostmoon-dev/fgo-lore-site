@@ -95,7 +95,9 @@ export function renderMarkdown(src, { quotes = false } = {}) {
       out.push(`<blockquote>${inline(quote[1], { quotes })}</blockquote>`);
     } else {
       flushList();
-      para.push(spacedAction ? line.replace(/^(\s*)\*\s+/, "$1*") : line);
+      const norm = spacedAction ? line.replace(/^(\s*)\*\s+/, "$1*") : line;
+      if (quotes && para.length && ACT.test(norm) !== ACT.test(para[0])) flushPara();
+      para.push(norm);
     }
   }
   if (fence !== null) out.push(`<pre><code>${fence.join("\n")}</code></pre>`);

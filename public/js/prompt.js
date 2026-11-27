@@ -266,6 +266,82 @@ export const stripBond = (text) => String(text ?? "").replace(THOUGHT_TAG, "").r
   .replace(OPEN_THOUGHT, "").replace(OPEN_CHOICES, "")
   .replace(BOND_TAG, "").replace(MOOD_TAG, "").replace(/\n{3,}$/, "\n").trimEnd();
 
+// Removes roleplay narration (*actions*, _actions_, and unquoted narrative
+// prose outside spoken dialogue) so a greeting or earlier story-mode reply
+// does not prime the model to keep writing narration in texting or
+// dialogue-only mode.
+export function stripNarration(text, { unwrapQuotes = false } = {}) {
+  let src = stripBond(text).replace(/\r\n?/g, "\n");
+  if (!src.trim()) return "";
+  const bolds = [];
+  src = src.replace(/\*\*(.+?)\*\*/g, (_, b) => `\u0000B${bolds.push(b) - 1}\u0000`);
+  const quotes = [];
+  src = src.replace(/(?:"([^"\n]+)"|“([^”\n]+)”)/g, (full, a, b) => {
+    const inner = (a ?? b ?? "").trim();
+    return `\u0000Q${quotes.push({ full, inner }) - 1}\u0000`;
+  });
+  src = src
+    .replace(/(^|[^*\w])\*(?!\s)([^*]+?)(?<!\s)\*(?!\w)/g, "$1 ")
+    .replace(/(^|[^_\w])_(?!\s)([^_]+?)(?<!\s)_(?!\w)/g, "$1 ")
+    .replace(/(^|[^*\w])\*(?=[^\s*])[^*\n]+$/gm, "$1 ");
+
+  const hasDialogueQuotes = quotes.some(({ inner }) => /[.!?…~—-]$/.test(inner) || inner.split(/\s+/).length >= 3);
+  let out;
+  if (hasDialogueQuotes) {
+    const paras = src.split(/\n\s*\n/).map((p) => {
+      const hits = [...p.matchAll(/\u0000Q(\d+)\u0000/g)].map((m) => quotes[Number(m[1])]);
+      if (!hits.length) return "";
+      return hits.map((q) => (unwrapQuotes ? q.inner.replace(/,$/, ".") : q.full)).join(" ");
+    }).filter(Boolean);
+    out = paras.join("\n\n");
+  } else {
+    out = src.replace(/\u0000Q(\d+)\u0000/g, (_, i) => {
+      const q = quotes[Number(i)];
+      return unwrapQuotes && /^\s*\u0000Q\d+\u0000\s*$/.test(src) ? q.inner : q.full;
+    });
+  }
+  return out
+    .replace(/\u0000B(\d+)\u0000/g, (_, i) => `**${bolds[Number(i)]}**`)
+    .split("\n")
+    .map((l) => l.replace(/[ \t]{2,}/g, " ").trim())
+    .filter(Boolean)
+    .join("\n\n")
+    .trim();
+}
+
+export function stripReplyNarration(text, { unwrapQuotes = false } = {}) {
+  const raw = String(text ?? "");
+  if (!raw.trim()) return raw;
+  const tags = [
+    ...(raw.match(MOOD_TAG) ?? []),
+    ...(raw.match(THOUGHT_TAG) ?? []),
+    ...(raw.match(CHOICES_TAG) ?? []),
+    ...(raw.match(BOND_TAG) ?? []),
+  ].map((t) => t.trim());
+  const cleaned = stripNarration(raw, { unwrapQuotes });
+  if (!cleaned) return raw;
+  return [cleaned, ...tags].filter(Boolean).join("\n");
+}
+
+function cleanExamples(examples, { unwrapQuotes = false } = {}) {
+  return String(examples ?? "")
+    .replace(/<START>\s*/gi, "---\n")
+    .split("\n")
+    .map((line) => {
+      if (/^---\s*$/.test(line)) return "---";
+      const match = line.match(/^(\s*(?:\{\{(?:char|user)\}\}|<BOT>|<USER>|[^:\n]{1,30}):\s*)(.*)$/i);
+      const prefix = match ? match[1] : "";
+      const body = match ? match[2] : line;
+      const cleaned = stripNarration(body, { unwrapQuotes }).replace(/\n+/g, " ");
+      return cleaned ? `${prefix}${cleaned}` : "";
+    })
+    .filter(Boolean)
+    .join("\n")
+    .replace(/(?:^---\n)+|(?:\n---)+$/g, "")
+    .replace(/(---\n){2,}/g, "---\n")
+    .trim();
+}
+
 // The real time where the person is, and how long they were away, for bots
 // that live in the person's own world. gapMs: time since the last message
 // before this exchange.
@@ -304,10 +380,11 @@ export function buildPrompt({
   bot, persona, preset, settings, history, loreEntries = [], bond = null,
   mode = "reply", hint = "", memory = "", note = "", cast = [], scene = "",
   facts = "", chapters = [], recalled = [], windowStart = 0, authorNote = "", liked = [], repetition = [], clock = "",
-  texting = false, choices = false,
+  texting = false, noNarration = false, choices = false,
 }) {
   const asUser = mode === "impersonate";
   if (asUser) bond = null;
+  const dialogueOnly = texting || noNarration;
   const names = { char: bot.name || "Character", user: persona?.name || "User" };
   const m = (t) => applyMacros(t, names).trim();
   const group = cast.length > 0;
@@ -330,15 +407,21 @@ export function buildPrompt({
         return { role: "user", content: head ? `[Scene break — ${m(head)}]` : "[Scene break]" };
       }
       if (x.role === "narrator") {
+        if (dialogueOnly) return { role: "user", content: "" };
         hasStoryBeat = true;
         const text = m(stripBond(currentText(x)));
         return { role: "user", content: text ? `[Narrator / World event — not spoken or done by ${names.user}]: ${text}` : "" };
       }
       // A message that answers an earlier one says which, the same way every
       // turn, so the cached part of the prompt does not change.
-      const said = x.role === "user" && x.replyTo?.text
-        ? `[Replying to ${x.replyTo.name}: ${x.replyTo.text}]\n${currentText(x)}` : currentText(x);
-      const content = stripBond(said);
+      const bodyText = dialogueOnly
+        ? stripNarration(currentText(x), { unwrapQuotes: texting })
+        : stripBond(currentText(x));
+      if (!bodyText.trim()) return { role: x.role, content: "" };
+      const replyQuote = x.role === "user" && x.replyTo?.text
+        ? (dialogueOnly ? stripNarration(x.replyTo.text, { unwrapQuotes: texting }) || x.replyTo.text : x.replyTo.text)
+        : "";
+      const content = replyQuote ? `[Replying to ${x.replyTo.name}: ${replyQuote}]\n${bodyText}` : bodyText;
       if (!group) return { role: x.role, content };
       const own = x.role === "assistant" && nameOf(x) === names.char;
       return { role: own ? "assistant" : "user", content: own ? content : `${nameOf(x)}: ${content}` };
@@ -364,9 +447,15 @@ export function buildPrompt({
   // follows; what can change every turn (scene, lore that matched, recalled
   // moments, bond) comes after it. Providers that cache repeated prompts can
   // then reuse the whole front of each request.
-  const parts = [asUser
+  let mainInst = asUser
     ? m(preset.impersonate?.trim() || DEFAULT_IMPERSONATE_PROMPT)
-    : m(override(bot.systemPrompt, preset.main))];
+    : m(override(bot.systemPrompt, preset.main));
+  if (texting) {
+    mainInst += `\n\nIMPORTANT: This conversation is in text-message / chat mode. Write ONLY the direct text messages ${asUser ? names.user : names.char} types and sends. Never write narration, physical actions, stage directions, scene descriptions, or text in *asterisks*, and do not wrap messages in quotation marks — even if the character definition or opening greeting used roleplay narration.`;
+  } else if (noNarration) {
+    mainInst += `\n\nIMPORTANT: Narration is turned off. Write ONLY ${asUser ? names.user : names.char}'s spoken dialogue. Never write narration, physical actions, stage directions, scene descriptions, or text in *asterisks* — even if the character definition or opening greeting used roleplay narration.`;
+  }
+  const parts = [mainInst];
   const about = [bot.description, bot.personality && `Personality: ${bot.personality}`].filter(Boolean).join("\n\n");
   if (about) parts.push(`## ${names.char}\n${m(about)}`);
   if (group) {
@@ -382,12 +471,19 @@ export function buildPrompt({
   }
   const examplesUntil = Number(preset.examplesUntil ?? 40);
   if (preset.includeExamples !== false && bot.examples?.trim() && !(examplesUntil > 0 && history.length >= examplesUntil)) {
-    parts.push(`## Example dialogue (style reference only)\n${m(bot.examples.replace(/<START>\s*/gi, "---\n"))}`);
+    const ex = dialogueOnly ? cleanExamples(bot.examples, { unwrapQuotes: texting }) : bot.examples.replace(/<START>\s*/gi, "---\n");
+    if (ex.trim()) parts.push(`## Example dialogue (style reference only)\n${m(ex)}`);
   }
   // Replies the person liked: the voice and quality to aim for, never content to reuse.
   if (!asUser && liked.length) {
-    parts.push(`## Replies ${names.user} liked (match their style, voice, length and quality; never reuse their events, wording or content)\n` +
-      liked.map((t) => `---\n${m(clip(stripBond(t), 1200))}`).join("\n"));
+    const likedLines = liked
+      .map((t) => (dialogueOnly ? stripNarration(t, { unwrapQuotes: texting }) : stripBond(t)))
+      .filter((t) => t.trim())
+      .map((t) => `---\n${m(clip(t, 1200))}`);
+    if (likedLines.length) {
+      parts.push(`## Replies ${names.user} liked (match their style, voice, length and quality; never reuse their events, wording or content)\n` +
+        likedLines.join("\n"));
+    }
   }
   parts.push(contentRule(contentLevel(settings, bot)));
   if (memory?.trim()) parts.push(`## Story so far (memory of earlier events)\n${m(memory)}`);
@@ -398,8 +494,13 @@ export function buildPrompt({
   }
   const pinned = history.filter((x) => x.pinned && (x.role === "user" || x.role === "assistant" || x.role === "narrator")).slice(-10);
   if (pinned.length) {
-    parts.push(`## Key moments (pinned by ${names.user}; always remember these)\n` +
-      pinned.map((x) => `- ${x.role === "narrator" ? "Narrator" : nameOf(x)}: ${m(clip(stripBond(currentText(x)).replace(/\s+/g, " "), 600))}`).join("\n"));
+    const pinLines = pinned.map((x) => {
+      const txt = dialogueOnly ? stripNarration(currentText(x), { unwrapQuotes: texting }) : stripBond(currentText(x));
+      return txt.trim() ? `- ${x.role === "narrator" ? "Narrator" : nameOf(x)}: ${m(clip(txt.replace(/\s+/g, " "), 600))}` : "";
+    }).filter(Boolean);
+    if (pinLines.length) {
+      parts.push(`## Key moments (pinned by ${names.user}; always remember these)\n` + pinLines.join("\n"));
+    }
   }
   const system = parts.filter(Boolean).join("\n\n");
 
@@ -428,14 +529,19 @@ export function buildPrompt({
     post = [post, `This is a group scene. Write only ${names.char}'s next reply. Do not write lines or actions for ${names.user} ` +
       `or for ${cast.map((c) => c.name).join(", ")}. Do not start with a name label.`].filter(Boolean).join("\n\n");
   }
-  // Text messages: the two are apart, typing on their phones.
+  // Text messages or dialogue-only mode: no narration or *actions*.
   if (texting) {
     post = [post, asUser
-      ? `This chat happens over text messages. Write only what ${names.user} types and sends: one or more short texts, each in its own paragraph. ` +
-        "No narration, no actions in asterisks, no quotation marks."
-      : `This chat happens over text messages: ${names.char} and ${names.user} are apart, texting on their phones. Write only what ${names.char} types and sends. ` +
-        "No narration, no actions or descriptions in asterisks, no quotation marks. Keep it like real texting: short messages, and you may send " +
-        `two to four separate texts, each in its own paragraph. Use ${names.char}'s own way of texting (punctuation, emoji, slang, capitals) only where it fits who they are.`,
+      ? `This chat happens over text messages. Write ONLY what ${names.user} types and sends: one or more short texts, each in its own paragraph. ` +
+        "Do NOT write any narration, physical actions, stage directions, or text in *asterisks*, and do not use quotation marks."
+      : `This chat happens over text messages: ${names.char} and ${names.user} are apart, texting on their phones. Write ONLY what ${names.char} types and sends. ` +
+        "Do NOT write any narration, scene descriptions, physical actions, or text in *asterisks*, and do not wrap messages in quotation marks — even if the opening greeting used narration. " +
+        `Keep it like real texting: short messages, and you may send two to four separate texts, each in its own paragraph. Use ${names.char}'s own way of texting (punctuation, emoji, slang, capitals) only where it fits who they are.`,
+    ].filter(Boolean).join("\n\n");
+  } else if (noNarration) {
+    post = [post, asUser
+      ? `Write ONLY ${names.user}'s spoken dialogue. Do NOT write any narration, physical actions, stage directions, or text in *asterisks*.`
+      : `Dialogue only: write ONLY what ${names.char} says aloud to ${names.user}. Do NOT write any narration, scene descriptions, physical actions, or text in *asterisks* — even if the opening greeting used narration.`,
     ].filter(Boolean).join("\n\n");
   }
   // A lasting instruction for this chat (the author's note), sent with every request.

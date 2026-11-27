@@ -1910,7 +1910,7 @@ html { -webkit-tap-highlight-color: transparent; }
   --r-sm: 0px; --r-md: 0px; --r-lg: 0px; --r-pill: 0px;
   --rough: url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2748%27 height=%2748%27 viewBox=%270 0 48 48%27 fill=%27none%27 stroke=%27%234a3a32%27 stroke-linecap=%27round%27%3E %3Cpath stroke-width=%271.7%27 d=%27M.6 4.6C9 3.7 17 5.4 25 4.4S39 5 47.4 3.9%27/%3E %3Cpath stroke-width=%27.7%27 d=%27M2 6.2C14 5.6 30 6.6 46 5.7%27 opacity=%27.55%27/%3E %3Cpath stroke-width=%271.5%27 d=%27M4.3.6C3.5 10 5.2 19 4.2 28S4.9 40 3.8 47.4%27/%3E %3Cpath stroke-width=%271.7%27 d=%27M.6 43.5C10 44.6 20 42.9 31 44.2S42 43.3 47.4 44.4%27/%3E %3Cpath stroke-width=%271.5%27 d=%27M43.6.6C44.5 11 43 22 44.3 32S43.4 41 44.5 47.4%27/%3E %3Cpath stroke-width=%27.6%27 d=%27M41.5 2.2l4.6 3.9M2.4 41.6l3.7 4.4%27 opacity=%27.6%27/%3E %3C/svg%3E");
   --grain: url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27180%27 height=%27180%27%3E%3Cfilter id=%27n%27%3E%3CfeTurbulence type=%27fractalNoise%27 baseFrequency=%27.85%27 numOctaves=%272%27 stitchTiles=%27stitch%27/%3E%3CfeColorMatrix values=%270 0 0 0 0.1 0 0 0 0 0.05 0 0 0 0 0.03 0 0 0 0.5 0%27/%3E%3C/filter%3E%3Crect width=%27100%25%27 height=%27100%25%27 filter=%27url%28%23n%29%27/%3E%3C/svg%3E");
-  --vignette: radial-gradient(ellipse at center, transparent 55%, rgba(70, 30, 15, .22) 100%);
+  --vignette: none;
 }
 :root[data-palette="horror"][data-theme="dark"] {
   --bg: #0d0b0a; --surface: #15110f; --raised: #1c1714;
@@ -1924,7 +1924,7 @@ html { -webkit-tap-highlight-color: transparent; }
   --scrim: rgba(0, 0, 0, .72);
   --rough: url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2748%27 height=%2748%27 viewBox=%270 0 48 48%27 fill=%27none%27 stroke=%27%237a6b5b%27 stroke-linecap=%27round%27%3E %3Cpath stroke-width=%271.7%27 d=%27M.6 4.6C9 3.7 17 5.4 25 4.4S39 5 47.4 3.9%27/%3E %3Cpath stroke-width=%27.7%27 d=%27M2 6.2C14 5.6 30 6.6 46 5.7%27 opacity=%27.55%27/%3E %3Cpath stroke-width=%271.5%27 d=%27M4.3.6C3.5 10 5.2 19 4.2 28S4.9 40 3.8 47.4%27/%3E %3Cpath stroke-width=%271.7%27 d=%27M.6 43.5C10 44.6 20 42.9 31 44.2S42 43.3 47.4 44.4%27/%3E %3Cpath stroke-width=%271.5%27 d=%27M43.6.6C44.5 11 43 22 44.3 32S43.4 41 44.5 47.4%27/%3E %3Cpath stroke-width=%27.6%27 d=%27M41.5 2.2l4.6 3.9M2.4 41.6l3.7 4.4%27 opacity=%27.6%27/%3E %3C/svg%3E");
   --grain: url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27180%27 height=%27180%27%3E%3Cfilter id=%27n%27%3E%3CfeTurbulence type=%27fractalNoise%27 baseFrequency=%27.85%27 numOctaves=%272%27 stitchTiles=%27stitch%27/%3E%3CfeColorMatrix values=%270 0 0 0 0.95 0 0 0 0 0.9 0 0 0 0 0.82 0 0 0 0.35 0%27/%3E%3C/filter%3E%3Crect width=%27100%25%27 height=%27100%25%27 filter=%27url%28%23n%29%27/%3E%3C/svg%3E");
-  --vignette: radial-gradient(ellipse at center, transparent 50%, rgba(0, 0, 0, .55) 100%);
+  --vignette: none;
 }
 /* Film grain and a vignette over everything; clicks go straight through. */
 :root[data-palette="horror"] body::before,
@@ -2187,44 +2187,42 @@ html { -webkit-tap-highlight-color: transparent; }
 }
 :root[data-palette="horror"] { --bubble-r: 3px; }
 
-/* Dialogue only (Chat narration: Hide): paragraphs that are all actions go,
-   and so do actions beside speech; emphasis inside a quote stays. */
-:root[data-chat-narration="hide"] .msg-body > p.act { display: none; }
-:root[data-chat-narration="hide"] .msg-body em:not(.q em) { display: none; }
+/* Dialogue only (Chat narration: Hide, Messages layout, or Text messages mode):
+   paragraphs that are all actions go, and so do actions beside speech; emphasis inside a quote stays. */
+:is(:root[data-chat-narration="hide"], :root[data-chat-layout="messages"], .chat-main.is-texting) .msg-body > p.act { display: none; }
+:is(:root[data-chat-narration="hide"], :root[data-chat-layout="messages"], .chat-main.is-texting) .msg-body em:not(.q em) { display: none; }
 
 /* ---------- Horror Story: Apocalypse (Outpost 3) ----------
-   Nuclear winter fallout ash, charred obsidian, sulphur gold and Antichrist
-   ember crimson. Cards carry a double charred-gold bunker rule; titles smoulder
-   in dark mode. Contrast: ink > 13:1, muted & accent > 5:1. */
+   Warm fallout ash, candlelit umber and muted antique brass. Analogous warm
+   harmony with uniform matte luminance, no radial-gradient glare, and no
+   red-vs-yellow chromostereopsis. Contrast: ink > 12.5:1, muted & accent > 5:1. */
 :root[data-palette="horror"][data-season="apocalypse"] {
-  --bg: #e5ded2; --surface: #efe9de; --raised: #f7f2e8;
-  --ink: #181310; --muted: #5c5045; --narration: #4d4238;
-  --line: #cfc5b4; --line-strong: #7b6c5c; --fill: #dbd2c2; --fill-strong: #cec3b0;
-  --primary: #7c1c12; --primary-hover: #5f140c; --on-primary: #faf3e8;
-  --accent: #854f00; --accent-hover: #673d00; --on-accent: #ffffff; --accent-soft: #eddcb9;
-  --danger: #8f1812; --ok: #4b5d34;
-  --rough: url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2748%27 height=%2748%27 viewBox=%270 0 48 48%27 fill=%27none%27 stroke=%27%23594633%27 stroke-linecap=%27round%27%3E %3Cpath stroke-width=%271.7%27 d=%27M.6 4.6C9 3.7 17 5.4 25 4.4S39 5 47.4 3.9%27/%3E %3Cpath stroke-width=%27.7%27 d=%27M2 6.2C14 5.6 30 6.6 46 5.7%27 opacity=%27.55%27/%3E %3Cpath stroke-width=%271.5%27 d=%27M4.3.6C3.5 10 5.2 19 4.2 28S4.9 40 3.8 47.4%27/%3E %3Cpath stroke-width=%271.7%27 d=%27M.6 43.5C10 44.6 20 42.9 31 44.2S42 43.3 47.4 44.4%27/%3E %3Cpath stroke-width=%271.5%27 d=%27M43.6.6C44.5 11 43 22 44.3 32S43.4 41 44.5 47.4%27/%3E %3Cpath stroke-width=%27.6%27 d=%27M41.5 2.2l4.6 3.9M2.4 41.6l3.7 4.4%27 opacity=%27.6%27/%3E %3C/svg%3E");
+  --bg: #e7e1d6; --surface: #f1ece2; --raised: #f8f4ec;
+  --ink: #1e1915; --muted: #61564b; --narration: #51473d;
+  --line: #d4cbbb; --line-strong: #7d7061; --fill: #dfd7c9; --fill-strong: #d3c9b8;
+  --primary: #4a3728; --primary-hover: #38291d; --on-primary: #f8f4ec;
+  --accent: #7a541b; --accent-hover: #604113; --on-accent: #ffffff; --accent-soft: #eadcc4;
+  --danger: #8a2c22; --ok: #4b5d34;
+  --shadow-1: 0 1px 2px rgba(30, 25, 21, .07);
+  --shadow-2: 0 12px 32px rgba(30, 25, 21, .16);
+  --vignette: none;
+  --rough: url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2748%27 height=%2748%27 viewBox=%270 0 48 48%27 fill=%27none%27 stroke=%27%23635546%27 stroke-linecap=%27round%27%3E %3Cpath stroke-width=%271.7%27 d=%27M.6 4.6C9 3.7 17 5.4 25 4.4S39 5 47.4 3.9%27/%3E %3Cpath stroke-width=%27.7%27 d=%27M2 6.2C14 5.6 30 6.6 46 5.7%27 opacity=%27.55%27/%3E %3Cpath stroke-width=%271.5%27 d=%27M4.3.6C3.5 10 5.2 19 4.2 28S4.9 40 3.8 47.4%27/%3E %3Cpath stroke-width=%271.7%27 d=%27M.6 43.5C10 44.6 20 42.9 31 44.2S42 43.3 47.4 44.4%27/%3E %3Cpath stroke-width=%271.5%27 d=%27M43.6.6C44.5 11 43 22 44.3 32S43.4 41 44.5 47.4%27/%3E %3Cpath stroke-width=%27.6%27 d=%27M41.5 2.2l4.6 3.9M2.4 41.6l3.7 4.4%27 opacity=%27.6%27/%3E %3C/svg%3E");
 }
 :root[data-palette="horror"][data-season="apocalypse"][data-theme="dark"] {
-  --bg: #0b0908; --surface: #14110f; --raised: #1c1714;
-  --ink: #ece3d4; --muted: #ab9e8a; --narration: #d1c5b2;
-  --line: #2d251e; --line-strong: #7a6854; --fill: #211b17; --fill-strong: #2d241e;
-  --primary: #9e2317; --primary-hover: #bc2b1d; --on-primary: #faf1e4;
-  --accent: #e3a334; --accent-hover: #f0ba59; --on-accent: #170f03; --accent-soft: #362712;
-  --danger: #f56852; --ok: #9fb886;
-  --vignette: radial-gradient(ellipse at center, transparent 46%, rgba(35, 10, 4, .65) 100%);
-  --rough: url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2748%27 height=%2748%27 viewBox=%270 0 48 48%27 fill=%27none%27 stroke=%27%238f7248%27 stroke-linecap=%27round%27%3E %3Cpath stroke-width=%271.7%27 d=%27M.6 4.6C9 3.7 17 5.4 25 4.4S39 5 47.4 3.9%27/%3E %3Cpath stroke-width=%27.7%27 d=%27M2 6.2C14 5.6 30 6.6 46 5.7%27 opacity=%27.55%27/%3E %3Cpath stroke-width=%271.5%27 d=%27M4.3.6C3.5 10 5.2 19 4.2 28S4.9 40 3.8 47.4%27/%3E %3Cpath stroke-width=%271.7%27 d=%27M.6 43.5C10 44.6 20 42.9 31 44.2S42 43.3 47.4 44.4%27/%3E %3Cpath stroke-width=%271.5%27 d=%27M43.6.6C44.5 11 43 22 44.3 32S43.4 41 44.5 47.4%27/%3E %3Cpath stroke-width=%27.6%27 d=%27M41.5 2.2l4.6 3.9M2.4 41.6l3.7 4.4%27 opacity=%27.6%27/%3E %3C/svg%3E");
-}
-:root[data-palette="horror"][data-season="apocalypse"] .card {
-  box-shadow: inset 0 2px 0 var(--accent), var(--shadow-1);
-}
-:root[data-palette="horror"][data-season="apocalypse"] dialog {
-  box-shadow: inset 0 2px 0 var(--accent), var(--shadow-2);
+  --bg: #141210; --surface: #1c1916; --raised: #24201c;
+  --ink: #e8e0d3; --muted: #a39888; --narration: #cbc1b1;
+  --line: #2e2924; --line-strong: #73675a; --fill: #27221e; --fill-strong: #332c26;
+  --primary: #cbb082; --primary-hover: #d8c096; --on-primary: #181410;
+  --accent: #d4ad6e; --accent-hover: #dfc08a; --on-accent: #181410; --accent-soft: #33281a;
+  --danger: #e28475; --ok: #9cb588;
+  --shadow-1: 0 1px 3px rgba(0, 0, 0, .35);
+  --shadow-2: 0 12px 32px rgba(0, 0, 0, .55);
+  --vignette: none;
+  --rough: url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2748%27 height=%2748%27 viewBox=%270 0 48 48%27 fill=%27none%27 stroke=%27%236b5e50%27 stroke-linecap=%27round%27%3E %3Cpath stroke-width=%271.7%27 d=%27M.6 4.6C9 3.7 17 5.4 25 4.4S39 5 47.4 3.9%27/%3E %3Cpath stroke-width=%27.7%27 d=%27M2 6.2C14 5.6 30 6.6 46 5.7%27 opacity=%27.55%27/%3E %3Cpath stroke-width=%271.5%27 d=%27M4.3.6C3.5 10 5.2 19 4.2 28S4.9 40 3.8 47.4%27/%3E %3Cpath stroke-width=%271.7%27 d=%27M.6 43.5C10 44.6 20 42.9 31 44.2S42 43.3 47.4 44.4%27/%3E %3Cpath stroke-width=%271.5%27 d=%27M43.6.6C44.5 11 43 22 44.3 32S43.4 41 44.5 47.4%27/%3E %3Cpath stroke-width=%27.6%27 d=%27M41.5 2.2l4.6 3.9M2.4 41.6l3.7 4.4%27 opacity=%27.6%27/%3E %3C/svg%3E");
 }
 :root[data-palette="horror"][data-season="apocalypse"][data-theme="dark"] h1 {
-  color: #f4be5e;
-  text-shadow: 0 0 6px rgba(227, 163, 52, .7), 0 0 18px rgba(188, 43, 29, .65), 0 0 34px rgba(158, 35, 23, .45);
-  filter: url(#mp-scratch);
+  color: var(--accent);
+  text-shadow: none;
 }
 
 /* ---------- Frostmoon ----------
@@ -2242,22 +2240,15 @@ html { -webkit-tap-highlight-color: transparent; }
   --scrim: rgba(15, 20, 38, .48);
 }
 :root[data-palette="frostmoon"][data-theme="dark"] {
-  --bg: #0a0e17; --surface: #111726; --raised: #172035;
+  --bg: #0e131d; --surface: #141b29; --raised: #1b2436;
   --ink: #e8effa; --muted: #9aa9c4; --narration: #c8d4ea;
-  --line: #212c45; --line-strong: #627396; --fill: #1a2338; --fill-strong: #232f4a;
+  --line: #232e45; --line-strong: #627396; --fill: #1d263a; --fill-strong: #26324c;
   --primary: #d9e6ff; --primary-hover: #ffffff; --on-primary: #0d1424;
-  --accent: #8cb8ff; --accent-hover: #adcfff; --on-accent: #091324; --accent-soft: #1a2b4d;
+  --accent: #8cb8ff; --accent-hover: #adcfff; --on-accent: #091324; --accent-soft: #1c2c4c;
   --danger: #f58b99; --ok: #88cba9;
-  --shadow-1: 0 1px 3px rgba(0, 0, 0, .4);
-  --shadow-2: 0 16px 40px rgba(0, 0, 0, .62);
+  --shadow-1: 0 1px 3px rgba(0, 0, 0, .35);
+  --shadow-2: 0 16px 40px rgba(0, 0, 0, .58);
   --scrim: rgba(5, 8, 16, .68);
-}
-:root[data-palette="frostmoon"][data-theme="dark"] body::before {
-  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0;
-  background: radial-gradient(ellipse 80% 45% at 50% -10%, rgba(140, 184, 255, .13), transparent 70%);
-}
-:root[data-palette="frostmoon"][data-theme="dark"] :is(.card, dialog, .bot-card) {
-  box-shadow: inset 0 1px 0 rgba(217, 230, 255, .12), var(--shadow-1);
 }
 :root[data-palette="frostmoon"] .msg.is-opening .msg-body > p:first-child::first-letter {
   float: left; margin: .05em .12em 0 0; font-family: var(--font-display); font-size: 3em; line-height: .84;
@@ -2267,52 +2258,47 @@ html { -webkit-tap-highlight-color: transparent; }
 :root[data-palette="frostmoon"][data-chat-quotes="plain"] .msg-body .q { color: inherit; }
 
 /* ---------- Baobhan Sith (Fate/Grand Order) ----------
-   Fairy Knight Tristan: porcelain and obsidian velvet, crimson-rose heels,
-   delicate lace-trimmed inner borders and thorny baroque elegance.
-   Contrast: ink > 16:1, muted > 6.5:1, accent > 6.5:1. */
+   Fairy Knight Tristan: warm rose-parchment and matte aubergine velvet,
+   desaturated tea-rose accents, and quiet bookbinding inner rules with
+   uniform background luminance (no radial gradients or neon glare).
+   Contrast: ink ~12.8:1, muted > 5.5:1, accent > 5.5:1. */
 :root[data-palette="sith"] {
-  --bg: #f6eef1; --surface: #fdf8fa; --raised: #ffffff;
-  --ink: #1d1016; --muted: #694d59; --narration: #593f4b;
-  --line: #ebd8df; --line-strong: #8f6b7a; --fill: #f0e1e7; --fill-strong: #e5cfd8;
-  --primary: #6e0d2b; --primary-hover: #530920; --on-primary: #fdf6f8;
-  --accent: #a81040; --accent-hover: #870c33; --on-accent: #ffffff; --accent-soft: #f8d8e3;
-  --danger: #9e122b; --ok: #386646;
-  --shadow-1: 0 1px 3px rgba(52, 12, 26, .08);
-  --shadow-2: 0 14px 36px rgba(52, 12, 26, .18);
-  --scrim: rgba(24, 6, 12, .52);
+  --bg: #f3ecee; --surface: #faf6f7; --raised: #ffffff;
+  --ink: #22171c; --muted: #6c5861; --narration: #5a4750;
+  --line: #e6d8dd; --line-strong: #8c737e; --fill: #ece0e5; --fill-strong: #e0d0d7;
+  --primary: #4c2233; --primary-hover: #612c42; --on-primary: #faf6f7;
+  --accent: #943556; --accent-hover: #7a2a46; --on-accent: #ffffff; --accent-soft: #f2dde4;
+  --danger: #96283b; --ok: #386646;
+  --shadow-1: 0 1px 2px rgba(34, 23, 28, .06);
+  --shadow-2: 0 12px 32px rgba(34, 23, 28, .15);
+  --scrim: rgba(24, 12, 18, .48);
 }
 :root[data-palette="sith"][data-theme="dark"] {
-  --bg: #0d070a; --surface: #160c11; --raised: #201118;
-  --ink: #f5e9ee; --muted: #b89aa7; --narration: #dec9d2;
-  --line: #311a24; --line-strong: #805769; --fill: #24131b; --fill-strong: #321a26;
-  --primary: #a6133f; --primary-hover: #c4184c; --on-primary: #fdf4f7;
-  --accent: #ff759f; --accent-hover: #ff99b8; --on-accent: #1a050c; --accent-soft: #3d1223;
-  --danger: #ff7a8a; --ok: #95c49c;
-  --shadow-1: 0 2px 6px rgba(0, 0, 0, .45);
-  --shadow-2: 0 16px 44px rgba(0, 0, 0, .68);
-  --scrim: rgba(8, 2, 5, .72);
+  --bg: #161114; --surface: #1e171b; --raised: #261e23;
+  --ink: #efe6ea; --muted: #ad99a2; --narration: #d4c4cb;
+  --line: #31262c; --line-strong: #7c6872; --fill: #2b2127; --fill-strong: #372b32;
+  --primary: #efe6ea; --primary-hover: #ffffff; --on-primary: #22171c;
+  --accent: #e295b0; --accent-hover: #eba9c0; --on-accent: #211017; --accent-soft: #38222b;
+  --danger: #eb8f9c; --ok: #98c29e;
+  --shadow-1: 0 1px 3px rgba(0, 0, 0, .35);
+  --shadow-2: 0 12px 32px rgba(0, 0, 0, .55);
+  --scrim: rgba(8, 4, 6, .62);
 }
-:root[data-palette="sith"][data-theme="dark"] body::before {
-  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0;
-  background: radial-gradient(ellipse at center, transparent 52%, rgba(88, 8, 34, .28) 100%);
-}
-/* Lace-trimmed double inner frame on cards and dialogs. */
+/* Quiet bookbinding inner rule on cards and dialogs. */
 :root[data-palette="sith"] :is(.card, dialog) {
-  border-color: color-mix(in srgb, var(--accent) 24%, var(--line));
-  box-shadow: inset 0 0 0 4px var(--surface), inset 0 0 0 5px color-mix(in srgb, var(--accent) 34%, var(--line)), var(--shadow-1);
+  border-color: var(--line);
+  box-shadow: inset 0 0 0 4px var(--surface), inset 0 0 0 5px var(--line), var(--shadow-1);
 }
 :root[data-palette="sith"] dialog {
-  border-color: color-mix(in srgb, var(--accent) 30%, var(--line));
-  box-shadow: inset 0 0 0 4px var(--raised), inset 0 0 0 5px color-mix(in srgb, var(--accent) 42%, var(--line)), var(--shadow-2);
+  box-shadow: inset 0 0 0 4px var(--raised), inset 0 0 0 5px var(--line), var(--shadow-2);
 }
 :root[data-palette="sith"] h1 { letter-spacing: .01em; font-weight: 600; }
 :root[data-palette="sith"] .msg.is-opening .msg-body > p:first-child::first-letter {
   float: left; margin: .05em .12em 0 0; font-family: var(--font-display); font-size: 3.1em; line-height: .82;
   font-style: normal; color: var(--accent);
 }
-:root[data-palette="sith"] .msg-body .q { color: color-mix(in srgb, var(--accent) 48%, var(--ink)); }
+:root[data-palette="sith"] .msg-body .q { color: color-mix(in srgb, var(--accent) 45%, var(--ink)); }
 :root[data-palette="sith"][data-chat-quotes="plain"] .msg-body .q { color: inherit; }
-:root[data-palette="sith"] .bot-card { border-color: color-mix(in srgb, var(--accent) 26%, var(--line)); }
 
 /* ---------- Story chapter breaks & narrator beats ---------- */
 .story-chapter {

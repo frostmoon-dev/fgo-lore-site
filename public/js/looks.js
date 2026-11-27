@@ -52,7 +52,7 @@ export const PALETTES = [
       head: { stack: `"Cormorant Garamond", ${SERIF}`, href: gf("Cormorant+Garamond:wght@500;600") },
     } },
   { key: "sith", label: "Baobhan Sith", about: "After Fairy Knight Tristan (FGO): porcelain and black velvet, crimson-rose heels, lace-trimmed cards and thorny elegance.",
-    swatch: ["#f6eef1", "#6e0d2b", "#a81040"], dark: ["#0d070a", "#a6133f", "#ff759f"],
+    swatch: ["#f3ecee", "#4c2233", "#943556"], dark: ["#161114", "#efe6ea", "#e295b0"],
     fonts: {
       chat: { stack: `"Crimson Pro", ${SERIF}`, href: gf("Crimson+Pro:ital,wght@0,400;0,600;1,400") },
       head: { stack: `"Cormorant Garamond", ${SERIF}`, href: gf("Cormorant+Garamond:ital,wght@0,500;0,600;1,500") },
