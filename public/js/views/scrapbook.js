@@ -8,6 +8,7 @@ import { liveChapters } from "../memory.js";
 import { previewHTML, renderMarkdown } from "../markdown.js";
 import { bondChartHTML, wireBondChart } from "../chart.js";
 import { $, esc, avatarHTML, timeAgo } from "../ui.js";
+import { setBotLook } from "../looks.js";
 
 const DAY = 86400000;
 
@@ -18,6 +19,7 @@ export async function render(main, [id]) {
       <p>That bot may have been deleted.</p><div class="actions"><a class="btn btn-primary" href="#/">Back to bots</a></div></div></div>`;
     return;
   }
+  setBotLook(bot.look);
   const [list, settings, persona] = await Promise.all([chats.forBot(bot.id), getSettings(), personas.active()]);
   const names = { char: bot.name, user: persona?.name || "you" };
   const fill = (t) => applyMacros(t, names);
@@ -81,7 +83,7 @@ export async function render(main, [id]) {
            <div data-chart>${bondChartHTML({ id: `scrap-${bot.id}`, name: bot.name, points, levels: bondLevels(bot) })}</div>`,
           "The chart fills in as the bond moves in a chat.", { counted: false }) : ""}
         ${section("pinned", "Pinned moments", pinned.length,
-          `<ul class="scrap-list">${pinned.sort(newest).map((p) => item({ ...p, text: stripBond(currentText(p.m)), label: p.m.role === "user" ? "You" : bot.name })).join("")}</ul>`,
+          `<ul class="scrap-list">${pinned.sort(newest).map((p) => item({ ...p, text: stripBond(currentText(p.m)), label: p.m.role === "user" ? "You" : p.m.role === "narrator" ? "Narrator" : bot.name })).join("")}</ul>`,
           "Pin a message in a chat (the pin under it) to keep it here, and always remembered by the bot.")}
         ${section("liked", "Liked replies", liked.length,
           `<ul class="scrap-list">${[...liked].sort(newest).map((l) => item({ c: l.c, m: l.m, text: l.text, at: l.at })).join("")}</ul>`,
@@ -94,11 +96,16 @@ export async function render(main, [id]) {
             <li class="journal-entry"><header><span>${esc(e.c.title ?? "A chat")}</span><time>${when(e.at)}</time></header>
               <div class="prose">${renderMarkdown(fill(e.text), { quotes: true })}</div></li>`).join("")}</ul>`,
           "After a good stretch of chat, the bot writes a short diary entry when you leave. They gather here.")}
-        ${section("chapters", "Chapters", chapters.length,
-          `<ul class="scrap-list">${chapters.sort(newest).map((ch) => item({ c: ch.c, text: ch.text, at: ch.at, label: `Chapter ${ch.n}`, full: true })).join("")}</ul>`,
-          "Long chats are summed up in chapters by memory. They gather here.")}
+        ${(() => {
+          const breaks = list.flatMap((c) => c.messages.filter((m) => m.role === "chapter").map((m) => ({ c, m, text: currentText(m), at: m.at ?? 0, label: "Story chapter", full: false })));
+          const allChapters = [...chapters.map((ch) => ({ c: ch.c, text: ch.text, at: ch.at, label: `Chapter ${ch.n}`, full: true })), ...breaks].sort(newest);
+          return section("chapters", "Chapters", allChapters.length,
+            `<ul class="scrap-list">${allChapters.map((ch) => item(ch)).join("")}</ul>`,
+            "Long chats are summed up in chapters by memory, and chapter breaks you add appear here too.");
+        })()}
       </div>
     </div>`;
   if (points.length) wireBondChart($("[data-chart]", main), points);
   document.title = `${bot.name}'s scrapbook · MoonPaper`;
+  return { cleanup: () => setBotLook(null) };
 }

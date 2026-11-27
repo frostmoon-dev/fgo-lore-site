@@ -173,19 +173,25 @@ function escapeRegex(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-// Whole-word match, so "art" does not trigger on "Artoria".
+// Whole-word match on ASCII word edges, so "art" does not trigger on "Artoria",
+// while CJK, accented words and symbol keywords like "C.C." or "F/GO" still match.
+function loreRegex(keyword) {
+  const k = keyword.toLowerCase();
+  return new RegExp(`${/^\w/.test(k) ? "\\b" : ""}${escapeRegex(k)}${/\w$/.test(k) ? "\\b" : ""}`);
+}
 export function matchLore(entries, text, maxEntries) {
   const lower = text.toLowerCase();
   const enabled = entries.filter((e) => e.enabled !== false);
   const constant = enabled.filter((e) => e.constant);
   const triggered = enabled
-    .filter((e) => !e.constant && e.keywords.some((k) => k && new RegExp(`\\b${escapeRegex(k.toLowerCase())}\\b`).test(lower)))
+    .filter((e) => !e.constant && e.keywords.some((k) => k && loreRegex(k).test(lower)))
     .sort((a, b) => b.priority - a.priority)
     .slice(0, maxEntries);
   return [...constant, ...triggered];
 }
 
 export function currentText(msg) {
+  if (msg?.role === "chapter") return [msg.title, msg.subtitle].filter(Boolean).join(" — ");
   return msg.swipes ? msg.swipes[msg.swipeIndex ?? 0] ?? "" : msg.content ?? "";
 }
 
@@ -301,16 +307,27 @@ export function buildPrompt({
   // Older messages are covered by the layered memory; only the recent part
   // is sent word for word. The newest message is always kept.
   const recentHistory = history.slice(Math.max(0, Math.min(windowStart, history.length - 1)));
+  let hasStoryBeat = false;
   let clean = recentHistory
-    .filter((x) => (x.role === "user" || x.role === "assistant") && !x.error)
+    .filter((x) => (x.role === "user" || x.role === "assistant" || x.role === "narrator" || x.role === "chapter") && !x.error)
     .map((x) => {
+      if (x.role === "chapter") {
+        hasStoryBeat = true;
+        const head = [x.title, x.subtitle].filter(Boolean).join(" — ");
+        return { role: "user", content: head ? `[Scene break — ${m(head)}]` : "[Scene break]" };
+      }
+      if (x.role === "narrator") {
+        hasStoryBeat = true;
+        const text = m(stripBond(currentText(x)));
+        return { role: "user", content: text ? `[Narrator / World event — not spoken or done by ${names.user}]: ${text}` : "" };
+      }
       const content = stripBond(currentText(x));
-      if (!group) return { role: x.role, content: currentText(x) };
+      if (!group) return { role: x.role, content };
       const own = x.role === "assistant" && nameOf(x) === names.char;
       return { role: own ? "assistant" : "user", content: own ? content : `${nameOf(x)}: ${content}` };
     })
     .filter((x) => x.content.trim());
-  if (group) {
+  if (group || hasStoryBeat) {
     clean = clean.reduce((out, x) => {
       const last = out.at(-1);
       if (last && last.role === x.role) last.content += `\n\n${x.content}`;
@@ -362,10 +379,10 @@ export function buildPrompt({
     parts.push("## Recent chapters (what happened just before the messages below)\n\n" +
       chapters.map((c, i) => `### Chapter ${i + 1}\n${m(c)}`).join("\n\n"));
   }
-  const pinned = history.filter((x) => x.pinned && (x.role === "user" || x.role === "assistant")).slice(-10);
+  const pinned = history.filter((x) => x.pinned && (x.role === "user" || x.role === "assistant" || x.role === "narrator")).slice(-10);
   if (pinned.length) {
     parts.push(`## Key moments (pinned by ${names.user}; always remember these)\n` +
-      pinned.map((x) => `- ${nameOf(x)}: ${m(clip(stripBond(currentText(x)).replace(/\s+/g, " "), 600))}`).join("\n"));
+      pinned.map((x) => `- ${x.role === "narrator" ? "Narrator" : nameOf(x)}: ${m(clip(stripBond(currentText(x)).replace(/\s+/g, " "), 600))}`).join("\n"));
   }
   const system = parts.filter(Boolean).join("\n\n");
 

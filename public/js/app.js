@@ -69,7 +69,9 @@ async function route() {
       <p>There is nothing at this address.</p><div class="actions"><a class="btn btn-primary" href="#/">Back to bots</a></div></div></div>`;
     return;
   }
-  $(`[data-nav="${match.nav}"]`)?.setAttribute("aria-current", "page");
+  const activeNav = $(`[data-nav="${match.nav}"]`);
+  activeNav?.setAttribute("aria-current", "page");
+  activeNav?.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
   main.innerHTML = "";
   // Only show a placeholder when loading is slow enough to notice.
   const slow = setTimeout(() => { main.innerHTML = skeletonHTML(match.nav); }, 120);

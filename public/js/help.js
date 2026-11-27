@@ -4,10 +4,16 @@
 import { getMeta, setMeta } from "./store.js";
 import { $, esc, icon, openDialog } from "./ui.js";
 
-export const APP_VERSION = "2026.09.25.1";
-
 // Newest first. Each item says what it is and where it lives.
 export const NEWS = [
+  {
+    version: "2026.11.27.1",
+    items: [
+      ["Three new looks: Frostmoon, Baobhan Sith & Apocalypse", "Frostmoon (midnight indigo, winter silver and moonlight), Baobhan Sith (porcelain and obsidian velvet with crimson-rose heels and lace-trimmed frames, after Fairy Knight Tristan), and Apocalypse as a fifth Horror Story season (Outpost 3 fallout ash, sulphur gold and hellfire ember)."],
+      ["Ambient atmosphere & soundscapes", "Add gentle rain, snow, embers, petals, or moonlit motes (or set Auto to follow the scene tracker), plus offline procedural soundscapes (soft rain, fireplace, night wind, Moon hum) in Chat look & atmosphere."],
+      ["Chapters, time skips & narrator beats", "Drop editorial chapter breaks (/chapter, /skip) with a Table of Contents in the ⋯ menu, or third-person world events (/narrate) that are not spoken by your persona. The scene strip now shows Mood and custom tracker lines live."],
+    ],
+  },
   {
     version: "2026.11.11.5",
     items: [
@@ -274,6 +280,8 @@ export const NEWS = [
     ],
   },
 ];
+
+export const APP_VERSION = NEWS[0]?.version ?? "1";
 
 const STEPS = [
   { icon: "book", title: "Welcome to MoonPaper",
