@@ -36,6 +36,10 @@ const P = {
   search: '<circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/>',
   quill: '<path d="M20 4C12 4 7 9 5 20"/><path d="M8.5 13H14c3 0 5-3 6-9"/>',
   scroll: '<path d="M6 4h11a3 3 0 0 1 0 6h-1v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1h10M6 4a2 2 0 0 0-2 2v11M17 10H8"/>',
+  volume: '<path d="M11 5 6 9H3v6h3l5 4V5Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12"/>',
+  volumeOff: '<path d="M11 5 6 9H3v6h3l5 4V5Z"/><path d="m22 9-6 6M16 9l6 6"/>',
+  sparkles: '<path d="m12 3 1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6L12 3ZM5 16l.8 2.2L8 19l-2.2.8L5 22l-.8-2.2L2 19l2.2-.8L5 16ZM19 14l.8 2.2L22 17l-2.2.8L19 20l-.8-2.2L16 17l2.2-.8L19 14Z"/>',
+  bookmark: '<path d="M6 4h12v17l-6-4-6 4V4Z"/>',
 };
 
 export function icon(name, cls = "") {

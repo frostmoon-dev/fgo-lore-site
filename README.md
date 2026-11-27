@@ -97,17 +97,20 @@ server-side storage of your key.
 - **Rename in place**: click a chat's name in the chat header to rename it. The ⋯ menu's
   Rename still offers a suggested title.
 - **Colours**: Moon Cell (violet and rose, after BB; the default), Paper (cream and clay), Avalon
-  (moss and gold), Chaldea (slate and blue), Sakura (blush and plum), Ember (charcoal and crimson) or
-  Mono, each in light and dark, or Horror Story (after American Horror Story: Aubrey titles in the spirit of
+  (moss and gold), Chaldea (slate and blue), Sakura (blush and plum), Ember (charcoal and crimson),
+  Mono, **Frostmoon** (midnight indigo, winter silver and moonlight, with Cormorant Garamond headings and Literata prose),
+  **Baobhan Sith** (after Fairy Knight Tristan: porcelain and obsidian velvet, crimson-rose heels, lace-trimmed inner borders and Crimson Pro prose), each in light and dark, or Horror Story (after American Horror Story: Aubrey titles in the spirit of
   the show's Mackintosh-style logo, typewritten labels, hand-inked borders, square corners, moving
-  film grain, a vignette, faded photographs, a fandom quote on the home page, and four seasons:
-  Murder House, Asylum, Coven and Hotel), with text at 7:1 contrast and the accent at 4.5:1. An accent colour of
+  film grain, a vignette, faded photographs, a fandom quote on the home page, and five seasons:
+  Murder House, Asylum, Coven, Hotel and **Apocalypse**), with text at 7:1 contrast and the accent at 4.5:1. An accent colour of
   your own can replace the set's. Corners: Sharp, Soft or Round. Settings → Appearance, or Chat look.
 - **Chat touches**: spoken lines in quotes are tinted toward the accent (Settings → Appearance →
-  Chat dialogue: Tinted or Plain); a strip under the chat header shows the scene tracker's location
-  and time; three dots wait for the first word of a reply; new messages ease in and expression
+  Chat dialogue: Tinted or Plain); a living scene strip under the chat header shows the scene tracker's location,
+  time, mood and custom tracker lines (e.g. Sanity, Inventory); three dots wait for the first word of a reply; new messages ease in and expression
   pictures fade when the mood changes (redraws resume the animation rather than restart it; off with
   reduced motion); Novel layout opens the first message with a drop cap.
+- **Ambient atmosphere & soundscapes** (`public/js/ambience.js`): optional subtle weather and particle layers (Rain, Snow & frost, Embers, Petals, Moonlit motes, or **Auto** to follow the scene tracker automatically; disabled with reduced motion) plus offline procedural Web Audio soundscapes (Soft rain, Fireplace, Night wind, Moon hum) with a top-bar mute toggle and volume slider. Set per chat in **⋯ → Chat look & atmosphere**, or set a default atmosphere per bot in the bot editor.
+- **Chapter breaks, time skips & narrator beats**: drop editorial chapter headings or time skips (`/chapter`, `/skip`, or `+ → New chapter / time skip`) with a **Chapters** Table of Contents in the `⋯` menu and Scrapbook, or insert third-person world events (`/narrate`, or `+ → Narrator / world event`) that the model treats as omniscient narration rather than your persona's speech.
 - **Fonts**: fourteen chat fonts (sans, serif, typewriter, handwritten), five site fonts and six
   heading fonts. Fonts not in `index.html` load from Google Fonts only once chosen; `looks.js`
   caches the choice so `theme-init.js` applies it before the first paint.

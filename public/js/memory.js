@@ -163,7 +163,7 @@ export function recallFor(chat, { query, nameOf, textOf, start = windowStart(cha
   }
   for (let i = entry.messages.size; i < start; i++) {
     const m = chat.messages[i];
-    const ok = m.role === "user" || m.role === "assistant";
+    const ok = m.role === "user" || m.role === "assistant" || m.role === "narrator" || m.role === "chapter";
     addDoc(entry.messages, i, ok ? textOf(m) : "");
     entry.lastId = m.id;
   }

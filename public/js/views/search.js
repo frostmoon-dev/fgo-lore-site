@@ -45,11 +45,12 @@ export async function render(main, [query = ""]) {
       const host = botById.get(c.botId);
       if (!host) continue;
       for (const m of c.messages) {
-        const speaker = m.role === "user" ? null : botById.get(m.botId ?? c.botId) ?? host;
+        const speaker = m.role === "assistant" ? botById.get(m.botId ?? c.botId) ?? host : null;
+        const who = m.role === "chapter" ? "Chapter" : m.role === "narrator" ? "Narrator" : speaker ? speaker.name : personaName(c);
         const text = applyMacros(stripBond(currentText(m)), { char: speaker?.name ?? host.name, user: personaName(c) }).replace(/\s+/g, " ");
         const at = text.toLowerCase().indexOf(lower);
         if (at === -1) continue;
-        hits.push({ c, m, host, speaker, text, at });
+        hits.push({ c, m, host, speaker, who, text, at });
         if (hits.length >= MAX_RESULTS) break;
       }
       if (hits.length >= MAX_RESULTS) break;
@@ -57,11 +58,11 @@ export async function render(main, [query = ""]) {
     $("#count", main).textContent = hits.length
       ? `${hits.length}${hits.length >= MAX_RESULTS ? "+" : ""} message${hits.length === 1 ? "" : "s"} found`
       : "Nothing found. Try another word.";
-    results.innerHTML = hits.map(({ c, m, host, speaker, text, at }) => `
+    results.innerHTML = hits.map(({ c, m, host, speaker, who, text, at }) => `
       <li class="list-item search-hit">
-        ${avatarHTML(speaker ? speaker.avatar : null, speaker ? speaker.name : personaName(c), 36)}
+        ${avatarHTML(speaker ? speaker.avatar : null, who, 36)}
         <div class="grow">
-          <div class="title">${esc(speaker ? speaker.name : personaName(c))}
+          <div class="title">${esc(who)}
             <span class="sub-inline">in ${esc(c.title)} with ${esc(host.name)} · ${timeAgo(m.at)}</span></div>
           <p class="hit-text">${snippet(text, at, term.length)}</p>
         </div>

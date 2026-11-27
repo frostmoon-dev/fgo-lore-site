@@ -45,11 +45,24 @@ export const PALETTES = [
   { key: "sakura", label: "Sakura", about: "Blush and plum.", swatch: ["#f7eff1", "#4a1f35", "#b0306a"], dark: ["#170f13", "#f6e9ee", "#f39abf"] },
   { key: "ember", label: "Ember", about: "Charcoal and crimson.", swatch: ["#f2efee", "#2a1d1b", "#b3261e"], dark: ["#141010", "#f3ecea", "#ff8a7a"] },
   { key: "mono", label: "Mono", about: "Black and white, nothing else.", swatch: ["#f4f4f4", "#111111", "#111111"], dark: ["#0d0d0d", "#f0f0f0", "#f0f0f0"] },
+  { key: "frostmoon", label: "Frostmoon", about: "Midnight indigo, winter silver and moonlight, crafted for quiet late-night reading.",
+    swatch: ["#edf1f7", "#1f2b48", "#3f4aa6"], dark: ["#0a0e17", "#d9e6ff", "#8cb8ff"],
+    fonts: {
+      chat: { stack: `"Literata", ${SERIF}`, href: gf("Literata:ital,wght@0,400;0,600;1,400") },
+      head: { stack: `"Cormorant Garamond", ${SERIF}`, href: gf("Cormorant+Garamond:wght@500;600") },
+    } },
+  { key: "sith", label: "Baobhan Sith", about: "After Fairy Knight Tristan (FGO): porcelain and black velvet, crimson-rose heels, lace-trimmed cards and thorny elegance.",
+    swatch: ["#f6eef1", "#6e0d2b", "#a81040"], dark: ["#0d070a", "#a6133f", "#ff759f"],
+    fonts: {
+      chat: { stack: `"Crimson Pro", ${SERIF}`, href: gf("Crimson+Pro:ital,wght@0,400;0,600;1,400") },
+      head: { stack: `"Cormorant Garamond", ${SERIF}`, href: gf("Cormorant+Garamond:ital,wght@0,500;0,600;1,500") },
+    } },
   // A whole look rather than colours alone: its fonts replace the defaults
   // (a font picked in Settings still wins), and style.css adds the borders,
   // square corners, grain and faded photographs.
   { key: "horror", label: "Horror Story", about: "After American Horror Story: tall Art Nouveau titles in blood red, like the show's Mackintosh-style logo; typewritten case-file labels; antique print for the story; hand-inked borders and moving film grain, after the Super 16mm opening titles. Pick a season below.",
     swatch: ["#e6dcc8", "#1b1311", "#8f1218"], dark: ["#0d0b0a", "#e9dfcc", "#e2463e"],
+    squareCorners: true,
     fonts: {
       site: { stack: '"Special Elite", "Courier New", monospace', href: gf("Special+Elite") },
       chat: { stack: `"IM Fell English", ${SERIF}`, href: gf("IM+Fell+English:ital@0;1") },
@@ -65,6 +78,7 @@ export const SEASONS = [
   { key: "asylum", label: "Asylum", about: "Briarcliff: institutional green, rust, and ruled case files." },
   { key: "coven", label: "Coven", about: "Black lace and white, with a witch's violet." },
   { key: "hotel", label: "Hotel", about: "The Cortez: art deco crimson and gold, with neon." },
+  { key: "apocalypse", label: "Apocalypse", about: "Outpost 3: fallout ash, charred obsidian, sulphur gold and hellfire ember." },
 ];
 
 // Short lines the fandom quotes most, shown under the home page title.
@@ -73,11 +87,20 @@ const EPIGRAPHS = [
   { season: "murder", text: "Normal people scare me.", who: "Tate Langdon, Murder House" },
   { season: "asylum", text: "All monsters are human.", who: "Sister Jude, Asylum" },
   { season: "coven", text: "Surprise, bitch.", who: "Madison Montgomery, Coven" },
+  { season: "hotel", text: "Goddesses don't speak in whispers. They scream.", who: "The Countess, Hotel" },
+  { season: "apocalypse", text: "Find our sisters.", who: "Cordelia Goode, Apocalypse" },
 ];
+const THEME_EPIGRAPHS = {
+  sith: { text: "If you're going to break, at least make it pretty.", who: "Baobhan Sith, Fairy Knight Tristan" },
+};
 export function epigraph() {
-  if (getLook("palette") !== "horror") return null;
-  return EPIGRAPHS.find((e) => e.season === getLook("horrorSeason"))
-    ?? EPIGRAPHS[Math.floor(Date.now() / 86400000) % EPIGRAPHS.length];
+  const palette = botLook?.palette ?? getLook("palette");
+  if (palette === "horror") {
+    const season = botLook?.season ?? getLook("horrorSeason");
+    return EPIGRAPHS.find((e) => e.season === season)
+      ?? EPIGRAPHS[Math.floor(Date.now() / 86400000) % EPIGRAPHS.length];
+  }
+  return THEME_EPIGRAPHS[palette] ?? null;
 }
 
 export const CORNERS = [["sharp", "Sharp"], ["soft", "Soft"], ["round", "Round"]];
@@ -135,11 +158,11 @@ export function applyLooks() {
   const root = document.documentElement;
   const pick = (list, key) => list.find((f) => f.key === getLook(key)) ?? list[0];
   const palette = botLook?.palette ?? getLook("palette");
-  // A palette with fonts of its own fills every font left at its default.
+  // A palette with fonts of its own fills each slot left at its default.
   const own = PALETTES.find((p) => p.key === palette)?.fonts;
-  const chat = own && getLook("chatFont") === DEFAULTS.chatFont ? { key: "theme", ...own.chat } : pick(CHAT_FONTS, "chatFont");
-  const site = own && getLook("siteFont") === DEFAULTS.siteFont ? { key: "theme", ...own.site } : pick(SITE_FONTS, "siteFont");
-  const head = own && getLook("headFont") === DEFAULTS.headFont ? { key: "theme", ...own.head } : pick(HEAD_FONTS, "headFont");
+  const chat = own?.chat && getLook("chatFont") === DEFAULTS.chatFont ? { key: "theme", ...own.chat } : pick(CHAT_FONTS, "chatFont");
+  const site = own?.site && getLook("siteFont") === DEFAULTS.siteFont ? { key: "theme", ...own.site } : pick(SITE_FONTS, "siteFont");
+  const head = own?.head && getLook("headFont") === DEFAULTS.headFont ? { key: "theme", ...own.head } : pick(HEAD_FONTS, "headFont");
 
   const vars = {};
   if (site.key !== "rounded") vars["--font"] = site.stack;

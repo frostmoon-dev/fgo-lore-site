@@ -18,7 +18,8 @@ import {
   memoryContext, liveChapters, windowStart as memoryWindowStart, autoChapters, pendingChapters,
   chaptersToFold, recallFor, parseChapter, cachedTokens, reasoningTokens, trimMemory, KEEP_RECENT,
 } from "../memory.js";
-import { CHAT_FONTS, PALETTES, getLook, setLook, setBotLook, fontSelectHTML, paletteSwatchesHTML } from "../looks.js";
+import { CHAT_FONTS, PALETTES, SEASONS, getLook, setLook, setBotLook, fontSelectHTML, paletteSwatchesHTML } from "../looks.js";
+import { VISUALS, SOUNDS, detectVisualFromScene, createVisualLayer, createSoundscape } from "../ambience.js";
 import { bondChartHTML, wireBondChart } from "../chart.js";
 import { renderMarkdown, previewHTML } from "../markdown.js";
 import {
@@ -142,7 +143,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
   const others = (speaker) => everyone().filter((b) => b.id !== speaker.id);
   const userName = () => persona()?.name || "You";
   const namesFor = (speaker = bot) => ({ char: speaker.name, user: userName() });
-  const nameOf = (m) => (m.role === "user" ? userName() : speakerOf(m).name);
+  const nameOf = (m) => (m.role === "user" ? userName() : m.role === "narrator" ? "Narrator" : m.role === "chapter" ? "Chapter" : speakerOf(m).name);
 
   // Auto: the character the message names, otherwise whoever has been
   // quiet the longest.
@@ -190,8 +191,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
   const bondFor = (b, start = bondStartFor(b)) => levelOf(b, start + bondEarnedFor(b));
   // Every point where this character's bond changed, for the chart.
   const bondHistory = (b) => bondPoints(chat, b, bondDefault());
-  const bondOn = bondOnFor(bot); // the meter in the header follows the chat's own bot
-  const bondNow = () => bondFor(bot);
+  const bondTarget = () => everyone().find(bondOnFor) ?? null;
 
   const readOn = () => document.documentElement.dataset.chatRead === "on";
 
@@ -217,24 +217,26 @@ export async function render(main, [botId, chatId, jumpTo]) {
 
       <section class="chat-main" aria-label="Conversation">
         <div class="chat-bg" aria-hidden="true" hidden></div>
+        <canvas class="chat-ambience" id="ambience" aria-hidden="true" hidden></canvas>
         <div class="chat-topbar">
           <button class="icon-btn only-desktop" type="button" id="toggle-sidebar" aria-controls="sidebar">${icon("sidebar")}</button>
           <button class="icon-btn only-mobile" type="button" id="open-sidebar" aria-label="Show chats" aria-controls="sidebar" aria-expanded="false">${icon("menu")}</button>
           ${botAvatar(bot, 36, " only-mobile")}
           <div class="title"><span class="title-line"><button class="title-edit" type="button" id="chat-title" title="Rename this chat"></button><input type="text" class="title-input" id="title-input" aria-label="Chat name" maxlength="80" autocomplete="off" hidden><span class="content-tag" id="content-tag" hidden></span></span><small id="chat-sub"></small></div>
-          ${bondOn ? `<button class="bond" type="button" id="bond" title="Bond with ${esc(bot.name)} · set where it starts">
+          <button class="bond" type="button" id="bond" title="Bonds · set where they start" hidden>
             <span class="bond-label" id="bond-label"></span>
             <span class="bond-bar"><span class="bond-fill" id="bond-fill"></span></span>
-          </button>` : ""}
+          </button>
           <button class="model-chip hide-narrow" type="button" id="model-chip" aria-haspopup="menu" aria-expanded="false"></button>
           <button class="icon-btn tool-btn hide-narrow" type="button" id="memory" aria-label="Memory" title="Memory">${icon("book")}<span class="tool-label">Memory</span></button>
           <button class="icon-btn tool-btn hide-narrow" type="button" id="scene" aria-label="Scene tracker" title="Scene tracker">${icon("map")}<span class="tool-label">Scene</span></button>
           <button class="icon-btn tool-btn hide-narrow" type="button" id="cast" aria-label="Characters in this chat" title="Characters in this chat">${icon("users")}<span class="tool-label">Characters</span></button>
+          <button class="icon-btn" type="button" id="sound-toggle" aria-label="Mute ambient sound" title="Ambient sound" hidden>${icon("volume")}</button>
           <button class="icon-btn" type="button" id="read-enter" aria-label="Read mode: only the story and the message box (Alt+B)" title="Read mode (Alt+B)">${icon("scroll")}</button>
           <button class="icon-btn" type="button" id="more" aria-label="More chat actions" aria-haspopup="menu" aria-expanded="false" title="More">${icon("dots")}</button>
         </div>
 
-        <button class="scene-strip" type="button" id="scene-strip" hidden>${icon("map")}<span id="scene-strip-text"></span></button>
+        <button class="scene-strip" type="button" id="scene-strip" hidden>${icon("map")}<span class="scene-strip-main" id="scene-strip-text"></span><span class="scene-chips" id="scene-chips"></span></button>
         <div class="chat-log" id="log" tabindex="0" aria-label="Messages">
           <div class="chat-log-inner" id="log-inner"></div>
         </div>
@@ -279,6 +281,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
               <button class="icon-btn" type="button" id="suggest-close" aria-label="Close ideas" title="Close">${icon("x")}</button>
             </div>
             <button class="note-pill" type="button" id="note-pill" hidden></button>
+            <div class="slash-menu" id="slash-menu" role="listbox" aria-label="Story commands" hidden></div>
             <div class="composer-box">
               <label for="input" class="sr-only">Message</label>
               <textarea id="input" rows="1" placeholder="Message ${esc(bot.name)}…" enterkeyhint="send"></textarea>
@@ -422,22 +425,29 @@ export async function render(main, [botId, chatId, jumpTo]) {
   });
 
   function paintBond() {
-    if (!bondOn || gone()) return;
-    const { value, label, index } = bondNow();
+    if (gone()) return;
+    const target = bondTarget();
+    const btn = $("#bond", main);
+    if (!btn) return;
+    btn.hidden = !target;
+    if (!target) return;
+    const { value, label, index } = bondFor(target);
     $("#bond-label", main).textContent = label;
     $("#bond-fill", main).style.width = `${value}%`;
-    $("#bond", main).setAttribute("aria-label",
-      `Bond with ${bot.name}: ${label}, ${value} of 100. Open bonds, history and starting points.`);
-    $("#bond", main).dataset.level = String(index);
+    btn.title = `Bond with ${target.name} · set where it starts`;
+    btn.setAttribute("aria-label",
+      `Bond with ${target.name}: ${label}, ${value} of 100. Open bonds, history and starting points.`);
+    btn.dataset.level = String(index);
   }
 
   // The meter opens every bond in the chat: where it stands, how it moved,
   // and where it starts. Existing replies keep their changes on top.
   function openBonds() {
     const people = everyone().filter(bondOnFor);
+    if (!people.length) return;
     const dlg = openDialog(`
       <form method="dialog" class="dialog-body">
-        <h2>${people.length > 1 ? "Bonds in this chat" : `Bond with ${esc(bot.name)}`}</h2>
+        <h2>${people.length > 1 ? "Bonds in this chat" : `Bond with ${esc(people[0].name)}`}</h2>
         <p class="hint">Each reply can move a bond up or down. Set where a bond starts before the first line of this chat.</p>
         <div class="bond-rows">${people.map((b, i) => {
           const now = bondFor(b);
@@ -537,20 +547,61 @@ export async function render(main, [botId, chatId, jumpTo]) {
 
   // One line of the scene tracker, by its label; empty when unknown.
   function sceneLine(label) {
-    const v = new RegExp(`^\\s*${label}\\s*:\\s*(.+)$`, "im").exec(chat.scene?.text ?? "")?.[1].trim() ?? "";
+    const safe = String(label).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const v = new RegExp(`^\\s*${safe}\\s*:\\s*(.+)$`, "im").exec(chat.scene?.text ?? "")?.[1].trim() ?? "";
     return /^(unknown|n\/a|none|-)?$/i.test(v) ? "" : v;
   }
 
-  // Where and when the scene is, from the scene tracker, under the header.
+  // ---------- Ambient atmosphere & soundscapes ----------
+  const visualLayer = createVisualLayer($("#ambience", main));
+  const soundscape = createSoundscape();
+  let soundMuted = false;
+  const visualPref = () => chat.ambience?.visual ?? bot.ambience?.visual ?? "off";
+  const soundPref = () => chat.ambience?.sound ?? "off";
+  function paintSoundButton() {
+    const btn = $("#sound-toggle", main);
+    if (!btn) return;
+    const mode = soundPref();
+    btn.hidden = mode === "off";
+    if (mode === "off") return;
+    const label = SOUNDS.find((s) => s.key === mode)?.label ?? "Sound";
+    btn.innerHTML = icon(soundMuted ? "volumeOff" : "volume");
+    btn.classList.toggle("is-on", !soundMuted);
+    btn.setAttribute("aria-pressed", String(!soundMuted));
+    btn.setAttribute("aria-label", soundMuted ? `Unmute ${label}` : `Mute ${label}`);
+    btn.title = soundMuted ? `${label} (muted) · click to unmute` : `${label} · click to mute`;
+  }
+  function paintAmbience() {
+    if (gone()) return;
+    const v = visualPref();
+    visualLayer.set(v === "auto" ? detectVisualFromScene(chat.scene?.text ?? "") : v);
+    paintSoundButton();
+  }
+  $("#sound-toggle", main).addEventListener("click", () => {
+    soundMuted = !soundMuted;
+    soundscape.set(soundMuted ? "off" : soundPref());
+    paintSoundButton();
+  });
+
+  // Where and when the scene is, plus live Mood and custom tracker pills, under the header.
   function paintSceneStrip() {
     const strip = $("#scene-strip", main);
     const line = sceneLine;
     const parts = [line("Location"), line("Time")].filter(Boolean);
-    strip.hidden = !parts.length;
-    $("#scene-strip-text", main).textContent = parts.join(" · ");
     const mood = line("Mood");
+    const extras = (bot.trackerLines ?? [])
+      .map((label) => ({ label, value: line(label) }))
+      .filter((x) => x.value);
+    strip.hidden = !parts.length && !mood && !extras.length;
+    $("#scene-strip-text", main).textContent = parts.join(" · ");
+    const chips = [
+      ...(mood ? [`<span class="scene-chip is-mood">${esc(mood)}</span>`] : []),
+      ...extras.map((x) => `<span class="scene-chip"><strong>${esc(x.label)}:</strong> ${esc(x.value)}</span>`),
+    ];
+    $("#scene-chips", main).innerHTML = chips.join("");
     strip.title = mood ? `Mood: ${mood}. Open the scene tracker.` : "Open the scene tracker.";
     paintBackground(); // the place may have its own background
+    paintAmbience(); // auto atmosphere follows the scene too
   }
 
   // How long the chat had been quiet before the message now being answered
@@ -648,6 +699,54 @@ export async function render(main, [botId, chatId, jumpTo]) {
   const animStyle = (at) => (at && performance.now() - at < ANIM_MS ? `--anim-delay:-${Math.round(performance.now() - at)}ms` : "");
 
   function messageHTML(m, i) {
+    if (!drawnAt.has(m.id)) drawnAt.set(m.id, opened ? performance.now() : 0);
+    const arriving = animStyle(drawnAt.get(m.id));
+
+    // Chapter break / time skip divider.
+    if (m.role === "chapter") {
+      return `<div class="story-chapter${arriving ? " is-arriving" : ""}${m.id === toolsFor ? " tools-open" : ""}" data-id="${m.id}" role="separator" aria-label="${esc(m.title || "Chapter break")}"${arriving ? ` style="${arriving}"` : ""}>
+        <div class="chapter-rule" aria-hidden="true"><span></span><i>✦</i><span></span></div>
+        <div class="chapter-inner">
+          <div class="chapter-title">${esc(applyMacros(m.title || "New chapter", namesFor(bot)))}</div>
+          ${m.subtitle ? `<p class="chapter-sub">${esc(applyMacros(m.subtitle, namesFor(bot)))}</p>` : ""}
+        </div>
+        <div class="chapter-tools">
+          <button class="icon-btn" type="button" data-action="edit-chapter" aria-label="Edit chapter break" title="Edit" ${busy ? "disabled" : ""}>${icon("edit")}</button>
+          <button class="icon-btn" type="button" data-action="delete-beat" aria-label="Delete chapter break" title="Delete" ${busy ? "disabled" : ""}>${icon("trash")}</button>
+        </div>
+      </div>`;
+    }
+
+    // Narrator / world event beat (3rd-person, not spoken by the persona).
+    if (m.role === "narrator") {
+      const text = currentText(m);
+      if (editingId === m.id) {
+        return `<article class="msg narrator" data-id="${m.id}"><div class="msg-edit">
+          <div class="msg-head"><span class="msg-name">Editing narrator beat</span></div>
+          <label class="sr-only" for="edit-box">Narrator text</label>
+          <textarea id="edit-box">${esc(text)}</textarea>
+          <div class="actions"><span class="hint">Ctrl+Enter to save · Esc to cancel</span>
+            <button class="btn btn-ghost btn-sm" type="button" data-action="cancel-edit">Cancel</button>
+            <button class="btn btn-primary btn-sm" type="button" data-action="save-edit">Save</button></div>
+        </div></article>`;
+      }
+      return `<article class="msg narrator${arriving ? " is-arriving" : ""}${m.id === toolsFor ? " tools-open" : ""}" data-id="${m.id}" aria-label="Narrator"${arriving ? ` style="${arriving}"` : ""}>
+        <div class="narrator-card">
+          <div class="msg-head"><span class="msg-name">Narrator</span><time class="msg-time" datetime="${new Date(m.at).toISOString()}">${clock(m.at)}</time></div>
+          <div class="msg-body">${renderMarkdown(applyMacros(text, namesFor(bot)), { quotes: true })}</div>
+          <div class="msg-foot">
+            <span class="msg-tools">
+              <button class="icon-btn" type="button" data-action="edit" aria-label="Edit narrator beat" title="Edit" ${busy ? "disabled" : ""}>${icon("edit")}</button>
+              <button class="icon-btn${m.pinned ? " is-on" : ""}" type="button" data-action="pin" aria-pressed="${m.pinned ? "true" : "false"}"
+                aria-label="${m.pinned ? "Unpin" : "Pin this moment so it is always remembered"}" title="${m.pinned ? "Unpin" : "Pin"}">${icon("pin")}</button>
+              <button class="icon-btn" type="button" data-action="msg-menu" aria-label="More message actions" aria-haspopup="menu" aria-expanded="false" title="More">${icon("dots")}</button>
+            </span>
+            ${m.pinned ? `<span class="msg-meta"><span class="chip pinned-chip">pinned</span></span>` : ""}
+          </div>
+        </div>
+      </article>`;
+    }
+
     const isBot = m.role === "assistant";
     const p = persona();
     const speaker = speakerOf(m);
@@ -660,8 +759,6 @@ export async function render(main, [botId, chatId, jumpTo]) {
       : face ? `<a class="avatar-link" href="#/bot/${speaker.id}" aria-label="Edit ${esc(speaker.name)}" title="${esc(speaker.name)}, ${esc(moodKey)}"><span class="expr-face"><img src="${esc(face)}" alt=""></span></a>`
       : botById.has(speaker.id) ? botAvatar(speaker, 96) : avatarHTML(null, name, 96);
     const text = currentText(m);
-    if (!drawnAt.has(m.id)) drawnAt.set(m.id, opened ? performance.now() : 0);
-    const arriving = animStyle(drawnAt.get(m.id));
     if (face && faces.get(m.id)?.src !== face) faces.set(m.id, { src: face, at: opened ? performance.now() : 0 });
     const faceChanged = face ? animStyle(faces.get(m.id).at) : "";
     const isLastBot = isBot && i === lastAssistantIndex() && i === chat.messages.length - 1;
@@ -869,7 +966,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
     $("#direct-reroll", main).classList.add("is-loading");
     try {
       const text = await surpriseEvent({
-        bot, names: namesFor(), scene: chat.scene?.text ?? "", kind: storyKind, avoid: turnedDown, level: contentLevel(settings, bot),
+        bot, model: chat.model, names: namesFor(), scene: chat.scene?.text ?? "", kind: storyKind, avoid: turnedDown, level: contentLevel(settings, bot),
         note: chat.authorNote ?? "", facts: memoryContext(chat).facts ?? "",
         lines: transcript(chat.messages.slice(-10), nameOf, namesFor()),
       });
@@ -1066,13 +1163,15 @@ export async function render(main, [botId, chatId, jumpTo]) {
       ok = true;
     } catch (err) {
       const aborted = err.name === "AbortError";
-      const partial = target.swipes[si]?.trim();
+      const partial = stripBond(target.swipes[si] ?? "").trim();
       if (kind === "continue") {
         // Keep whatever was added before the stop; the reply was never empty.
+        if (partial) target.swipes[si] = partial;
       } else if (!partial) {
         if (kind === "swipe") { target.swipes.pop(); target.meta.pop(); target.swipeIndex = prevIndex; }
         else chat.messages.pop();
       } else {
+        target.swipes[si] = partial;
         target.meta[si] = { ...target.meta[si], lore: prompt.loreUsed, model: body.model };
       }
       if (!aborted) {
@@ -1085,13 +1184,13 @@ export async function render(main, [botId, chatId, jumpTo]) {
       if (pace?.id === target.id) { if (ok) finishPace(); else endPace(); }
       // Left the chat while the reply was coming in: keep what arrived, draw nothing.
       if (gone()) { await bots.touch(bot); await persist(); return; }
+      const shouldStick = nearBottom() || !!pendingError;
       setActivity("reply", null);
       setBusy(false);
       await bots.touch(bot);
       if (!pendingError && target.swipes[si]) $("#announce", main).textContent = `${speaker.name}: ${target.swipes[si]}`;
       await persist();
-      paintLog({ scroll: nearBottom() || !!pendingError });
-      toBottom();
+      paintLog({ scroll: shouldStick });
     }
     if (ok) {
       if (freshSettings.check?.auto) runCheck(target, { quiet: true });
@@ -1134,7 +1233,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
     try {
       for (const r of ranges) {
         const { chapter, facts } = parseChapter(await writeChapter({
-          bot, names: namesFor(), facts: chat.memory?.facts ?? "", lines: memoryLines(r.from, r.to),
+          bot, model: chat.model, names: namesFor(), facts: chat.memory?.facts ?? "", lines: memoryLines(r.from, r.to),
         }));
         if (!chapter) throw new Error("The model sent back an empty chapter.");
         const nextFacts = facts || chat.memory?.facts || "";
@@ -1145,7 +1244,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
       const fold = chaptersToFold(chat);
       if (fold.length) {
         const text = await summarize({
-          bot, names: namesFor(), previous: chat.memory?.text ?? "",
+          bot, model: chat.model, names: namesFor(), previous: chat.memory?.text ?? "",
           lines: fold.map((c) => `Messages ${c.from + 1}–${c.to}:\n${c.text}`).join("\n\n"),
         });
         if (!text) throw new Error("The model sent back an empty summary.");
@@ -1254,7 +1353,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
     paintLog({ scroll: false });
     try {
       const result = await checkCharacter({
-        bot: speaker, names: namesFor(speaker),
+        bot: speaker, model: chat.model, names: namesFor(speaker),
         reply: applyMacros(stripBond(currentText(m)), namesFor(speaker)),
         context: transcript(chat.messages.slice(Math.max(0, i - 4), i), nameOf, namesFor(speaker)),
       });
@@ -1377,7 +1476,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
     const speaker = speakerOf(m);
     setActivity(`avoid-${m.id}`, "Rewriting overused phrases");
     try {
-      const fresh = (await rewriteAvoiding({ bot: speaker, text, phrases })).trim();
+      const fresh = (await rewriteAvoiding({ bot: speaker, model: chat.model, text, phrases })).trim();
       if (!fresh) throw new Error("The model returned nothing.");
       if (!m.swipes) { m.swipes = [currentText(m)]; m.meta = [{}]; delete m.content; }
       const { check, usage, reasoning, ...keep } = m.meta?.[idx] ?? {};
@@ -1557,7 +1656,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
     setActivity("journal", `${bot.name} is writing in their journal…`);
     try {
       const text = await journalEntry({
-        bot, names: namesFor(), previous: chat.journal.at(-1)?.text ?? "",
+        bot, model: chat.model, names: namesFor(), previous: chat.journal.at(-1)?.text ?? "",
         lines: transcript(chat.messages.slice(Math.max(from, chat.messages.length - 40)), nameOf, namesFor()),
       });
       if (!text) throw new Error("The model sent back an empty entry.");
@@ -1578,7 +1677,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
     try {
       const upTo = chat.messages.length;
       const text = await journalEntry({
-        bot, names: namesFor(), previous: chat.journal.at(-1)?.text ?? "",
+        bot, model: chat.model, names: namesFor(), previous: chat.journal.at(-1)?.text ?? "",
         lines: transcript(chat.messages.slice(Math.max(journalFrom(), upTo - 40)), nameOf, namesFor()),
       });
       const fresh = text && await chats.get(chat.id);
@@ -1691,7 +1790,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
     paintHeader();
     try {
       const text = await updateScene({
-        bot, names: namesFor(), previous: chat.scene?.text ?? "", extra: bot.trackerLines ?? [],
+        bot, model: chat.model, names: namesFor(), previous: chat.scene?.text ?? "", extra: bot.trackerLines ?? [],
         lines: transcript(chat.messages.slice(chat.scene?.text ? -2 : -12), nameOf, namesFor()),
       });
       if (!text) throw new Error("The model sent back an empty scene.");
@@ -1881,7 +1980,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
     body.innerHTML = '<span class="skeleton skeleton-line"></span><span class="skeleton skeleton-line"></span>';
     try {
       const text = await recap({
-        bot, names: namesFor(), memory: [chat.memory?.text, ...memoryContext(chat).chapters].filter(Boolean).join("\n\n"),
+        bot, model: chat.model, names: namesFor(), memory: [chat.memory?.text, ...memoryContext(chat).chapters].filter(Boolean).join("\n\n"),
         lines: transcript(chat.messages.slice(-16), nameOf, namesFor()),
       });
       if (!text) throw new Error("The model sent back an empty recap.");
@@ -1935,7 +2034,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
       out.innerHTML = '<span class="skeleton skeleton-title"></span>' + '<span class="skeleton skeleton-line"></span>'.repeat(5);
       try {
         story = await storyFrom({
-          bot, names: namesFor(), pov: $("#st-pov", dlg).value,
+          bot, model: chat.model, names: namesFor(), pov: $("#st-pov", dlg).value,
           lines: transcript(msgs, nameOf, namesFor()), signal: aborter.signal,
         });
         if (!story) throw new Error("The model sent back an empty story.");
@@ -2032,7 +2131,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
       const [entries, allBooks] = await Promise.all([loreForBot(bot), getLorebooks()]);
       books = allBooks;
       found = await suggestLore({
-        bot, names: namesFor(), existing: entries.map((e) => e.title),
+        bot, model: chat.model, names: namesFor(), existing: entries.map((e) => e.title),
         lines: transcript(chat.messages.slice(-30), nameOf, namesFor()), signal: aborter.signal,
       });
     } catch (err) {
@@ -2210,7 +2309,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
     const partner = last ? speakerOf(last) : bot;
     try {
       ideas = await suggestReplies({
-        bot: partner, names: namesFor(partner), persona: persona()?.description ?? "",
+        bot: partner, model: chat.model, names: namesFor(partner), persona: persona()?.description ?? "",
         lines: transcript(chat.messages.slice(-8), nameOf, namesFor(partner)), signal: ideasBusy.signal,
       });
       if (!ideas.length) throw new Error("No ideas came back. Try again.");
@@ -2249,7 +2348,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
     btn.classList.add("is-loading");
     input.readOnly = true;
     try {
-      const out = await translate({ text, to: chatLanguage(), bot });
+      const out = await translate({ text, to: chatLanguage(), bot, model: chat.model });
       if (!out) throw new Error("The model sent back an empty translation.");
       draftSource = text;
       input.value = out;
@@ -2276,6 +2375,9 @@ export async function render(main, [botId, chatId, jumpTo]) {
       hint: contentLevel(settings, bot) === "explicit" ? "18+: toward sexual tension and sex, from where the story is" : "18+: toward romance and intimacy, kept implied",
       onSelect: () => surprise("heat"),
     }] : []),
+    "-",
+    { label: "New chapter / time skip", hint: "Mark a scene break · /chapter or /skip", onSelect: () => openChapterDialog() },
+    { label: "Narrator / world event", hint: "Describe what happens around you · /narrate", onSelect: () => openNarratorDialog() },
     { label: "Roll dice", hint: "A fair roll the reply has to respect · /roll d20", onSelect: openDice },
     { label: `Translate my message into ${chatLanguage()}`, hint: "Write in any language, check, then send · Alt+T", onSelect: translateOutgoing },
   ], { align: "end" }));
@@ -2287,6 +2389,110 @@ export async function render(main, [botId, chatId, jumpTo]) {
     input.focus();
   });
 
+  // ---------- Story chapters & narrator beats ----------
+  const chapterBreaks = () => chat.messages.filter((m) => m.role === "chapter");
+
+  function openChapterDialog(existing = null) {
+    if (busy) return;
+    const count = chapterBreaks().length + 1;
+    const dlg = openDialog(`
+      <form method="dialog" class="dialog-body" id="chapter-form">
+        <h2>${existing ? "Edit chapter break" : "New chapter / time skip"}</h2>
+        <p class="hint">Marks a fresh chapter or time skip in the story. ${esc(bot.name)} sees it as a scene transition, and you can jump back to it from the ⋯ menu.</p>
+        <div class="field">
+          <label for="ch-title">Chapter or scene title</label>
+          <input type="text" id="ch-title" value="${esc(existing ? existing.title : `Chapter ${count}`)}" placeholder="e.g. Chapter ${count}: The Red Ballroom" maxlength="100" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="ch-sub">Time skip or setting note <span class="count">Optional</span></label>
+          <input type="text" id="ch-sub" value="${esc(existing?.subtitle ?? "")}" placeholder="e.g. Three days later · Rain over Camelot" maxlength="140" autocomplete="off">
+        </div>
+        ${existing ? "" : `<label class="check"><input type="checkbox" id="ch-reply">
+          <span>Let ${esc(bot.name)} open the new scene<small>Leave unticked to write your own opening first.</small></span></label>`}
+        <div class="dialog-actions">
+          <button class="btn btn-ghost" value="cancel" formnovalidate>Cancel</button>
+          <button class="btn btn-primary" value="ok">${existing ? "Save" : "Add chapter break"}</button>
+        </div>
+      </form>`, {
+      onClose: async (v) => {
+        if (v !== "ok") return;
+        const title = $("#ch-title", dlg).value.trim() || `Chapter ${count}`;
+        const subtitle = $("#ch-sub", dlg).value.trim();
+        if (existing) {
+          existing.title = title;
+          existing.subtitle = subtitle;
+          await persist(); paintLog({ scroll: false });
+          toast("Chapter break updated.");
+          return;
+        }
+        chat.messages.push({ id: uid(), role: "chapter", title, subtitle, at: now() });
+        await persist(); paintLog();
+        if ($("#ch-reply", dlg)?.checked) generate("new");
+      },
+    });
+    const field = $("#ch-title", dlg);
+    field.focus(); field.select();
+  }
+
+  function openNarratorDialog(initial = "") {
+    if (busy) return;
+    const dlg = openDialog(`
+      <form method="dialog" class="dialog-body">
+        <h2>Narrator / world event</h2>
+        <p class="hint">Drop a third-person world event, arrival or atmosphere beat that is not spoken or done by ${esc(userName())}. You can also type <code>/narrate …</code> in the message box.</p>
+        <div class="field">
+          <label for="nar-text">What happens in the world</label>
+          <textarea id="nar-text" class="tall" placeholder="Outside, the bells begin to toll midnight. A cold wind pushes the tall doors ajar…">${esc(initial)}</textarea>
+        </div>
+        <label class="check"><input type="checkbox" id="nar-reply" checked>
+          <span>Have ${esc(group() ? "the next character" : bot.name)} react to this</span></label>
+        <div class="dialog-actions">
+          <button class="btn btn-ghost" value="cancel" formnovalidate>Cancel</button>
+          <button class="btn btn-primary" value="ok">Add to story</button>
+        </div>
+      </form>`, {
+      onClose: async (v) => {
+        if (v !== "ok") return;
+        const content = $("#nar-text", dlg).value.trim();
+        if (!content) return;
+        chat.messages.push({ id: uid(), role: "narrator", content, at: now() });
+        await persist(); paintLog();
+        if ($("#nar-reply", dlg).checked) generate("new");
+      },
+    });
+    const ta = $("#nar-text", dlg);
+    autosize(ta); ta.focus();
+  }
+
+  function openChaptersList() {
+    const items = chapterBreaks();
+    const dlg = openDialog(`<div class="dialog-body">
+      <h2>Chapters in this chat</h2>
+      <p class="hint">Jump straight to any chapter break or time skip in this story.</p>
+      ${items.length ? `<ul class="list" id="toc-list">${items.map((m, idx) => `
+        <li class="list-item">
+          <div class="grow">
+            <div class="title">${esc(applyMacros(m.title || `Chapter ${idx + 1}`, namesFor(bot)))}</div>
+            ${m.subtitle ? `<div class="sub">${esc(applyMacros(m.subtitle, namesFor(bot)))}</div>` : ""}
+          </div>
+          <span class="sub">${timeAgo(m.at)}</span>
+          <button class="btn btn-sm" type="button" data-jump="${m.id}">Jump</button>
+        </li>`).join("")}</ul>` : `<p class="hint">No chapter breaks yet. Add one from + → New chapter / time skip, or type <code>/chapter</code>.</p>`}
+      <div class="dialog-actions">
+        <button class="btn btn-quiet push" type="button" id="toc-add">New chapter</button>
+        <button class="btn btn-primary" type="button" id="toc-close">Close</button>
+      </div>
+    </div>`, { wide: true });
+    $("#toc-list", dlg)?.addEventListener("click", (e) => {
+      const b = e.target.closest("[data-jump]");
+      if (!b) return;
+      dlg.close();
+      scrollToMessage(b.dataset.jump);
+    });
+    $("#toc-add", dlg).addEventListener("click", () => { dlg.close(); openChapterDialog(); });
+    $("#toc-close", dlg).addEventListener("click", () => dlg.close());
+  }
+
   // ---------- Reply to a message ----------
   // The next message you send quotes this one; the model is told which line
   // you answered.
@@ -2295,7 +2501,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
   function setReply(m) {
     const text = stripBond(currentText(m)).replace(/[*_]/g, "").replace(/\s+/g, " ").trim();
     if (!text) return;
-    const name = m.role === "user" ? userName() : (speakerOf(m) ?? bot).name;
+    const name = nameOf(m);
     replyTo = { id: m.id, name, text: text.length > 140 ? `${text.slice(0, 140).replace(/\s+\S*$/, "")}…` : text };
     $("#reply-text", main).innerHTML = `Replying to <strong>${esc(name)}</strong>: “${esc(replyTo.text)}”`;
     replyBar.hidden = false;
@@ -2312,12 +2518,38 @@ export async function render(main, [botId, chatId, jumpTo]) {
     if (!text) {
       // Empty send: answer your last message, or in a group, let the next
       // character carry the scene on.
-      if (chat.messages.at(-1)?.role === "user" || group() || direction()) generate("new");
+      const lastRole = chat.messages.at(-1)?.role;
+      if (lastRole === "user" || lastRole === "narrator" || lastRole === "chapter" || group() || direction()) generate("new");
       else input.focus();
       return;
     }
     hideDraftBar();
     closeIdeas();
+    // Slash commands for story immersion: /chapter, /skip, /narrate, /roll.
+    const chapterMatch = text.match(/^\/(chapter|skip)(?:\s+([\s\S]+))?$/i);
+    if (chapterMatch) {
+      const isSkip = chapterMatch[1].toLowerCase() === "skip";
+      const rest = (chapterMatch[2] ?? "").trim();
+      input.value = ""; fitInput();
+      if (!rest) { openChapterDialog(); return; }
+      const [first, ...more] = rest.split(/\s*(?:\||—|--)\s*/);
+      const title = isSkip ? (more.length ? first : "Time skip") : first;
+      const subtitle = isSkip ? (more.length ? more.join(" · ") : first) : more.join(" · ");
+      chat.messages.push({ id: uid(), role: "chapter", title, subtitle, at: now() });
+      await persist(); paintLog();
+      toast(isSkip ? "Time skip added. Press Send (empty) to let the bot open the scene, or write yours." : "Chapter break added.");
+      return;
+    }
+    const narrateMatch = text.match(/^\/narrate(?:\s+([\s\S]+))?$/i);
+    if (narrateMatch) {
+      const rest = (narrateMatch[1] ?? "").trim();
+      input.value = ""; fitInput();
+      if (!rest) { openNarratorDialog(); return; }
+      chat.messages.push({ id: uid(), role: "narrator", content: rest, at: now() });
+      await persist(); paintLog();
+      generate("new");
+      return;
+    }
     const roll = text.startsWith("/roll") ? parseRoll(text) : null;
     if (text.startsWith("/roll") && !roll) { toast("Write a roll like /roll d20, /roll 2d6+1 or /roll d100 to open the door.", "error"); return; }
     if (roll) await addRoll(roll);
@@ -2376,15 +2608,60 @@ export async function render(main, [botId, chatId, jumpTo]) {
     });
   }
 
-  $("#composer", main).addEventListener("submit", (e) => { e.preventDefault(); send(); });
+  // ---------- Slash-command autocomplete ----------
+  const SLASH_COMMANDS = [
+    { cmd: "/chapter", insert: "/chapter ", hint: "New chapter break — /chapter Title | Subtitle" },
+    { cmd: "/skip", insert: "/skip ", hint: "Time skip divider — /skip Three days later" },
+    { cmd: "/narrate", insert: "/narrate ", hint: "3rd-person world event not spoken by you" },
+    { cmd: "/roll", insert: "/roll d20 ", hint: "Roll dice the bot must respect — /roll 2d6+1" },
+  ];
+  const slashMenu = $("#slash-menu", main);
+  let slashItems = [];
+  let slashActive = 0;
+  function closeSlash() { slashMenu.hidden = true; slashItems = []; }
+  function applySlash(item) {
+    if (!item) return;
+    input.value = item.insert;
+    closeSlash();
+    fitInput();
+    input.focus();
+  }
+  function paintSlash() {
+    const v = input.value;
+    if (!v.startsWith("/") || /\s/.test(v)) { closeSlash(); return; }
+    const q = v.toLowerCase();
+    slashItems = SLASH_COMMANDS.filter((c) => c.cmd.startsWith(q));
+    if (!slashItems.length) { closeSlash(); return; }
+    slashActive = Math.min(slashActive, slashItems.length - 1);
+    slashMenu.innerHTML = slashItems.map((c, i) => `
+      <button type="button" class="slash-item${i === slashActive ? " is-active" : ""}" role="option" aria-selected="${i === slashActive}" data-slash="${i}">
+        <code>${esc(c.cmd)}</code><span>${esc(c.hint)}</span>
+      </button>`).join("");
+    slashMenu.hidden = false;
+  }
+  input.addEventListener("input", paintSlash);
+  slashMenu.addEventListener("mousedown", (e) => {
+    const b = e.target.closest("[data-slash]");
+    if (!b) return;
+    e.preventDefault();
+    applySlash(slashItems[Number(b.dataset.slash)]);
+  });
+
+  $("#composer", main).addEventListener("submit", (e) => { e.preventDefault(); closeSlash(); send(); });
   input.addEventListener("keydown", (e) => {
+    if (!slashMenu.hidden && slashItems.length) {
+      if (e.key === "ArrowDown") { e.preventDefault(); slashActive = (slashActive + 1) % slashItems.length; paintSlash(); return; }
+      if (e.key === "ArrowUp") { e.preventDefault(); slashActive = (slashActive - 1 + slashItems.length) % slashItems.length; paintSlash(); return; }
+      if (e.key === "Tab") { e.preventDefault(); applySlash(slashItems[slashActive]); return; }
+      if (e.key === "Escape") { e.preventDefault(); closeSlash(); return; }
+    }
     if (e.key === "Escape" && replyTo && !busy && !drafting) { e.preventDefault(); clearReply(); return; }
     if (e.altKey && e.code === "KeyW") { e.preventDefault(); impersonate(); return; }
     if (e.altKey && e.code === "KeyD") { e.preventDefault(); setDirecting(directBar.hidden); return; }
     if (e.altKey && e.code === "KeyS") { e.preventDefault(); suggestBar.hidden ? showIdeas() : closeIdeas(); return; }
     if (e.altKey && e.code === "KeyT") { e.preventDefault(); translateOutgoing(); return; }
     const submit = settings.enterToSend ? e.key === "Enter" && !e.shiftKey && !e.isComposing : e.key === "Enter" && (e.ctrlKey || e.metaKey);
-    if (submit) { e.preventDefault(); send(); }
+    if (submit) { e.preventDefault(); closeSlash(); send(); }
   });
   // iPhones scroll the whole page up to make room for the keyboard and can
   // leave it there. The chat page never scrolls, so put it back.
@@ -2485,6 +2762,11 @@ export async function render(main, [botId, chatId, jumpTo]) {
       showCheck(m);
     } else if (action === "fix-avoided") {
       fixAvoided(m);
+    } else if (action === "edit-chapter") {
+      if (busy) return;
+      openChapterDialog(m);
+    } else if (action === "delete-beat") {
+      deleteMessage(m);
     } else if (action === "branch") {
       if (busy) return;
       branchFrom(i);
@@ -2533,7 +2815,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
     setActivity(`tr-${m.id}`, "Translating…");
     paintLog({ scroll: false });
     try {
-      const text = await translate({ text: stripBond(currentText(m)), to: lang, bot: speaker });
+      const text = await translate({ text: stripBond(currentText(m)), to: lang, bot: speaker, model: chat.model });
       if (!text) throw new Error("The model sent back an empty translation.");
       const tr = { lang, text };
       if (m.role === "assistant") m.meta[m.swipeIndex ?? 0] = { ...m.meta[m.swipeIndex ?? 0], translation: tr };
@@ -2662,18 +2944,32 @@ export async function render(main, [botId, chatId, jumpTo]) {
 
   function openLook() {
     const dlg = openDialog(`<div class="dialog-body look">
-      <h2>Chat look</h2>
+      <h2>Chat look &amp; atmosphere</h2>
       <p class="hint">Changes show in the chat straight away.</p>
       <div class="field"><span class="field-label">Background for ${esc(bot.name)}</span>
         <div id="look-bg">${imagePickerHTML("look-bg-file", { label: "Upload background", hint: "Cropped to 16:9 and dimmed behind the text.", cls: "bg-edit" })}</div>
         <p class="hint">${settings.chatBackground ? "Without one, this chat uses the default background from Settings." : "Only chats with this bot use it. The default for every bot is in Settings."}</p>
       </div>
       ${sliderHTML({ id: "look-dim", label: "Dim behind the text", min: 0.4, max: 0.98, step: 0.02, value: settings.backgroundDim ?? 0.86, hint: "Higher hides more of the picture. Applies to every chat." })}
+      <div class="field"><label for="look-visual">Atmosphere</label>
+        <select id="look-visual">
+          ${VISUALS.map((v) => `<option value="${v.key}" ${visualPref() === v.key ? "selected" : ""}>${esc(v.label)}</option>`).join("")}
+        </select>
+        <p class="hint" id="look-visual-hint"></p>
+      </div>
+      <fieldset class="field"><legend class="field-label">Soundscape</legend>
+        ${seg("look-sound", SOUNDS.map((s) => [s.key, s.label]), soundPref())}
+        <p class="hint">Generated gently in your browser with no downloads. Stops when you leave the chat.</p>
+      </fieldset>
+      <div id="look-vol-wrap" ${soundPref() === "off" ? "hidden" : ""}>
+        ${sliderHTML({ id: "look-vol", label: "Soundscape volume", min: 0.05, max: 0.8, step: 0.05, value: soundscape.volume })}
+      </div>
       ${bot.look ? `<div class="field"><span class="field-label">Colours</span>
         <p class="hint">${esc(bot.name)} has a look of its own (${esc(PALETTES.find((p) => p.key === bot.look.palette)?.label ?? "custom")}), used while you are in its chats.
           <a href="#/bot/${bot.id}" id="look-bot">Change it in the bot's editor</a>.</p></div>`
     : `<fieldset class="field"><legend class="field-label">Colours</legend>
         ${paletteSwatchesHTML("look-palette", getLook("palette"))}
+        <div class="segmented" id="look-season" ${getLook("palette") === "horror" ? "" : "hidden"}>${SEASONS.map((x) => `<label><input type="radio" name="look-season" value="${x.key}" ${getLook("horrorSeason") === x.key ? "checked" : ""}><span>${esc(x.label)}</span></label>`).join("")}</div>
         <p class="hint">For the whole site. More in Settings: your own accent, fonts and corners. A bot can have colours of its own, set in its editor.</p>
       </fieldset>`}
       <div class="field"><label for="look-font">Font</label>
@@ -2728,8 +3024,36 @@ export async function render(main, [botId, chatId, jumpTo]) {
       paintBackground();
       saveDim();
     });
+    const paintVisualHint = () => {
+      const v = VISUALS.find((x) => x.key === $("#look-visual", dlg).value);
+      $("#look-visual-hint", dlg).textContent = v?.hint ?? "";
+    };
+    paintVisualHint();
+    $("#look-visual", dlg).addEventListener("change", async (e) => {
+      chat.ambience = { ...(chat.ambience ?? {}), visual: e.target.value };
+      paintVisualHint();
+      paintAmbience();
+      await persist();
+    });
+    $$('input[name="look-sound"]', dlg).forEach((r) => r.addEventListener("change", async () => {
+      chat.ambience = { ...(chat.ambience ?? {}), sound: r.value };
+      soundMuted = false;
+      soundscape.set(r.value);
+      $("#look-vol-wrap", dlg).hidden = r.value === "off";
+      paintSoundButton();
+      await persist();
+    }));
+    wireSlider(dlg, "look-vol", () => {
+      const v = Number($("#look-vol", dlg).value);
+      if (Number.isFinite(v)) soundscape.setVolume(v);
+    });
     $("#look-font", dlg).addEventListener("change", (e) => setLook("chatFont", e.target.value));
-    $$('input[name="look-palette"]', dlg).forEach((r) => r.addEventListener("change", () => setLook("palette", r.value)));
+    $$('input[name="look-palette"]', dlg).forEach((r) => r.addEventListener("change", () => {
+      setLook("palette", r.value);
+      const seasonBox = $("#look-season", dlg);
+      if (seasonBox) seasonBox.hidden = r.value !== "horror";
+    }));
+    $$('input[name="look-season"]', dlg).forEach((r) => r.addEventListener("change", () => setLook("horrorSeason", r.value)));
     $$('input[name="look-actions"]', dlg).forEach((r) => r.addEventListener("change", () => setLocal("chatActions", "chatActions", r.value, "italic")));
     $$('input[name="look-quotes"]', dlg).forEach((r) => r.addEventListener("change", () => setLocal("chatQuotes", "chatQuotes", r.value, "tint")));
     $$('input[name="look-size"]', dlg).forEach((r) => r.addEventListener("change", () => setLocal("chatTextSize", "chatText", r.value, "md")));
@@ -2804,7 +3128,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
   }
   $("#persona-edit", main).addEventListener("click", editPersona);
 
-  if (bondOn) $("#bond", main).addEventListener("click", openBonds);
+  $("#bond", main).addEventListener("click", openBonds);
   $("#memory", main).addEventListener("click", openMemory);
   $("#cast", main).addEventListener("click", openCast);
   $("#scene", main).addEventListener("click", openScene);
@@ -2841,7 +3165,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
       const b = e.currentTarget;
       b.classList.add("is-loading"); b.setAttribute("aria-busy", "true");
       try {
-        const name = await nameChat({ bot, names: namesFor(), lines: transcript(chat.messages.slice(-40), nameOf, namesFor()) });
+        const name = await nameChat({ bot, model: chat.model, names: namesFor(), lines: transcript(chat.messages.slice(-40), nameOf, namesFor()) });
         if (!name) throw new Error("No name came back.");
         field.value = name;
         field.focus(); field.select();
@@ -2886,7 +3210,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
     const draft = input.value.trim();
     const speaker = pickSpeaker(draft || (chat.messages.at(-1)?.role === "user" ? chat.messages.at(-1).content : ""));
     const [s, preset, entries, conn] = await Promise.all([getSettings(), getActivePreset(), loreForBot(speaker), getActiveConnection()]);
-    const hist = draft ? [...chat.messages, { role: "user", content: draft }] : chat.messages;
+    const hist = draft ? [...chat.messages, { role: "user", content: draft, at: now() }] : chat.messages;
     const p = buildPrompt({
       bot: speaker, persona: persona(), preset, settings: s, history: withSpeakers(hist), loreEntries: entries,
       bond: bondOnFor(speaker) ? bondFor(speaker) : null,
@@ -2895,6 +3219,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
       liked: likedFor(speaker),
       repetition: s.repetition?.enabled !== false ? repetitionHints(chat.messages.filter((x) => spokeBy(x, speaker)).slice(-6).map((x) => currentText(x)),
         { userTexts: chat.messages.filter((x) => x.role === "user").slice(-10).map((x) => currentText(x)) }) : [],
+      clock: speaker.realTime ? clockNote({ gapMs: gapBefore(hist), user: userName(), char: speaker.name }) : "",
     });
     const params = generationParams(s, speaker);
     openDialog(`<div class="dialog-body">
@@ -2920,6 +3245,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
       { label: "Characters in this chat", hint: group() ? `${everyone().length} in the scene` : "Add bots for a group scene", onSelect: openCast },
     ] : []),
     { heading: "Story" },
+    { label: `Chapters (${chapterBreaks().length})`, hint: "Jump to any chapter break or time skip", onSelect: openChaptersList },
     { label: `Pinned moments (${chat.messages.filter((m) => m.pinned).length})`, hint: "Always remembered by the model", onSelect: openPinned },
     { label: `Liked replies (${(bot.liked ?? []).length})`, hint: "Style examples for this bot", onSelect: openLiked },
     { label: `${bot.name}'s journal (${chat.journal.length})`, hint: "Private diary entries about you", onSelect: openJournal },
@@ -2933,7 +3259,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
     { label: "See the prompt", hint: "Exactly what the model gets next", onSelect: previewPrompt },
     { label: "Usage in this chat", hint: "Tokens used by replies here", onSelect: openChatUsage },
     { heading: "Manage" },
-    { label: "Chat look", hint: "Background, font, text and picture size", onSelect: openLook },
+    { label: "Chat look & atmosphere", hint: "Background, weather, soundscape, colours and font", onSelect: openLook },
     { label: "Rename chat", onSelect: rename },
     { label: "Export chat", onSelect: exportChat },
     { label: "Delete chat", danger: true, onSelect: deleteChat },
@@ -2945,6 +3271,7 @@ export async function render(main, [botId, chatId, jumpTo]) {
   paintHeader();
   paintList();
   paintLog();
+  paintAmbience();
   // Coming back after a break: a few lines on where the story stands.
   if (hasConnection && settings.recap?.auto !== false && chat.messages.length >= 6 && Date.now() - lastVisit > 12 * 3600 * 1000) showRecap();
   // A bot that knows the real time can open after a long gap: one request,
@@ -2973,7 +3300,10 @@ export async function render(main, [botId, chatId, jumpTo]) {
       c("Memory", openMemory, "summary remember"),
       c("Scene tracker", openScene, "where location"),
       c("Characters in this chat", openCast, "group cast add bot"),
-      ...(bondOn ? [c("Bond", openBonds, "relationship meter chart")] : []),
+      ...(bondTarget() ? [c("Bond", openBonds, "relationship meter chart")] : []),
+      c("New chapter / time skip", () => openChapterDialog(), "chapter break skip scene divider"),
+      c("Chapters in this chat", openChaptersList, "toc table of contents jump chapter"),
+      c("Narrator / world event", () => openNarratorDialog(), "narrate narrator gm event world"),
       c("Pinned moments", openPinned, "pin remembered"),
       c(`${bot.name}'s journal`, openJournal, "diary"),
       c("Recap so far", showRecap, "summary what happened"),
@@ -2989,11 +3319,12 @@ export async function render(main, [botId, chatId, jumpTo]) {
       ...(contentLevel(settings, bot) !== "off" ? [c("Turn up the heat", () => surprise("heat"), "18+ nsfw romance intimacy sex spicy")] : []),
       c("Roll dice", openDice, "d20 roll random"),
       c(`Translate my message into ${chatLanguage()}`, translateOutgoing, "language", "Alt+T"),
+      c(chat.texting ? "Turn off text messages" : "Turn on text messages", toggleTexting, "sms phone bubbles texting"),
       c("See the prompt", previewPrompt, "debug context"),
       c("Usage in this chat", openChatUsage, "tokens cost"),
       c("Liked replies", openLiked, "heart favourite style examples best"),
       c("Author's note", openAuthorNote, "instruction direction style rule lasting always steer"),
-      c("Chat look", openLook, "background font text size appearance wallpaper avatar picture resize layout novel hide"),
+      c("Chat look & atmosphere", openLook, "background font text size appearance wallpaper avatar picture resize layout novel hide weather rain snow embers petals soundscape audio"),
       c(readOn() ? "Leave read mode" : "Read mode", toggleRead, "novel book privacy hide reading prose", "Alt+B"),
       c(sidebarHidden() ? "Show chat list" : "Hide chat list", toggleChats, "sidebar panel history focus"),
       c("Rename chat", rename, "title"),
@@ -3010,6 +3341,8 @@ export async function render(main, [botId, chatId, jumpTo]) {
       unregister();
       controller?.abort();
       drafting?.abort();
+      visualLayer.destroy();
+      soundscape.destroy();
       // Leaving after a good stretch of chat: the bot writes in its journal.
       const every = Math.max(4, Number(settings.journal?.every) || 12);
       if (settings.journal?.auto !== false && activeConn && chat.messages.length - journalFrom() >= every) journalInBackground();

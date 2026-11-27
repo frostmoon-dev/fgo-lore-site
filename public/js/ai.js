@@ -9,9 +9,9 @@ import { currentText, stripBond, applyMacros, contentLevel, contentRule } from "
 // A reply cut off by the length limit is asked for once more with more room
 // (thinking models spend part of it before writing). If it is still cut and
 // the task is prose, it ends at the last whole sentence instead of mid-word.
-export async function ask(messages, { bot, maxTokens = 800, temperature = 0.4, signal, prose = false } = {}) {
-  let res = await askOnce(messages, { bot, maxTokens, temperature, signal });
-  if (res.finishReason === "length") res = await askOnce(messages, { bot, maxTokens: Math.min(8000, Math.ceil(maxTokens * 2.5)), temperature, signal });
+export async function ask(messages, { bot, model = "", maxTokens = 800, temperature = 0.4, signal, prose = false } = {}) {
+  let res = await askOnce(messages, { bot, model, maxTokens, temperature, signal });
+  if (res.finishReason === "length") res = await askOnce(messages, { bot, model, maxTokens: Math.min(8000, Math.ceil(maxTokens * 2.5)), temperature, signal });
   let text = String(res.content ?? "").trim();
   if (prose && res.finishReason === "length") text = toLastSentence(text);
   return text;
@@ -25,7 +25,7 @@ export function toLastSentence(text) {
   return end > text.length / 3 ? text.slice(0, end).trim() : text;
 }
 
-async function askOnce(messages, { bot, maxTokens, temperature, signal }) {
+async function askOnce(messages, { bot, model = "", maxTokens, temperature, signal }) {
   const [conn, settings] = await Promise.all([getActiveConnection(), getSettings()]);
   if (!conn) throw new Error("Set up an API connection first, on the Connection page.");
   // Every task follows the same content level as the chat itself, so a
@@ -33,7 +33,7 @@ async function askOnce(messages, { bot, maxTokens, temperature, signal }) {
   const rule = contentRule(contentLevel(settings, bot));
   if (rule && messages[0]?.role === "system") messages = [{ ...messages[0], content: `${messages[0].content}\n\n${rule}` }, ...messages.slice(1)];
   const res = await chatCompletion(conn, {
-    model: bot?.model || conn.model || undefined,
+    model: model || bot?.model || conn.model || undefined,
     messages, stream: false, max_tokens: maxTokens, temperature,
   }, { signal, purpose: "task" });
   window.dispatchEvent(new CustomEvent("api-status", { detail: true }));
@@ -57,8 +57,18 @@ export function parseJSON(text) {
 // "Name: text" lines, for tasks that read a chat rather than continue it.
 export function transcript(messages, nameOf, names) {
   return messages
-    .map((m) => `${nameOf(m)}: ${applyMacros(stripBond(currentText(m)), names).trim()}`)
-    .filter((line) => !line.endsWith(": "))
+    .map((m) => {
+      if (m.role === "chapter") {
+        const text = applyMacros(currentText(m), names).trim();
+        return text ? `--- ${text} ---` : "";
+      }
+      if (m.role === "narrator") {
+        const text = applyMacros(stripBond(currentText(m)), names).trim();
+        return text ? `Narrator: ${text}` : "";
+      }
+      return `${nameOf(m)}: ${applyMacros(stripBond(currentText(m)), names).trim()}`;
+    })
+    .filter((line) => line && !line.endsWith(": "))
     .join("\n\n");
 }
 
@@ -66,7 +76,7 @@ const clip = (s, n) => (String(s ?? "").length > n ? `${String(s).slice(0, n)}�
 
 // ---------- Memory ----------
 
-export async function summarize({ bot, names, previous, lines, signal }) {
+export async function summarize({ bot, model = "", names, previous, lines, signal }) {
   const system =
     `You keep the memory for a long roleplay between ${names.user} and ${names.char}. ` +
     "Write a compact summary a writer could use to continue the story without the full chat. Include: key events in order, " +
@@ -74,12 +84,12 @@ export async function summarize({ bot, names, previous, lines, signal }) {
     "Use short bullet points under the headings Events, Facts, Relationship and Now. Past tense for events. No commentary. " +
     "Keep it under 350 words. Keep what still matters from the previous summary and drop what no longer does.";
   const user = `${previous?.trim() ? `Previous summary:\n${previous.trim()}\n\n` : ""}New messages:\n\n${lines}`;
-  return ask([{ role: "system", content: system }, { role: "user", content: user }], { bot, maxTokens: 700, signal });
+  return ask([{ role: "system", content: system }, { role: "user", content: user }], { bot, model, maxTokens: 700, signal });
 }
 
 // One chapter of a long chat, plus the updated list of lasting facts. The
 // facts are rewritten in full each time, so outdated ones can be dropped.
-export async function writeChapter({ bot, names, facts, lines, signal }) {
+export async function writeChapter({ bot, model = "", names, facts, lines, signal }) {
   const system =
     `You keep the memory for a long roleplay between ${names.user} and ${names.char}. ` +
     "Answer in exactly two sections.\n\n" +
@@ -91,12 +101,12 @@ export async function writeChapter({ bot, names, facts, lines, signal }) {
     "drop ones that no longer matter, and add new ones. At most 25 bullets.";
   const user = `Current facts:\n${facts?.trim() || "(none yet)"}\n\nNew messages:\n\n${lines}\n\n` +
     "Reply in this format:\nCHAPTER:\n- ...\nFACTS:\n- ...";
-  return ask([{ role: "system", content: system }, { role: "user", content: user }], { bot, maxTokens: 900, signal });
+  return ask([{ role: "system", content: system }, { role: "user", content: user }], { bot, model, maxTokens: 900, signal });
 }
 
 // ---------- Lore suggestions ----------
 
-export async function suggestLore({ bot, names, lines, existing, signal }) {
+export async function suggestLore({ bot, model = "", names, lines, existing, signal }) {
   const system =
     "You maintain a lorebook for a roleplay. Read the chat and propose new lore entries for lasting facts that came up: " +
     "places, people, groups, objects, events, rules of the world. Skip small talk and anything already covered by an existing title. " +
@@ -105,7 +115,7 @@ export async function suggestLore({ bot, names, lines, existing, signal }) {
     '"keywords" (2 to 5 lowercase words or names that would appear in text about it), and "content" (2 to 4 factual sentences). ' +
     "Return [] if nothing is worth saving.";
   const user = `Existing lore titles: ${existing.length ? existing.join(", ") : "none"}\n\nChat between ${names.user} and ${names.char}:\n\n${lines}`;
-  const list = parseJSON(await ask([{ role: "system", content: system }, { role: "user", content: user }], { bot, maxTokens: 1400, signal }));
+  const list = parseJSON(await ask([{ role: "system", content: system }, { role: "user", content: user }], { bot, model, maxTokens: 1400, signal }));
   if (!Array.isArray(list)) throw new Error("The model did not return a list of entries.");
   return list
     .filter((e) => e && typeof e.title === "string" && typeof e.content === "string" && e.title.trim() && e.content.trim())
@@ -209,7 +219,7 @@ export async function sortDefinition({ text, signal }) {
 
 // ---------- Character check ----------
 
-export async function checkCharacter({ bot, names, reply, context, signal }) {
+export async function checkCharacter({ bot, model = "", names, reply, context, signal }) {
   const definition = applyMacros([bot.description, bot.personality && `Personality: ${bot.personality}`].filter(Boolean).join("\n\n"), names);
   const system =
     `You are an editor checking whether a roleplay reply stays true to ${names.char}. ` +
@@ -217,14 +227,14 @@ export async function checkCharacter({ bot, names, reply, context, signal }) {
     `contradicting established facts, speaking or acting for ${names.user}, or mentioning being an AI. Do not flag style preferences. ` +
     'Answer with JSON only: {"ok": true or false, "issues": [short strings, at most 4], "fix": "one sentence on how to fix it, or empty"}.';
   const user = `Character definition:\n${clip(definition, 6000)}\n\nRecent context:\n${clip(context, 3000)}\n\nReply to check:\n${reply}`;
-  const out = parseJSON(await ask([{ role: "system", content: system }, { role: "user", content: user }], { bot, maxTokens: 400, temperature: 0.2, signal }));
+  const out = parseJSON(await ask([{ role: "system", content: system }, { role: "user", content: user }], { bot, model, maxTokens: 400, temperature: 0.2, signal }));
   const issues = (Array.isArray(out?.issues) ? out.issues : []).map(String).filter(Boolean).slice(0, 4);
   return { ok: out?.ok !== false && !issues.length, issues, fix: typeof out?.fix === "string" ? out.fix : "" };
 }
 
 // ---------- Phrases to avoid ----------
 // Rewrites only the sentences that use a listed phrase; everything else stays word for word.
-export async function rewriteAvoiding({ bot, text, phrases, signal }) {
+export async function rewriteAvoiding({ bot, model = "", text, phrases, signal }) {
   const system =
     "You are a careful prose editor. Rewrite only the sentences that contain one of the listed phrases, " +
     "so they say the same thing in fresher words without any listed phrase or a close variant. " +
@@ -232,12 +242,12 @@ export async function rewriteAvoiding({ bot, text, phrases, signal }) {
     "Do not add, remove or reorder anything else. Reply with the full rewritten text only, no notes.";
   const user = `Phrases to remove:\n${phrases.map((p) => `- ${p}`).join("\n")}\n\nText:\n${text}`;
   return ask([{ role: "system", content: system }, { role: "user", content: user }],
-    { bot, maxTokens: Math.min(8000, Math.ceil(text.length / 3) + 400), temperature: 0.5, signal, prose: true });
+    { bot, model, maxTokens: Math.min(8000, Math.ceil(text.length / 3) + 400), temperature: 0.5, signal, prose: true });
 }
 
 // ---------- Reply suggestions ----------
 
-export async function suggestReplies({ bot, names, persona, lines, signal }) {
+export async function suggestReplies({ bot, model = "", names, persona, lines, signal }) {
   const system =
     `You help ${names.user} decide what to do next in a roleplay with ${names.char}. ` +
     `Offer three clearly different options for ${names.user}'s next message: for example one bold, one careful, one that changes direction. ` +
@@ -245,7 +255,7 @@ export async function suggestReplies({ bot, names, persona, lines, signal }) {
     'Answer with JSON only: an array of 3 objects with "label" (2 to 5 words, an action, e.g. "Call her bluff") and ' +
     `"text" (the full message in ${names.user}'s voice, 1 to 3 sentences, actions in *asterisks*).`;
   const user = `${persona?.trim() ? `About ${names.user}:\n${persona.trim()}\n\n` : ""}Recent chat:\n\n${lines}`;
-  const list = parseJSON(await ask([{ role: "system", content: system }, { role: "user", content: user }], { bot, maxTokens: 600, temperature: 0.9, signal }));
+  const list = parseJSON(await ask([{ role: "system", content: system }, { role: "user", content: user }], { bot, model, maxTokens: 600, temperature: 0.9, signal }));
   if (!Array.isArray(list)) throw new Error("The model did not return a list of options.");
   return list
     .filter((o) => o && typeof o.text === "string" && o.text.trim())
@@ -255,17 +265,17 @@ export async function suggestReplies({ bot, names, persona, lines, signal }) {
 
 // ---------- Translation ----------
 
-export async function translate({ text, to, bot, signal }) {
+export async function translate({ text, to, bot, model = "", signal }) {
   const system =
     `Translate the user's text into ${to}. Keep the meaning, tone and formatting exactly: *asterisk actions*, "quotes", ` +
     "names, line breaks and markdown. Do not add notes, explanations or quotation marks around the result. Output only the translation.";
-  return ask([{ role: "system", content: system }, { role: "user", content: text }], { bot, maxTokens: 1600, temperature: 0.2, signal });
+  return ask([{ role: "system", content: system }, { role: "user", content: text }], { bot, model, maxTokens: 1600, temperature: 0.2, signal });
 }
 
 // ---------- Scene tracker ----------
 
 // extra: more lines this bot tracks, such as Sanity or Inventory.
-export async function updateScene({ bot, names, previous, lines, extra = [], signal }) {
+export async function updateScene({ bot, model = "", names, previous, lines, extra = [], signal }) {
   const labels = ["Location", "Time", "Present", "Mood", "Appearance", "Holding", ...extra].map((l) => `"${l}:"`).join(", ");
   const system =
     `You track the current state of a roleplay scene between ${names.user} and ${names.char}. ` +
@@ -273,23 +283,23 @@ export async function updateScene({ bot, names, previous, lines, extra = [], sig
     `each starting with its label: ${labels}. ` +
     "Keep each line short. Carry details forward unless the messages change them. Write unknown if nothing is known. No other text.";
   const user = `${previous?.trim() ? `Previous state:\n${previous.trim()}\n\n` : ""}Latest messages:\n\n${lines}`;
-  return ask([{ role: "system", content: system }, { role: "user", content: user }], { bot, maxTokens: 300 + extra.length * 40, temperature: 0.2, signal });
+  return ask([{ role: "system", content: system }, { role: "user", content: user }], { bot, model, maxTokens: 300 + extra.length * 40, temperature: 0.2, signal });
 }
 
 // ---------- Recap ----------
 
-export async function recap({ bot, names, memory, lines, signal }) {
+export async function recap({ bot, model = "", names, memory, lines, signal }) {
   const system =
     `Write a short "previously on" recap of a roleplay between ${names.user} and ${names.char}, to help ${names.user} pick the story back up. ` +
     `Two to four sentences of plain prose, past tense, ending with where things stand right now. Refer to ${names.user} as "you". No headings, no lists.`;
   const user = `${memory?.trim() ? `Summary of earlier events:\n${memory.trim()}\n\n` : ""}Most recent messages, for reference only (do not continue them):\n<chat>\n${lines}\n</chat>\n\n` +
     `Now write the recap: two to four sentences, past tense, addressing ${names.user} as "you". Do not continue the scene.`;
-  return ask([{ role: "system", content: system }, { role: "user", content: user }], { bot, maxTokens: 500, temperature: 0.5, signal, prose: true });
+  return ask([{ role: "system", content: system }, { role: "user", content: user }], { bot, model, maxTokens: 500, temperature: 0.5, signal, prose: true });
 }
 
 // ---------- Story ----------
 
-export async function storyFrom({ bot, names, lines, pov, signal }) {
+export async function storyFrom({ bot, model = "", names, lines, pov, signal }) {
   const voice = pov === "char"
     ? `first person, from ${names.char}'s point of view, past tense`
     : "third person, past tense";
@@ -297,16 +307,16 @@ export async function storyFrom({ bot, names, lines, pov, signal }) {
     `Rewrite this roleplay chat as a piece of fiction in ${voice}. Keep every event, choice and important line of dialogue, in order. ` +
     "Turn actions and dialogue into flowing prose with paragraphs; trim repetition and out-of-story chatter. Do not add new plot events. " +
     "Start with a short title on its own line, prefixed with #. Use markdown paragraphs only.";
-  return ask([{ role: "system", content: system }, { role: "user", content: clip(lines, 24000) }], { bot, maxTokens: 3200, temperature: 0.7, signal });
+  return ask([{ role: "system", content: system }, { role: "user", content: clip(lines, 24000) }], { bot, model, maxTokens: 3200, temperature: 0.7, signal });
 }
 
 // ---------- Chat names ----------
 
-export async function nameChat({ bot, names, lines, signal }) {
+export async function nameChat({ bot, model = "", names, lines, signal }) {
   const system =
     `Suggest a title for this roleplay chat between ${names.user} and ${names.char}, like a chapter title: ` +
     "2 to 6 words, specific to what happened, no quotes, no trailing punctuation. Answer with the title only.";
-  const out = await ask([{ role: "system", content: system }, { role: "user", content: clip(lines, 8000) }], { bot, maxTokens: 30, temperature: 0.8, signal });
+  const out = await ask([{ role: "system", content: system }, { role: "user", content: clip(lines, 8000) }], { bot, model, maxTokens: 30, temperature: 0.8, signal });
   return out.split("\n")[0].replace(/^["'“”#\s]+|["'“”.\s]+$/g, "").slice(0, 60);
 }
 
@@ -322,7 +332,7 @@ export function looksLikeDiary(text) {
   return firstPerson >= 3;
 }
 
-export async function journalEntry({ bot, names, previous, lines, signal }) {
+export async function journalEntry({ bot, model = "", names, previous, lines, signal }) {
   // Without knowing who the character is, models lose track of whose diary
   // it is and write as the user. So: the definition, and plain roles.
   const who = applyMacros([bot?.personality, bot?.description].filter((t) => t?.trim()).join("\n\n"), names).slice(0, 1800);
@@ -338,7 +348,7 @@ export async function journalEntry({ bot, names, previous, lines, signal }) {
     `80 to 160 words. Do not continue the scene, do not write dialogue or actions, and do not narrate in the third person.`;
   const user = (reminder) => `${previous?.trim() ? `Your last journal entry:\n${previous.trim()}\n\n` : ""}` +
     `The chat since then, for reference only (do not continue it):\n<chat>\n${lines}\n</chat>\n\n${reminder}`;
-  const opts = { bot, maxTokens: 400, temperature: 0.8, signal, prose: true };
+  const opts = { bot, model, maxTokens: 400, temperature: 0.8, signal, prose: true };
   let text = await ask([{ role: "system", content: system }, { role: "user", content: user(ask1) }], opts);
   if (looksLikeDiary(text)) return text;
   text = await ask([{ role: "system", content: system }, { role: "user", content: user(`${ask1} Start with "I". This is ${names.char}'s diary, not a story.`) }], { ...opts, temperature: 0.6 });
@@ -377,7 +387,7 @@ const STORY_MOVES = {
   },
 };
 
-export async function surpriseEvent({ bot, names, lines, scene, facts = "", note = "", avoid = [], kind = "plot", level = "off", signal }) {
+export async function surpriseEvent({ bot, model = "", names, lines, scene, facts = "", note = "", avoid = [], kind = "plot", level = "off", signal }) {
   if (kind === "heat" && level === "off") throw new Error("Mature content is off for this chat. Turn it on in Settings → Mature content.");
   const move = kind === "heat"
     ? `${STORY_MOVES.heat[level] ?? STORY_MOVES.heat.mature} Both characters are adults. It sets up the moment; ${names.user} stays free to respond however they choose.`
@@ -394,6 +404,6 @@ export async function surpriseEvent({ bot, names, lines, scene, facts = "", note
     avoid.length && `Already suggested and turned down; suggest something clearly different:\n${avoid.map((a) => `- ${a}`).join("\n")}`,
     `Recent chat:\n\n${lines}`,
   ].filter(Boolean).join("\n\n");
-  const out = await ask([{ role: "system", content: system }, { role: "user", content: user }], { bot, maxTokens: 160, temperature: 0.95, signal });
+  const out = await ask([{ role: "system", content: system }, { role: "user", content: user }], { bot, model, maxTokens: 160, temperature: 0.95, signal });
   return out.replace(/^["“]|["”]$/g, "").trim();
 }

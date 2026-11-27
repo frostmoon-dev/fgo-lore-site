@@ -505,7 +505,12 @@ small { font-size: var(--t-sm); }
 @media (max-width: 700px) {
   .header-inner { flex-wrap: wrap; gap: var(--s2) var(--s3); padding-top: var(--s2); min-height: 0; }
   .brand { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-  .main-nav { order: 3; flex-basis: 100%; margin: 0 calc(-1 * var(--s4)); padding: 0 var(--s4) var(--s2); }
+  .main-nav { order: 3; flex-basis: 100%; margin: 0 calc(-1 * var(--s4)); padding: 0 0 var(--s2); }
+  .main-nav ul {
+    padding: 0 var(--s6) 0 var(--s4);
+    -webkit-mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 28px), transparent 100%);
+    mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 28px), transparent 100%);
+  }
 }
 
 /* ---------- Page scaffolding ---------- */
@@ -1018,15 +1023,25 @@ body.in-chat .site-footer { display: none; }
 .thought-label { display: block; font-family: var(--font); font-style: normal; font-size: var(--t-xs); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
 button.thought-chip { cursor: pointer; font: inherit; font-size: var(--t-sm); }
 :root[data-chat-read="on"] .thought, :root[data-chat-read="on"] .away-bar { display: none !important; }
-/* Where and when, from the scene tracker. Opens it on a click. */
+/* Where and when, plus Mood and custom tracker pills, from the scene tracker. Opens it on a click. */
 .scene-strip {
-  display: flex; align-items: center; gap: var(--s2); width: 100%; min-height: 32px; padding: var(--s1) var(--s4);
+  display: flex; align-items: center; flex-wrap: wrap; gap: var(--s1) var(--s2); width: 100%; min-height: 32px; padding: var(--s1) var(--s4);
   border: 0; border-bottom: 1px solid var(--line); background: var(--surface); color: var(--muted);
   font: inherit; font-size: var(--t-sm); text-align: left; cursor: pointer;
 }
 .scene-strip[hidden] { display: none; }
 .scene-strip svg { width: 14px; height: 14px; flex: none; }
-.scene-strip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scene-strip-main { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.scene-strip-main:empty { display: none; }
+.scene-chips { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-left: auto; }
+.scene-chips:empty { display: none; }
+.scene-chip {
+  display: inline-flex; align-items: center; gap: 3px; padding: 1px 8px; border-radius: var(--r-pill);
+  background: var(--fill); color: var(--ink); font-size: var(--t-xs); line-height: 1.5; max-width: 24ch;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.scene-chip strong { font-weight: 600; color: var(--muted); }
+.scene-chip.is-mood { background: var(--accent-soft); color: var(--ink); font-style: italic; }
 @media (hover: hover) { .scene-strip:hover { color: var(--ink); background: var(--fill); } }
 :root[data-chat-read="on"] .scene-strip { display: none; }
 
@@ -1245,7 +1260,9 @@ button.thought-chip { cursor: pointer; font: inherit; font-size: var(--t-sm); }
 .chat-bg-old { animation: bg-out 800ms var(--ease) forwards; }
 @keyframes bg-out { to { opacity: 0; } }
 .chat-bg::after { content: ""; position: absolute; inset: 0; background: var(--bg); opacity: var(--bg-dim, .86); }
-.chat-main.has-bg > *:not(.chat-bg) { position: relative; z-index: 1; }
+.chat-ambience { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; }
+.chat-ambience[hidden] { display: none; }
+.chat-main > *:not(.chat-bg):not(.chat-ambience) { position: relative; z-index: 2; }
 .chat-main.has-bg .chat-topbar, .chat-main.has-bg .composer { background: color-mix(in srgb, var(--bg) 90%, transparent); }
 /* Words keep a plain background of their own. */
 .chat-main.has-bg .msg-body {
@@ -1265,6 +1282,7 @@ button.thought-chip { cursor: pointer; font: inherit; font-size: var(--t-sm); }
 :root[data-chat-read="on"] body.in-chat .site-header,
 :root[data-chat-read="on"] .chat-sidebar,
 :root[data-chat-read="on"] .chat-bg,
+:root[data-chat-read="on"] .chat-ambience,
 :root[data-chat-read="on"] .chat-topbar,
 :root[data-chat-read="on"] .msg > .avatar,
 :root[data-chat-read="on"] .msg > .avatar-link,
@@ -2142,6 +2160,202 @@ html { -webkit-tap-highlight-color: transparent; }
    and so do actions beside speech; emphasis inside a quote stays. */
 :root[data-chat-narration="hide"] .msg-body > p.act { display: none; }
 :root[data-chat-narration="hide"] .msg-body em:not(.q em) { display: none; }
+
+/* ---------- Horror Story: Apocalypse (Outpost 3) ----------
+   Nuclear winter fallout ash, charred obsidian, sulphur gold and Antichrist
+   ember crimson. Cards carry a double charred-gold bunker rule; titles smoulder
+   in dark mode. Contrast: ink > 13:1, muted & accent > 5:1. */
+:root[data-palette="horror"][data-season="apocalypse"] {
+  --bg: #e5ded2; --surface: #efe9de; --raised: #f7f2e8;
+  --ink: #181310; --muted: #5c5045; --narration: #4d4238;
+  --line: #cfc5b4; --line-strong: #7b6c5c; --fill: #dbd2c2; --fill-strong: #cec3b0;
+  --primary: #7c1c12; --primary-hover: #5f140c; --on-primary: #faf3e8;
+  --accent: #854f00; --accent-hover: #673d00; --on-accent: #ffffff; --accent-soft: #eddcb9;
+  --danger: #8f1812; --ok: #4b5d34;
+  --rough: url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2748%27 height=%2748%27 viewBox=%270 0 48 48%27 fill=%27none%27 stroke=%27%23594633%27 stroke-linecap=%27round%27%3E %3Cpath stroke-width=%271.7%27 d=%27M.6 4.6C9 3.7 17 5.4 25 4.4S39 5 47.4 3.9%27/%3E %3Cpath stroke-width=%27.7%27 d=%27M2 6.2C14 5.6 30 6.6 46 5.7%27 opacity=%27.55%27/%3E %3Cpath stroke-width=%271.5%27 d=%27M4.3.6C3.5 10 5.2 19 4.2 28S4.9 40 3.8 47.4%27/%3E %3Cpath stroke-width=%271.7%27 d=%27M.6 43.5C10 44.6 20 42.9 31 44.2S42 43.3 47.4 44.4%27/%3E %3Cpath stroke-width=%271.5%27 d=%27M43.6.6C44.5 11 43 22 44.3 32S43.4 41 44.5 47.4%27/%3E %3Cpath stroke-width=%27.6%27 d=%27M41.5 2.2l4.6 3.9M2.4 41.6l3.7 4.4%27 opacity=%27.6%27/%3E %3C/svg%3E");
+}
+:root[data-palette="horror"][data-season="apocalypse"][data-theme="dark"] {
+  --bg: #0b0908; --surface: #14110f; --raised: #1c1714;
+  --ink: #ece3d4; --muted: #ab9e8a; --narration: #d1c5b2;
+  --line: #2d251e; --line-strong: #7a6854; --fill: #211b17; --fill-strong: #2d241e;
+  --primary: #9e2317; --primary-hover: #bc2b1d; --on-primary: #faf1e4;
+  --accent: #e3a334; --accent-hover: #f0ba59; --on-accent: #170f03; --accent-soft: #362712;
+  --danger: #f56852; --ok: #9fb886;
+  --vignette: radial-gradient(ellipse at center, transparent 46%, rgba(35, 10, 4, .65) 100%);
+  --rough: url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2748%27 height=%2748%27 viewBox=%270 0 48 48%27 fill=%27none%27 stroke=%27%238f7248%27 stroke-linecap=%27round%27%3E %3Cpath stroke-width=%271.7%27 d=%27M.6 4.6C9 3.7 17 5.4 25 4.4S39 5 47.4 3.9%27/%3E %3Cpath stroke-width=%27.7%27 d=%27M2 6.2C14 5.6 30 6.6 46 5.7%27 opacity=%27.55%27/%3E %3Cpath stroke-width=%271.5%27 d=%27M4.3.6C3.5 10 5.2 19 4.2 28S4.9 40 3.8 47.4%27/%3E %3Cpath stroke-width=%271.7%27 d=%27M.6 43.5C10 44.6 20 42.9 31 44.2S42 43.3 47.4 44.4%27/%3E %3Cpath stroke-width=%271.5%27 d=%27M43.6.6C44.5 11 43 22 44.3 32S43.4 41 44.5 47.4%27/%3E %3Cpath stroke-width=%27.6%27 d=%27M41.5 2.2l4.6 3.9M2.4 41.6l3.7 4.4%27 opacity=%27.6%27/%3E %3C/svg%3E");
+}
+:root[data-palette="horror"][data-season="apocalypse"] .card,
+:root[data-palette="horror"][data-season="apocalypse"] dialog {
+  box-shadow: inset 0 3px 0 var(--accent), inset 0 0 0 1px color-mix(in srgb, var(--primary) 45%, transparent), var(--shadow-1);
+}
+:root[data-palette="horror"][data-season="apocalypse"][data-theme="dark"] h1 {
+  color: #f4be5e;
+  text-shadow: 0 0 6px rgba(227, 163, 52, .7), 0 0 18px rgba(188, 43, 29, .65), 0 0 34px rgba(158, 35, 23, .45);
+  filter: url(#mp-scratch);
+}
+
+/* ---------- Frostmoon ----------
+   Midnight indigo, winter silver and moonlight, crafted for quiet late-night
+   story reading. Contrast: ink > 15:1, muted > 6:1, accent > 6.7:1. */
+:root[data-palette="frostmoon"] {
+  --bg: #edf1f7; --surface: #f7f9fd; --raised: #ffffff;
+  --ink: #141926; --muted: #505b73; --narration: #444e66;
+  --line: #d8e0ec; --line-strong: #73809b; --fill: #e3e9f3; --fill-strong: #d4deed;
+  --primary: #1f2b48; --primary-hover: #2c3d66; --on-primary: #f5f8ff;
+  --accent: #3f4aa6; --accent-hover: #313b8c; --on-accent: #ffffff; --accent-soft: #dfe4fa;
+  --danger: #a32c3d; --ok: #2e6b4f;
+  --shadow-1: 0 1px 3px rgba(20, 28, 52, .07);
+  --shadow-2: 0 14px 36px rgba(20, 28, 52, .16);
+  --scrim: rgba(15, 20, 38, .48);
+}
+:root[data-palette="frostmoon"][data-theme="dark"] {
+  --bg: #0a0e17; --surface: #111726; --raised: #172035;
+  --ink: #e8effa; --muted: #9aa9c4; --narration: #c8d4ea;
+  --line: #212c45; --line-strong: #627396; --fill: #1a2338; --fill-strong: #232f4a;
+  --primary: #d9e6ff; --primary-hover: #ffffff; --on-primary: #0d1424;
+  --accent: #8cb8ff; --accent-hover: #adcfff; --on-accent: #091324; --accent-soft: #1a2b4d;
+  --danger: #f58b99; --ok: #88cba9;
+  --shadow-1: 0 1px 3px rgba(0, 0, 0, .4);
+  --shadow-2: 0 16px 40px rgba(0, 0, 0, .62);
+  --scrim: rgba(5, 8, 16, .68);
+}
+:root[data-palette="frostmoon"][data-theme="dark"] body::before {
+  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  background: radial-gradient(ellipse 80% 45% at 50% -10%, rgba(140, 184, 255, .13), transparent 70%);
+}
+:root[data-palette="frostmoon"][data-theme="dark"] :is(.card, dialog, .bot-card) {
+  box-shadow: inset 0 1px 0 rgba(217, 230, 255, .12), var(--shadow-1);
+}
+:root[data-palette="frostmoon"] .msg.is-opening .msg-body > p:first-child::first-letter {
+  float: left; margin: .05em .12em 0 0; font-family: var(--font-display); font-size: 3em; line-height: .84;
+  font-style: normal; color: var(--accent);
+}
+:root[data-palette="frostmoon"] .msg-body .q { color: color-mix(in srgb, var(--accent) 42%, var(--ink)); }
+:root[data-palette="frostmoon"][data-chat-quotes="plain"] .msg-body .q { color: inherit; }
+
+/* ---------- Baobhan Sith (Fate/Grand Order) ----------
+   Fairy Knight Tristan: porcelain and obsidian velvet, crimson-rose heels,
+   delicate lace-trimmed inner borders and thorny baroque elegance.
+   Contrast: ink > 16:1, muted > 6.5:1, accent > 6.5:1. */
+:root[data-palette="sith"] {
+  --bg: #f6eef1; --surface: #fdf8fa; --raised: #ffffff;
+  --ink: #1d1016; --muted: #694d59; --narration: #593f4b;
+  --line: #ebd8df; --line-strong: #8f6b7a; --fill: #f0e1e7; --fill-strong: #e5cfd8;
+  --primary: #6e0d2b; --primary-hover: #530920; --on-primary: #fdf6f8;
+  --accent: #a81040; --accent-hover: #870c33; --on-accent: #ffffff; --accent-soft: #f8d8e3;
+  --danger: #9e122b; --ok: #386646;
+  --shadow-1: 0 1px 3px rgba(52, 12, 26, .08);
+  --shadow-2: 0 14px 36px rgba(52, 12, 26, .18);
+  --scrim: rgba(24, 6, 12, .52);
+}
+:root[data-palette="sith"][data-theme="dark"] {
+  --bg: #0d070a; --surface: #160c11; --raised: #201118;
+  --ink: #f5e9ee; --muted: #b89aa7; --narration: #dec9d2;
+  --line: #311a24; --line-strong: #805769; --fill: #24131b; --fill-strong: #321a26;
+  --primary: #a6133f; --primary-hover: #c4184c; --on-primary: #fdf4f7;
+  --accent: #ff759f; --accent-hover: #ff99b8; --on-accent: #1a050c; --accent-soft: #3d1223;
+  --danger: #ff7a8a; --ok: #95c49c;
+  --shadow-1: 0 2px 6px rgba(0, 0, 0, .45);
+  --shadow-2: 0 16px 44px rgba(0, 0, 0, .68);
+  --scrim: rgba(8, 2, 5, .72);
+}
+:root[data-palette="sith"][data-theme="dark"] body::before {
+  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  background: radial-gradient(ellipse at center, transparent 52%, rgba(88, 8, 34, .28) 100%);
+}
+/* Lace-trimmed double inner frame on cards and dialogs. */
+:root[data-palette="sith"] :is(.card, dialog) {
+  box-shadow: inset 0 0 0 4px var(--surface), inset 0 0 0 5px color-mix(in srgb, var(--accent) 34%, var(--line)), var(--shadow-1);
+}
+:root[data-palette="sith"] dialog {
+  box-shadow: inset 0 0 0 4px var(--raised), inset 0 0 0 5px color-mix(in srgb, var(--accent) 42%, var(--line)), var(--shadow-2);
+}
+:root[data-palette="sith"] h1 { letter-spacing: .01em; font-weight: 600; }
+:root[data-palette="sith"] .msg.is-opening .msg-body > p:first-child::first-letter {
+  float: left; margin: .05em .12em 0 0; font-family: var(--font-display); font-size: 3.1em; line-height: .82;
+  font-style: normal; color: var(--accent);
+}
+:root[data-palette="sith"] .msg-body .q { color: color-mix(in srgb, var(--accent) 48%, var(--ink)); }
+:root[data-palette="sith"][data-chat-quotes="plain"] .msg-body .q { color: inherit; }
+:root[data-palette="sith"] .bot-card { border-color: color-mix(in srgb, var(--accent) 26%, var(--line)); }
+
+/* ---------- Story chapter breaks & narrator beats ---------- */
+.story-chapter {
+  position: relative; margin: var(--s5) auto var(--s4); padding: var(--s3) var(--s4);
+  text-align: center; max-width: var(--measure);
+}
+.chapter-rule { display: flex; align-items: center; gap: var(--s3); margin-bottom: var(--s2); color: var(--accent); }
+.chapter-rule span { flex: 1; height: 1px; background: linear-gradient(90deg, transparent, var(--line-strong), transparent); }
+.chapter-rule i { font-style: normal; font-size: var(--t-sm); line-height: 1; opacity: .85; }
+.chapter-title {
+  font-family: var(--font-display); font-size: var(--t-lg); font-weight: 600; color: var(--ink);
+  letter-spacing: .02em; line-height: var(--lh-tight);
+}
+.chapter-sub { margin: var(--s1) 0 0; font-family: var(--chat-font, var(--font)); font-style: italic; font-size: var(--t-sm); color: var(--muted); }
+.chapter-tools {
+  position: absolute; top: var(--s2); right: 0; display: inline-flex; gap: 2px;
+  opacity: 0; transition: opacity var(--dur) var(--ease);
+}
+.story-chapter:is(:hover, :focus-within, .tools-open) .chapter-tools { opacity: 1; }
+:root[data-chat-read="on"] .chapter-tools { display: none; }
+:root[data-palette="horror"] .chapter-title { text-transform: uppercase; letter-spacing: .08em; color: var(--accent); }
+:root[data-palette="sith"] .chapter-rule i { color: var(--accent); }
+
+/* Narrator / world event beat: centered third-person card, never confused with persona speech. */
+.msg.narrator { display: block; max-width: var(--measure); margin-inline: auto; width: 100%; }
+.narrator-card {
+  padding: var(--s3) var(--s4); border-left: 3px solid var(--accent);
+  border-radius: var(--r-md); background: color-mix(in srgb, var(--surface) 88%, var(--accent-soft));
+  box-shadow: var(--shadow-1);
+}
+.msg.narrator .msg-head { margin-bottom: var(--s1); }
+.msg.narrator .msg-name { font-size: var(--t-xs); letter-spacing: .08em; text-transform: uppercase; color: var(--accent); font-weight: 600; }
+.msg.narrator .msg-body { font-style: italic; color: var(--narration); background: none; padding: 0; box-shadow: none; max-width: none; }
+.msg.narrator .msg-foot { margin-left: 0; padding-right: 0; }
+:is(:root[data-chat-layout="messages"], .chat-main.is-texting) .msg.narrator { display: block; grid-template-columns: none; }
+:is(:root[data-chat-layout="messages"], .chat-main.is-texting) .msg.narrator > .narrator-card { display: block; align-items: stretch; }
+:is(:root[data-chat-layout="messages"], .chat-main.is-texting) .msg.narrator .msg-body { display: block; max-width: none; }
+:is(:root[data-chat-layout="messages"], .chat-main.is-texting) .msg.narrator .msg-body > p { background: none; padding: 0; color: var(--narration); border-radius: 0; }
+:root[data-chat-read="on"] .narrator-card { background: none; border-left-color: var(--line-strong); box-shadow: none; padding: var(--s1) var(--s3); }
+
+/* Soundscape active button tint in chat topbar. */
+#sound-toggle.is-on { color: var(--accent); }
+
+/* Settings quick-jump pill bar. */
+.settings-jump {
+  position: sticky; top: 60px; z-index: 15; display: flex; gap: var(--s1); overflow-x: auto; scrollbar-width: none;
+  margin: calc(-1 * var(--s2)) calc(-1 * var(--s2)) var(--s5); padding: var(--s2);
+  background: color-mix(in srgb, var(--bg) 90%, transparent); backdrop-filter: blur(8px);
+  border-radius: var(--r-md);
+}
+.settings-jump::-webkit-scrollbar { display: none; }
+.settings-jump .chip { flex: none; cursor: pointer; font-size: var(--t-sm); }
+#set-appearance, #set-content, #set-background, #set-bond, #set-languages, #set-memory, #set-chat, #set-avoid, #set-usage, #set-data {
+  scroll-margin-top: 112px;
+}
+
+/* Composer slash-command autocomplete popup. */
+.slash-menu {
+  display: grid; gap: 2px; margin-bottom: var(--s2); padding: var(--s1);
+  background: var(--raised); border: 1px solid var(--line); border-radius: var(--r-md);
+  box-shadow: var(--shadow-2);
+}
+.slash-menu[hidden] { display: none; }
+.slash-item {
+  display: flex; align-items: baseline; gap: var(--s3); width: 100%; padding: var(--s2) var(--s3);
+  border: 0; border-radius: var(--r-sm); background: none; color: var(--ink); font: inherit; font-size: var(--t-ui);
+  text-align: left; cursor: pointer;
+}
+.slash-item code { font-family: var(--mono); font-size: var(--t-sm); color: var(--accent); font-weight: 600; flex: none; }
+.slash-item span { color: var(--muted); font-size: var(--t-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.slash-item.is-active, .slash-item:hover { background: var(--fill); }
+
+/* Markdown horizontal rule inside messages. */
+.msg-body hr { border: 0; height: 1px; margin: var(--s4) 0; background: linear-gradient(90deg, transparent, var(--line-strong), transparent); }
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-ambience { display: none !important; }
+}
 
 /* ---------- Reply to a message ---------- */
 .reply-bar svg { width: 16px; height: 16px; flex: none; color: var(--muted); }

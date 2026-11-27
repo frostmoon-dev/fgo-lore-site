@@ -2,6 +2,7 @@ import { bots, lore, newBot, newLorebook, getSettings, getLorebooks, saveLoreboo
 import { toCard, cardPng, importCardFile, importCardBytes } from "../card.js";
 import { estimateTokens } from "../prompt.js";
 import { SEASONS, paletteSwatchesHTML, setBotLook, validLook } from "../looks.js";
+import { VISUALS } from "../ambience.js";
 import { draftBot, sortDefinition } from "../ai.js";
 import {
   $, $$, esc, icon, imagePicker, imagePickerHTML, avatarHTML, toast, confirmDialog, openDialog, cropImage,
@@ -57,6 +58,7 @@ export async function render(main, [id]) {
   bot.thoughts ??= false;
   bot.trackerLines ??= [];
   bot.look = validLook(bot.look);
+  bot.ambience = bot.ambience?.visual && VISUALS.some((v) => v.key === bot.ambience.visual) ? { visual: bot.ambience.visual } : null;
   bot.backgrounds ??= [];
   const settings = await getSettings();
   // Series already in use come first; tags follow, since many people put the fandom in the tags.
@@ -214,6 +216,13 @@ export async function render(main, [id]) {
                 ${paletteSwatchesHTML("bot-palette", bot.look?.palette ?? "", { none: "Same as the site" })}
                 <div class="segmented" id="bot-season" hidden>${SEASONS.map((x) => `<label><input type="radio" name="bot-season" value="${x.key}" ${(bot.look?.season ?? "murder") === x.key ? "checked" : ""}><span>${esc(x.label)}</span></label>`).join("")}</div>
               </fieldset>
+              <div class="field">
+                <label for="bot-visual">Default atmosphere</label>
+                <select id="bot-visual">
+                  ${VISUALS.map((v) => `<option value="${v.key}" ${(bot.ambience?.visual ?? "off") === v.key ? "selected" : ""}>${esc(v.label)}</option>`).join("")}
+                </select>
+                <p class="hint">Subtle weather or ambient particles behind this bot's chats (can be changed per chat in Chat look &amp; atmosphere).</p>
+              </div>
               <fieldset class="field">
                 <legend class="field-label">Lorebooks</legend>
                 <p class="hint">Which sets of lore this bot can draw on. <a href="#/lore">Manage lorebooks</a>.</p>
@@ -376,6 +385,8 @@ export async function render(main, [id]) {
     bot.contentMode = val("#content-mode");
     const palette = $('input[name="bot-palette"]:checked', main)?.value ?? "";
     bot.look = validLook(palette ? { palette, season: $('input[name="bot-season"]:checked', main)?.value } : null);
+    const vis = val("#bot-visual");
+    bot.ambience = vis && vis !== "off" ? { visual: vis } : null;
     $$("[data-bg-tags]", main).forEach((el) => { const b = bot.backgrounds[Number(el.dataset.bgTags)]; if (b) b.tags = el.value; });
     bot.realTime = $("#real-time", main).checked;
     bot.thoughts = $("#thoughts", main).checked;

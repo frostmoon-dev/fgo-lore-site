@@ -49,6 +49,18 @@ export async function render(main) {
     <div class="wrap page">
       <h1>Settings</h1>
       <p class="lead">How the site looks and behaves, and your data.</p>
+      <nav class="settings-jump" aria-label="Settings sections">
+        <button type="button" class="chip" data-jump="appearance">Appearance</button>
+        <button type="button" class="chip" data-jump="content">Content</button>
+        <button type="button" class="chip" data-jump="background">Background</button>
+        <button type="button" class="chip" data-jump="bond">Bond</button>
+        <button type="button" class="chip" data-jump="languages">Languages</button>
+        <button type="button" class="chip" data-jump="memory">Memory</button>
+        <button type="button" class="chip" data-jump="chat">Chat</button>
+        <button type="button" class="chip" data-jump="avoid">Avoid</button>
+        <button type="button" class="chip" data-jump="usage">Usage</button>
+        <button type="button" class="chip" data-jump="data">Data</button>
+      </nav>
 
       <div class="card" id="set-appearance">
         <h2 class="card-title">Appearance</h2>
@@ -317,6 +329,18 @@ export async function render(main) {
       </div>
     </div>`;
 
+  // ---------- Quick-jump sections ----------
+  $(".settings-jump", main).addEventListener("click", (e) => {
+    const b = e.target.closest("[data-jump]");
+    if (!b) return;
+    const el = document.getElementById(`set-${b.dataset.jump}`);
+    if (!el) return;
+    el.scrollIntoView({ block: "start", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+    el.classList.remove("flash-card");
+    void el.offsetWidth;
+    el.classList.add("flash-card");
+  });
+
   // ---------- Phrases to avoid ----------
   $("#avoid-on", main).addEventListener("change", (e) => saveSettings({ avoid: { enabled: e.target.checked } }));
   const saveAvoid = debounce(() => {
@@ -345,7 +369,7 @@ export async function render(main) {
     const p = PALETTES.find((x) => x.key === getLook("palette"));
     $("#season-field", main).hidden = p?.key !== "horror";
     $("#season-about", main).textContent = SEASONS.find((x) => x.key === getLook("horrorSeason"))?.about ?? "";
-    $("#palette-about", main).textContent = `${p?.about ?? ""}${p?.fonts ? " It brings its own fonts while the font choices below stay at Rounded and Fraunces, and keeps its corners square." : ""}`;
+    $("#palette-about", main).textContent = `${p?.about ?? ""}${p?.fonts ? ` It brings its own fonts while the font choices below stay at Rounded and Fraunces${p.squareCorners ? ", and keeps its corners square" : ""}.` : ""}`;
   };
   // A home-made accent can vanish into some backgrounds; say so when it does.
   function paintAccent() {

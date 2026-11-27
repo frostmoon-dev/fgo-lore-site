@@ -26,7 +26,7 @@ function setPalette(value) {
   const radio = document.querySelector(`input[name="palette"][value="${value}"]`);
   if (radio) radio.checked = true;
 }
-const GROUP_ORDER = ["This chat", "Go to", "Bots", "Settings", "Help"];
+const GROUP_ORDER = ["This chat", "Go to", "Bots", "Series", "Settings", "Help"];
 
 async function baseCommands() {
   const allBots = await bots.all();

@@ -19,7 +19,10 @@ function inline(s, { quotes }) {
     .replace(/(^|[^*\w])\*(?=[^\s*])([^*]+)$/, "$1<em>$2</em>");
   // Spoken lines, with straight quotes turned into curly ones (many book
   // fonts draw " as a closing quote, so a line would open with ”).
-  if (quotes) s = s.replace(/(&quot;|“)(.+?)(&quot;|”)/g, '<span class="q">“$2”</span>');
+  // Match quotes inside text segments (or containing matched inline tags) without crossing an unmatched tag boundary.
+  if (quotes) {
+    s = s.replace(/(&quot;|“)((?:[^<>]|<(strong|em|del)>[^<>]*<\/\3>)+?)(&quot;|”)/g, '<span class="q">“$2”</span>');
+  }
   return s.replace(/\u0000(\d+)\u0000/g, (_, i) => `<code>${codes[i]}</code>`);
 }
 
@@ -66,13 +69,19 @@ export function renderMarkdown(src, { quotes = false } = {}) {
     }
     if (/^```/.test(line)) { flushPara(); flushList(); fence = []; continue; }
 
+    const hr = /^\s*(?:---+|\*\*\*+|___+)\s*$/.test(line);
     const heading = line.match(/^(#{1,4})\s+(.*)$/);
-    const bullet = line.match(/^\s*[-*+]\s+(.*)$/);
+    // Do not treat "* She steps back.*" (a spaced action closing with *) as a bullet list.
+    const spacedAction = /^\s*\*\s+[^*]+\*\s*$/.test(line);
+    const bullet = spacedAction ? null : line.match(/^\s*[-*+]\s+(.*)$/);
     const numbered = line.match(/^\s*\d+[.)]\s+(.*)$/);
     const quote = line.match(/^&gt;\s?(.*)$/);
 
     if (!line.trim()) { flushPara(); flushList(); }
-    else if (heading) {
+    else if (hr) {
+      flushPara(); flushList();
+      out.push("<hr>");
+    } else if (heading) {
       flushPara(); flushList();
       const level = Math.min(heading[1].length + 1, 4);
       out.push(`<h${level}>${inline(heading[2], { quotes })}</h${level}>`);
@@ -86,7 +95,7 @@ export function renderMarkdown(src, { quotes = false } = {}) {
       out.push(`<blockquote>${inline(quote[1], { quotes })}</blockquote>`);
     } else {
       flushList();
-      para.push(line);
+      para.push(spacedAction ? line.replace(/^(\s*)\*\s+/, "$1*") : line);
     }
   }
   if (fence !== null) out.push(`<pre><code>${fence.join("\n")}</code></pre>`);

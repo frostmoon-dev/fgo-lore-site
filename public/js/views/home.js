@@ -5,7 +5,7 @@ import {
 import { whatsNewCardHTML, showWhatsNew, APP_VERSION } from "../help.js";
 import { importCardFile, importChubLink } from "../card.js";
 import { $, $$, esc, icon, avatarHTML, toast, timeAgo, download, openDialog } from "../ui.js";
-import { currentText } from "../prompt.js";
+import { currentText, stripBond, applyMacros } from "../prompt.js";
 import { previewHTML } from "../markdown.js";
 import { epigraph } from "../looks.js";
 
@@ -92,7 +92,7 @@ export async function render(main) {
                 <a class="avatar-link" href="#/bot/${b.id}" aria-label="Edit ${esc(b.name)}" title="Edit ${esc(b.name)}">${avatarHTML(b.avatar, b.name, 40)}</a>
                 <div class="grow">
                   <div class="title">${esc(b.name)}</div>
-                  <div class="sub">${previewHTML(currentText(c.messages.at(-1)))}</div>
+                  <div class="sub">${previewHTML(applyMacros(stripBond(currentText(c.messages.at(-1))), { char: b.name, user: persona?.name || "You" }))}</div>
                 </div>
                 <span class="sub">${timeAgo(c.updatedAt)}</span>
                 <div class="actions">
