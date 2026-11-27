@@ -75,11 +75,13 @@ export async function render(main) {
             ${paletteSwatchesHTML("palette", getLook("palette"))}
             <p class="hint" id="palette-about"></p>
           </fieldset>
-          <fieldset class="field" id="season-field">
-            <legend class="field-label">Season</legend>
-            ${segmentedHTML("season", SEASONS.map((x) => [x.key, x.label]), getLook("horrorSeason"))}
+          <div class="field" id="season-field">
+            <label for="season">Season</label>
+            <select id="season" aria-describedby="season-about">
+              ${SEASONS.map((x) => `<option value="${x.key}" ${getLook("horrorSeason") === x.key ? "selected" : ""}>${esc(x.label)}</option>`).join("")}
+            </select>
             <p class="hint" id="season-about"></p>
-          </fieldset>
+          </div>
           <div class="field">
             <label for="accent">Accent colour</label>
             <div class="accent-row">
@@ -88,7 +90,7 @@ export async function render(main) {
             </div>
             <p class="hint" id="accent-hint">Links, the current choice and focus rings. Leave it to the colours above, or pick your own.</p>
           </div>
-          <fieldset class="field">
+          <fieldset class="field" id="corners-field">
             <legend class="field-label">Corners</legend>
             ${segmentedHTML("corners", CORNERS, getLook("corners"))}
           </fieldset>
@@ -368,6 +370,7 @@ export async function render(main) {
   const paintAbout = () => {
     const p = PALETTES.find((x) => x.key === getLook("palette"));
     $("#season-field", main).hidden = p?.key !== "horror";
+    $("#corners-field", main).hidden = !!p?.squareCorners;
     $("#season-about", main).textContent = SEASONS.find((x) => x.key === getLook("horrorSeason"))?.about ?? "";
     $("#palette-about", main).textContent = `${p?.about ?? ""}${p?.fonts ? ` It brings its own fonts while the font choices below stay at Rounded and Fraunces${p.squareCorners ? ", and keeps its corners square" : ""}.` : ""}`;
   };
@@ -383,7 +386,7 @@ export async function render(main) {
     $("#accent-hint", main).classList.toggle("error-text", weak);
   }
   $$('input[name="palette"]', main).forEach((r) => r.addEventListener("change", () => { setLook("palette", r.value); paintAbout(); paintAccent(); }));
-  $$('input[name="season"]', main).forEach((r) => r.addEventListener("change", () => { setLook("horrorSeason", r.value); paintAbout(); paintAccent(); }));
+  $("#season", main).addEventListener("change", (e) => { setLook("horrorSeason", e.target.value); paintAbout(); paintAccent(); });
   $("#accent", main).addEventListener("input", (e) => { setLook("accent", e.target.value); paintAccent(); });
   $("#accent-reset", main).addEventListener("click", () => { setLook("accent", ""); paintAccent(); });
   $$('input[name="corners"]', main).forEach((r) => r.addEventListener("change", () => setLook("corners", r.value)));

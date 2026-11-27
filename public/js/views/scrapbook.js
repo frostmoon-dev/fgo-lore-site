@@ -68,7 +68,7 @@ export async function render(main, [id]) {
           <div>
             <h1>${esc(bot.name)}'s scrapbook</h1>
             <p class="lead">${list.length
-              ? `${list.length} chat${list.length === 1 ? "" : "s"} · ${messages.toLocaleString()} messages · together since ${when(first)} (${days} day${days === 1 ? "" : "s"})`
+              ? `${list.length} chat${list.length === 1 ? "" : "s"} · ${messages.toLocaleString()} message${messages === 1 ? "" : "s"} · together since ${when(first)} (${days} day${days === 1 ? "" : "s"})`
               : "Nothing kept yet. Moments you pin or like, journal entries and chapters gather here."}</p>
           </div>
         </div>

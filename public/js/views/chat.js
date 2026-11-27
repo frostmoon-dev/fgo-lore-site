@@ -2951,16 +2951,20 @@ export async function render(main, [botId, chatId, jumpTo]) {
         <p class="hint">${settings.chatBackground ? "Without one, this chat uses the default background from Settings." : "Only chats with this bot use it. The default for every bot is in Settings."}</p>
       </div>
       ${sliderHTML({ id: "look-dim", label: "Dim behind the text", min: 0.4, max: 0.98, step: 0.02, value: settings.backgroundDim ?? 0.86, hint: "Higher hides more of the picture. Applies to every chat." })}
-      <div class="field"><label for="look-visual">Atmosphere</label>
-        <select id="look-visual">
-          ${VISUALS.map((v) => `<option value="${v.key}" ${visualPref() === v.key ? "selected" : ""}>${esc(v.label)}</option>`).join("")}
-        </select>
-        <p class="hint" id="look-visual-hint"></p>
+      <div class="form-row">
+        <div class="field"><label for="look-visual">Atmosphere</label>
+          <select id="look-visual">
+            ${VISUALS.map((v) => `<option value="${v.key}" ${visualPref() === v.key ? "selected" : ""}>${esc(v.label)}</option>`).join("")}
+          </select>
+          <p class="hint" id="look-visual-hint"></p>
+        </div>
+        <div class="field"><label for="look-sound">Soundscape</label>
+          <select id="look-sound">
+            ${SOUNDS.map((s) => `<option value="${s.key}" ${soundPref() === s.key ? "selected" : ""}>${esc(s.label)}</option>`).join("")}
+          </select>
+          <p class="hint">Generated offline; stops when you leave.</p>
+        </div>
       </div>
-      <fieldset class="field"><legend class="field-label">Soundscape</legend>
-        ${seg("look-sound", SOUNDS.map((s) => [s.key, s.label]), soundPref())}
-        <p class="hint">Generated gently in your browser with no downloads. Stops when you leave the chat.</p>
-      </fieldset>
       <div id="look-vol-wrap" ${soundPref() === "off" ? "hidden" : ""}>
         ${sliderHTML({ id: "look-vol", label: "Soundscape volume", min: 0.05, max: 0.8, step: 0.05, value: soundscape.volume })}
       </div>
@@ -2969,7 +2973,12 @@ export async function render(main, [botId, chatId, jumpTo]) {
           <a href="#/bot/${bot.id}" id="look-bot">Change it in the bot's editor</a>.</p></div>`
     : `<fieldset class="field"><legend class="field-label">Colours</legend>
         ${paletteSwatchesHTML("look-palette", getLook("palette"))}
-        <div class="segmented" id="look-season" ${getLook("palette") === "horror" ? "" : "hidden"}>${SEASONS.map((x) => `<label><input type="radio" name="look-season" value="${x.key}" ${getLook("horrorSeason") === x.key ? "checked" : ""}><span>${esc(x.label)}</span></label>`).join("")}</div>
+        <div class="field" id="look-season-field" ${getLook("palette") === "horror" ? "" : "hidden"}>
+          <label for="look-season">Season</label>
+          <select id="look-season">
+            ${SEASONS.map((x) => `<option value="${x.key}" ${getLook("horrorSeason") === x.key ? "selected" : ""}>${esc(x.label)}</option>`).join("")}
+          </select>
+        </div>
         <p class="hint">For the whole site. More in Settings: your own accent, fonts and corners. A bot can have colours of its own, set in its editor.</p>
       </fieldset>`}
       <div class="field"><label for="look-font">Font</label>
@@ -3035,14 +3044,15 @@ export async function render(main, [botId, chatId, jumpTo]) {
       paintAmbience();
       await persist();
     });
-    $$('input[name="look-sound"]', dlg).forEach((r) => r.addEventListener("change", async () => {
-      chat.ambience = { ...(chat.ambience ?? {}), sound: r.value };
+    $("#look-sound", dlg).addEventListener("change", async (e) => {
+      const val = e.target.value;
+      chat.ambience = { ...(chat.ambience ?? {}), sound: val };
       soundMuted = false;
-      soundscape.set(r.value);
-      $("#look-vol-wrap", dlg).hidden = r.value === "off";
+      soundscape.set(val);
+      $("#look-vol-wrap", dlg).hidden = val === "off";
       paintSoundButton();
       await persist();
-    }));
+    });
     wireSlider(dlg, "look-vol", () => {
       const v = Number($("#look-vol", dlg).value);
       if (Number.isFinite(v)) soundscape.setVolume(v);
@@ -3050,10 +3060,10 @@ export async function render(main, [botId, chatId, jumpTo]) {
     $("#look-font", dlg).addEventListener("change", (e) => setLook("chatFont", e.target.value));
     $$('input[name="look-palette"]', dlg).forEach((r) => r.addEventListener("change", () => {
       setLook("palette", r.value);
-      const seasonBox = $("#look-season", dlg);
+      const seasonBox = $("#look-season-field", dlg);
       if (seasonBox) seasonBox.hidden = r.value !== "horror";
     }));
-    $$('input[name="look-season"]', dlg).forEach((r) => r.addEventListener("change", () => setLook("horrorSeason", r.value)));
+    $("#look-season", dlg)?.addEventListener("change", (e) => setLook("horrorSeason", e.target.value));
     $$('input[name="look-actions"]', dlg).forEach((r) => r.addEventListener("change", () => setLocal("chatActions", "chatActions", r.value, "italic")));
     $$('input[name="look-quotes"]', dlg).forEach((r) => r.addEventListener("change", () => setLocal("chatQuotes", "chatQuotes", r.value, "tint")));
     $$('input[name="look-size"]', dlg).forEach((r) => r.addEventListener("change", () => setLocal("chatTextSize", "chatText", r.value, "md")));

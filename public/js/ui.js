@@ -383,7 +383,9 @@ export function openDialog(content, { wide = false, onClose } = {}) {
   if (wide) dlg.className = "wide";
   dlg.append(typeof content === "string" ? html(content) : content);
   document.body.append(dlg);
-  dlg.addEventListener("close", () => { onClose?.(dlg.returnValue); dlg.remove(); });
+  const away = () => { if (dlg.open) dlg.close("cancel"); };
+  window.addEventListener("hashchange", away);
+  dlg.addEventListener("close", () => { window.removeEventListener("hashchange", away); onClose?.(dlg.returnValue); dlg.remove(); });
   dlg.addEventListener("click", (e) => { if (e.target === dlg) dlg.close("cancel"); });
   dlg.showModal();
   return dlg;
