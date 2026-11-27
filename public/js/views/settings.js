@@ -232,6 +232,8 @@ export async function render(main) {
           <span>Recap when I come back to a chat<small>After a break of 12 hours or more, a few lines on where the story stands. One request each time.</small></span></label>
         <label class="check"><input type="checkbox" id="retry-on" ${settings.retry.tries > 0 ? "checked" : ""}>
           <span>Try again when the model is busy<small>Free and shared models often answer "overloaded" or "try again". The reply is asked for up to 3 more times, waiting a little longer each time. Stop cancels it.</small></span></label>
+        <label class="check"><input type="checkbox" id="text-pace" ${settings.textPace?.enabled !== false ? "checked" : ""}>
+          <span>Texts arrive one at a time<small>In Text messages chats, a reply's texts appear one by one with a typing pause, like someone typing. Tap the dots to see the rest at once. No extra cost.</small></span></label>
         <label class="check"><input type="checkbox" id="repetition-on" ${settings.repetition.enabled !== false ? "checked" : ""}>
           <span>Keep replies from repeating themselves<small>Before each reply, the site looks for habits in the bot's last few replies (the same opening, the same phrases, always ending on a question) and asks it to vary them. Free: no extra request. Replies it helped show "kept fresh".</small></span></label>
         <label class="check"><input type="checkbox" id="check-auto" ${settings.check.auto ? "checked" : ""}>
@@ -556,6 +558,7 @@ export async function render(main) {
   $("#confirm-on", main).addEventListener("change", (e) => saveSettings({ confirm: { enabled: e.target.checked } }).then(() => toast("Saved.", "ok")));
   $("#recap-auto", main).addEventListener("change", (e) => saveSettings({ recap: { auto: e.target.checked } }).then(() => toast("Saved.", "ok")));
   $("#retry-on", main).addEventListener("change", (e) => saveSettings({ retry: { tries: e.target.checked ? 3 : 0 } }).then(() => toast("Saved.", "ok")));
+  $("#text-pace", main).addEventListener("change", (e) => saveSettings({ textPace: { enabled: e.target.checked } }).then(() => toast("Saved.", "ok")));
   $("#repetition-on", main).addEventListener("change", (e) => saveSettings({ repetition: { enabled: e.target.checked } }).then(() => toast("Saved.", "ok")));
   $("#check-auto", main).addEventListener("change", (e) => saveSettings({ check: { auto: e.target.checked } }).then(() => toast("Saved.", "ok")));
   $("#bond-enabled", main).addEventListener("change", (e) => saveSettings({ bond: { ...settings.bond, enabled: e.target.checked } }).then(() => toast("Saved.", "ok")));
