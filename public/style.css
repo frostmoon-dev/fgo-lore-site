@@ -667,8 +667,12 @@ h2.sub {
 .card + .card { margin-top: var(--s5); }
 .form-grid > .card + .card { margin-top: 0; }
 .card > .page-head:last-child { margin-bottom: 0; }
-.card-title { font-size: var(--t-lg); margin-bottom: var(--s1); }
-.card > .card-title + .lead, .card > h2 + .lead { margin-bottom: var(--s5); }
+.card-title { font-size: var(--t-lg); margin-bottom: var(--s4); }
+.card > :is(.card-title, h2):has(+ .lead) { margin-bottom: var(--s1); }
+.card > .lead { margin-bottom: var(--s5); }
+.card > .lead:has(+ .hint) { margin-bottom: var(--s1); }
+.card > .lead + .hint { margin-bottom: var(--s5); }
+.card > .check + details.more { margin-top: var(--s4); }
 .card-tight { padding: var(--s4); }
 @media (max-width: 600px) { .card { padding: var(--s4); } }
 
@@ -768,6 +772,8 @@ input[aria-invalid="true"] { border-color: var(--danger); }
 input[type="range"] { width: 100%; height: 32px; padding: 0; border: 0; background: none; accent-color: var(--ink); }
 input[type="checkbox"], input[type="radio"] { width: 18px; height: 18px; accent-color: var(--ink); }
 .check { display: flex; gap: var(--s3); align-items: flex-start; justify-content: flex-start; padding: var(--s2) 0; cursor: pointer; font-weight: 400; }
+.form-grid > .check, .card > .lead + .check { padding-top: 0; }
+.form-grid > .check { padding-bottom: 0; }
 .check input { margin-top: 3px; flex: none; }
 .check small { display: block; color: var(--muted); }
 .input-group { display: flex; gap: var(--s2); }

@@ -193,6 +193,7 @@ export async function render(main) {
 
       <div class="card" id="set-bond">
         <h2 class="card-title">Bond</h2>
+        <p class="lead">How a character's feelings toward you grow or cool over a chat.</p>
         <div class="form-grid">
           <label class="check"><input type="checkbox" id="bond-enabled" ${settings.bond.enabled ? "checked" : ""}>
             <span>Track a bond in chats<small>The bot rates each exchange, the meter in the chat header moves, and the bot is told where it stands. Turn it off per bot in the bot's Scene settings.</small></span></label>
@@ -236,6 +237,7 @@ export async function render(main) {
 
       <div class="card" id="set-chat">
         <h2 class="card-title">Chat</h2>
+        <p class="lead">How messages send, and what happens around each reply.</p>
         <label class="check"><input type="checkbox" id="enter" ${settings.enterToSend ? "checked" : ""}>
           <span>Enter sends the message<small>Off: Enter adds a new line and Ctrl+Enter sends. Handy on phones.</small></span></label>
         <label class="check"><input type="checkbox" id="journal-on" ${settings.journal.auto ? "checked" : ""}>
@@ -278,8 +280,8 @@ export async function render(main) {
         </div>
       </div>
 
-      <h2 class="sub" id="usage-title">Usage</h2>
-      <div class="card" id="set-usage" aria-labelledby="usage-title">
+      <div class="card" id="set-usage">
+        <h2 class="card-title" id="usage-title">Usage</h2>
         <p class="lead">Tokens sent to and received from your API by this browser: replies and every extra task, like memory and ideas.</p>
         <div class="form-grid">
           <div id="usage-body"></div>
@@ -299,8 +301,8 @@ export async function render(main) {
         </div>
       </div>
 
-      <h2 class="sub">Help</h2>
       <div class="card" id="set-help">
+        <h2 class="card-title">Help</h2>
         <p class="lead">Press <kbd>Ctrl K</kbd> anywhere, or the search button at the top, to find any page, bot, setting or chat action.</p>
         <div class="actions">
           <button class="btn" type="button" id="show-tour">Show the welcome tour</button>
@@ -308,19 +310,21 @@ export async function render(main) {
         </div>
       </div>
 
-      <h2 class="sub">Your data</h2>
       <div class="card" id="set-data">
+        <h2 class="card-title">Your data</h2>
         <p class="lead" id="usage">Everything lives in this browser's storage.</p>
         <p class="hint" id="last-backup"></p>
         <div class="form-grid">
           <label class="check"><input type="checkbox" id="with-keys">
             <span>Include API keys in the backup<small>Only if you will keep the file private.</small></span></label>
-          <div class="actions">
-            <button class="btn btn-primary" type="button" id="backup">Download backup</button>
-            <button class="btn" type="button" id="restore">Restore from backup</button>
-            <button class="btn" type="button" id="persist" hidden>Protect from automatic cleanup</button>
+          <div class="field">
+            <div class="actions">
+              <button class="btn btn-primary" type="button" id="backup">Download backup</button>
+              <button class="btn" type="button" id="restore">Restore from backup</button>
+              <button class="btn" type="button" id="persist" hidden>Protect from automatic cleanup</button>
+            </div>
+            <p class="hint">Restoring adds to what is here and replaces items with the same ID. Browsers can clear site data when space runs low, so keep a backup.</p>
           </div>
-          <p class="hint">Restoring adds to what is here and replaces items with the same ID. Browsers can clear site data when space runs low, so keep a backup.</p>
         </div>
       </div>
 
@@ -501,7 +505,7 @@ export async function render(main) {
     body.innerHTML = `
       <div class="form-grid">
         <div class="usage-tiles">${tile("Today", today)}${tile("Last 7 days", week)}${tile("Last 30 days", month)}</div>
-        <div><h3 class="field-label">Tokens per day, last 14 days</h3>${usageChartHTML(days)}</div>
+        <div class="field"><h3 class="field-label">Tokens per day, last 14 days</h3>${usageChartHTML(days)}</div>
         <details class="more">
           <summary>By model, last 30 days</summary>
           <table class="usage-table">
@@ -597,8 +601,6 @@ export async function render(main) {
     download(`moonpaper-backup-${new Date().toISOString().slice(0, 10)}.json`, data);
     await markBackedUp();
     paintLastBackup();
-  $("#show-tour", main).addEventListener("click", async () => (await import("../help.js")).showTour());
-  $("#show-news", main).addEventListener("click", async () => (await import("../help.js")).showWhatsNew());
   });
   $("#restore", main).addEventListener("click", async () => {
     const file = await pickFile(".json,application/json");
