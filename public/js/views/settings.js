@@ -85,7 +85,7 @@ export async function render(main) {
           <div class="field">
             <label for="accent">Accent colour</label>
             <div class="accent-row">
-              <input type="color" id="accent" value="${isHex(getLook("accent")) ? getLook("accent") : "#a8234b"}" aria-describedby="accent-hint">
+              <input type="color" id="accent" value="${isHex(getLook("accent")) ? getLook("accent") : "#74383b"}" aria-describedby="accent-hint">
               <button class="btn btn-sm" type="button" id="accent-reset">Use the colours' own</button>
             </div>
             <p class="hint" id="accent-hint">Links, the current choice and focus rings. Leave it to the colours above, or pick your own.</p>

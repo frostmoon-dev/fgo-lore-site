@@ -6,8 +6,8 @@ try {
   root.dataset.theme = dark ? "dark" : "light";
   const text = localStorage.getItem("textSize");
   const chatText = localStorage.getItem("chatTextSize");
-  // Moon Cell is the default; Paper is saved only when chosen.
-  const palette = localStorage.getItem("palette") ?? "moon";
+  // Paper (muslin, sand, sage, deep maroon) is the default (:root).
+  const palette = localStorage.getItem("palette") ?? "paper";
   if (palette !== "paper") root.dataset.palette = palette;
   if (text) root.dataset.text = text;
   if (chatText) root.dataset.chatText = chatText;
@@ -41,5 +41,4 @@ try {
   }
 } catch {
   root.dataset.theme = "light";
-  root.dataset.palette = "moon";
 }
