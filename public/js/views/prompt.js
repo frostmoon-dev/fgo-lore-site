@@ -102,8 +102,8 @@ export async function render(main) {
         </div>
       </div>
 
-      <h2 class="sub">Generation</h2>
       <div class="card">
+        <h2 class="card-title">Generation</h2>
         <p class="lead">Defaults for every bot. A bot can override temperature and length in its own settings.</p>
         <div class="form-grid">
           <div class="form-row">${GEN.map((g) => sliderHTML({ id: `gen-${g.k}`, label: g.label, min: g.min, max: g.max, step: g.step, value: settings.gen[g.k] ?? "", allowBlank: !!g.optional, hint: g.hint })).join("")}</div>
@@ -111,8 +111,8 @@ export async function render(main) {
         </div>
       </div>
 
-      <h2 class="sub">Lore</h2>
       <div class="card">
+        <h2 class="card-title">Lore</h2>
         <p class="lead">Lore entries are added when their keywords appear in recent messages. <a href="#/lore">Manage lore</a>.</p>
         <div class="form-row">
           ${sliderHTML({ id: "lore-scan", label: "Messages to scan", min: 1, max: 20, step: 1, value: settings.lore.scanDepth, hint: "How many recent messages are checked for keywords." })}
