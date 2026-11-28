@@ -38,8 +38,8 @@ export const HEAD_FONTS = [
 
 // swatch: background, primary and accent, light theme then dark.
 export const PALETTES = [
+  { key: "paper", label: "Paper", about: "Muslin, sand, sage and deep maroon.", swatch: ["#f6f5ef", "#452829", "#aaac9b"], dark: ["#141111", "#d6cab6", "#d6989a"] },
   { key: "moon", label: "Moon Cell", about: "Violet and rose, after BB.", swatch: ["#f1edf5", "#2b1e3f", "#a8234b"], dark: ["#131019", "#efeaf6", "#f07ea2"] },
-  { key: "paper", label: "Paper", about: "Warm cream and clay.", swatch: ["#f3efe8", "#1c1a17", "#ad4318"], dark: ["#161412", "#f2ede5", "#ef8a5a"] },
   { key: "avalon", label: "Avalon", about: "Moss green and old gold.", swatch: ["#eef1ea", "#1f3a2b", "#7a5000"], dark: ["#101511", "#e9efe6", "#e0b45a"] },
   { key: "chaldea", label: "Chaldea", about: "Slate and holographic blue.", swatch: ["#edf0f4", "#172a45", "#1d5fa8"], dark: ["#0f131a", "#e8edf4", "#6fb0f0"] },
   { key: "sakura", label: "Sakura", about: "Blush and plum.", swatch: ["#f7eff1", "#4a1f35", "#b0306a"], dark: ["#170f13", "#f6e9ee", "#f39abf"] },
@@ -105,7 +105,7 @@ export function epigraph() {
 
 export const CORNERS = [["sharp", "Sharp"], ["soft", "Soft"], ["round", "Round"]];
 
-const DEFAULTS = { palette: "moon", chatFont: "rounded", siteFont: "rounded", headFont: "fraunces", corners: "soft", accent: "", horrorSeason: "murder" };
+const DEFAULTS = { palette: "paper", chatFont: "rounded", siteFont: "rounded", headFont: "fraunces", corners: "soft", accent: "", horrorSeason: "murder" };
 const VARS = ["--font", "--chat-font", "--font-display", "--accent", "--accent-hover", "--accent-soft", "--on-accent"];
 
 export function getLook(key) {

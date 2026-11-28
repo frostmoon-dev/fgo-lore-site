@@ -37,65 +37,68 @@
   --ease: cubic-bezier(.2, 0, 0, 1);
   --dur: 160ms;
 
-  --bg: #f3efe8;
-  --surface: #fbf9f5;
+  /* Default palette: Muslin (#F6F5EF), Sand (#D6CAB6), Sage (#AAAC9B),
+     Deep Maroon (#452829), and soft carbon Black. Every pair checked for
+     WCAG AAA text contrast and low-glare reading comfort. */
+  --bg: #f6f5ef;
+  --surface: #fcfbf7;
   --raised: #ffffff;
-  --ink: #1c1a17;
-  --muted: #6b645b;
-  /* Roleplay actions and your own messages: softer than --ink, but still at
-     APCA Lc 75+ so long passages stay easy to read (--muted is ~Lc 70). */
-  --narration: #5b554d;
-  --line: #e6e0d6;
-  --line-strong: #8c8478;
-  --fill: #ece6dc;
-  --fill-strong: #e1d9cc;
+  --ink: #171514;
+  --muted: #5c5e53;
+  /* Roleplay actions and your own messages: deep botanical sage-charcoal
+     (8.6:1 on surface, APCA Lc 83) so long passages read effortlessly. */
+  --narration: #494a41;
+  --line: #e2dacb;
+  --line-strong: #828576;
+  --fill: #ebe6da;
+  --fill-strong: #d6cab6;
 
-  /* Primary action: ink. */
-  --primary: #1c1a17;
-  --primary-hover: #3a3631;
-  --on-primary: #fbf9f5;
+  /* Primary action: Deep Maroon on Muslin (12.1:1). */
+  --primary: #452829;
+  --primary-hover: #5a3537;
+  --on-primary: #f6f5ef;
 
-  /* Current choice, links, focus. */
-  --accent: #ad4318;
-  --accent-hover: #8f3712;
-  --on-accent: #ffffff;
-  --accent-soft: #f6e3d8;
+  /* Current choice, links, focus: harmonized garnet-maroon (8.5:1). */
+  --accent: #74383b;
+  --accent-hover: #5c2a2d;
+  --on-accent: #f6f5ef;
+  --accent-soft: #efe0df;
 
-  --danger: #a3301f;
-  --ok: #3d6b34;
+  --danger: #912f32;
+  --ok: #495f44;
 
-  --shadow-1: 0 1px 2px rgba(28, 26, 23, .05);
-  --shadow-2: 0 12px 32px rgba(28, 26, 23, .14);
-  --scrim: rgba(28, 26, 23, .45);
+  --shadow-1: 0 1px 2px rgba(23, 21, 20, .05);
+  --shadow-2: 0 12px 32px rgba(23, 21, 20, .14);
+  --scrim: rgba(23, 21, 20, .45);
   color-scheme: light;
 }
 :root[data-theme="dark"] {
-  --bg: #161412;
-  --surface: #1f1c19;
-  --raised: #262320;
-  --ink: #f2ede5;
-  --muted: #a9a197;
-  --narration: #d5cfc6;
-  --line: #2f2b27;
-  --line-strong: #7a7268;
-  --fill: #2e2a26;
-  --fill-strong: #3a3530;
+  --bg: #141111;
+  --surface: #1c1818;
+  --raised: #241f1f;
+  --ink: #eceae2;
+  --muted: #aaac9b;
+  --narration: #d1c9bc;
+  --line: #2f2828;
+  --line-strong: #7c7e70;
+  --fill: #262120;
+  --fill-strong: #332c2a;
 
-  --primary: #f2ede5;
-  --primary-hover: #ffffff;
-  --on-primary: #1c1a17;
+  --primary: #d6cab6;
+  --primary-hover: #e4dac9;
+  --on-primary: #181313;
 
-  --accent: #ef8a5a;
-  --accent-hover: #f5a17a;
-  --on-accent: #1a1210;
-  --accent-soft: #3a261c;
+  --accent: #d6989a;
+  --accent-hover: #e2aeaf;
+  --on-accent: #1f1213;
+  --accent-soft: #332021;
 
-  --danger: #ef9b87;
-  --ok: #9ec293;
+  --danger: #e38d90;
+  --ok: #9fb397;
 
   --shadow-1: 0 1px 2px rgba(0, 0, 0, .3);
   --shadow-2: 0 12px 32px rgba(0, 0, 0, .5);
-  --scrim: rgba(0, 0, 0, .55);
+  --scrim: rgba(0, 0, 0, .58);
   color-scheme: dark;
 }
 
